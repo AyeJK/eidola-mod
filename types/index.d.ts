@@ -19,6 +19,8 @@ declare module 'claude-code' {
       view: VesselView
       /** The awake Engram's id, or null while asleep. Mirrors $.store. */
       engram: string | null
+      /** True while the pane shows the media test (`/eidola media`). */
+      media: boolean
     }
   }
 }

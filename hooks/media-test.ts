@@ -1,0 +1,47 @@
+// Media test: can a native surface play anything richer than a CSS sprite?
+// Each case wraps a tiny clip (a coloured square that slides, frames
+// numbered 1-8) in an SVG, since Svg is the only picture desktop, VS Code
+// and mobile draw. The base64 strings are generated; regenerate rather than
+// hand-edit.
+
+export const TEST_GIF_BASE64 =
+  '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'
+
+export const TEST_WEBM_BASE64 =
+  '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'
+
+const SIZE = 96
+
+/** An animated GIF inside an SVG <image>. */
+export function gifInSvg(): string {
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ` +
+    `viewBox="0 0 32 32" width="${SIZE}" height="${SIZE}">` +
+    `<image width="32" height="32" style="image-rendering:pixelated" ` +
+    `href="data:image/gif;base64,${TEST_GIF_BASE64}" ` +
+    `xlink:href="data:image/gif;base64,${TEST_GIF_BASE64}"/></svg>`
+  )
+}
+
+/** A looping, muted WebM inside an SVG <foreignObject> <video>. */
+export function webmInSvg(): string {
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="${SIZE}" height="${SIZE}">` +
+    `<foreignObject x="0" y="0" width="32" height="32">` +
+    `<video xmlns="http://www.w3.org/1999/xhtml" autoplay="" muted="" loop="" playsinline="" ` +
+    `width="32" height="32" style="image-rendering:pixelated" ` +
+    `src="data:video/webm;base64,${TEST_WEBM_BASE64}"></video>` +
+    `</foreignObject></svg>`
+  )
+}
+
+export type MediaCase = { key: string; label: string; source: string; isInteractive: boolean }
+
+/** A and B differ only in how the surface draws the Svg; C tries real video. */
+export function mediaCases(): MediaCase[] {
+  return [
+    { key: 'gif-frame', label: 'A · GIF in SVG, sandboxed frame', source: gifInSvg(), isInteractive: true },
+    { key: 'gif-image', label: 'B · GIF in SVG, plain image', source: gifInSvg(), isInteractive: false },
+    { key: 'webm-frame', label: 'C · WebM in SVG, sandboxed frame', source: webmInSvg(), isInteractive: true },
+  ]
+}

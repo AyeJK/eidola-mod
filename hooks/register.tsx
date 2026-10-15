@@ -4,6 +4,8 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { VesselState, VesselView } from '../types'
 import { DEFAULT_ENGRAM, ENGRAMS, RESTING, soulSection } from './engrams'
 import type { Engram } from './engrams'
+import { mediaCases } from './media-test'
+import { NET_PROBES, probeLine } from './net-probe'
 import { EMPTY, step } from './resolver'
 import type { Model, Signal, TurnEndReason } from './resolver'
 import { FACES, vesselSvg } from './sprite'
@@ -16,6 +18,7 @@ const viewAtom = atom({ plugin: 'eidola', key: 'view' } as const, {
   detail: '',
 } as VesselView)
 const engramAtom = atom({ plugin: 'eidola', key: 'engram' } as const, DEFAULT_ENGRAM as string | null)
+const mediaAtom = atom({ plugin: 'eidola', key: 'media' } as const, false)
 
 const LABELS: Record<VesselState, string> = {
   idle: 'Idle',
@@ -83,6 +86,24 @@ async function setEngram($: EngineInterface, id: string | null): Promise<void> {
   $.ui.status(engram ? `${engram.engram.name} · awake` : undefined)
 }
 
+// The band is the fallback for when no pane is up, so it steps aside while
+// the pane is placed. Every open and close redraws it to keep that true.
+async function isPanePlaced($: EngineInterface): Promise<boolean> {
+  try {
+    const panes = await $.ui.panes()
+    return panes.some(one => one.id === PANE && one.isPlaced)
+  } catch {
+    // Can't tell: show the band rather than risk showing no Vessel at all.
+    return false
+  }
+}
+
+async function openPane($: EngineInterface) {
+  const opened = await $.ui.open({ id: PANE, title: 'Eidola' })
+  $.ui.invalidate('ui.render')
+  return opened
+}
+
 function listText(active: string | null): string {
   return Object.values(ENGRAMS)
     .map(one => {
@@ -109,7 +130,7 @@ export const register: Register = on => {
     const id = stored === undefined ? DEFAULT_ENGRAM : typeof stored === 'string' && ENGRAMS[stored] ? stored : null
     await update($, engramAtom, () => id)
 
-    void $.ui.open({ id: PANE, title: 'Eidola' })
+    void openPane($).catch(() => undefined)
     await signal($, { kind: 'session' })
 
     return next(e)
@@ -117,7 +138,7 @@ export const register: Register = on => {
 
   on('session.attach', async ($, e, next) => {
     const result = await next(e)
-    void $.ui.open({ id: PANE, title: 'Eidola' })
+    void openPane($).catch(() => undefined)
     return result
   })
 
@@ -196,19 +217,54 @@ export const register: Register = on => {
 
   // ── Commands ───────────────────────────────────────────────────────────
 
-  on('command.run', { command: 'eidola' }, async $ => {
+  // /eidola        diagnostics: surfaces, pane, band, network reach
+  // /eidola media  toggles the media test in the pane
+  on('command.run', { command: 'eidola' }, async ($, e) => {
+    const arg = e.args.trim().toLowerCase()
+
+    if (arg === 'media') {
+      const isOn = !(await read($, mediaAtom))
+      await update($, mediaAtom, () => isOn)
+      const opened = await openPane($)
+      if (!isOn) {
+        return { text: 'Media test off.' }
+      }
+      const where = opened.isPlaced ? 'It is in the Eidola pane.' : `But the pane is not placed (${opened.reason}), so nothing draws.`
+      return {
+        text:
+          `Media test on. ${where}\n` +
+          'Three clips, each a square sliding across with frames numbered 1-8:\n' +
+          '  A · GIF in SVG, sandboxed frame\n' +
+          '  B · GIF in SVG, plain image\n' +
+          '  C · WebM in SVG, sandboxed frame\n' +
+          'Report which ones move. Run /eidola media again to turn it off.',
+      }
+    }
+
     const surfaces = await $.session.surfaces()
-    const opened = await $.ui.open({ id: PANE, title: 'Eidola' })
+    const opened = await openPane($)
     const panes = await $.ui.panes()
     const mine = panes.find(one => one.id === PANE)
+    const probes = await Promise.all(NET_PROBES.map(probe => probeLine($, probe)))
     const lines = [
       `Surfaces: ${surfaces.length ? surfaces.join(', ') : 'none attached'}`,
       opened.isPlaced ? 'Pane: placed.' : `Pane: not placed (${opened.reason})`,
       mine ? `Pane state: shown=${mine.isShown} placed=${mine.isPlaced}` : 'Pane state: not in the pane list',
-      'The Vessel also shows in the band above the prompt.',
+      opened.isPlaced ? 'Band: hidden while the pane is placed.' : 'Band: showing, as the fallback.',
+      'Network, from where this session runs:',
+      ...probes.map(line => `  ${line}`),
     ]
     return { text: lines.join('\n') }
   })
+
+  // The person closing the pane brings the band back.
+  on('ui.close', async ($, e, next) => {
+    const result = await next(e)
+    if (e.id === PANE) {
+      $.ui.invalidate('ui.render')
+    }
+    return result
+  }).catch(($, e, next) => next(e))
 
   on('command.run', { command: 'awaken' }, async ($, e) => {
     const id = e.args.trim().toLowerCase() || DEFAULT_ENGRAM
@@ -217,7 +273,7 @@ export const register: Register = on => {
       return { text: `No Engram called "${id}". Bundled Engrams:\n${listText(await read($, engramAtom))}` }
     }
     await setEngram($, id)
-    void $.ui.open({ id: PANE, title: 'Eidola' })
+    void openPane($).catch(() => undefined)
     return { text: `${engram.engram.name} is awake. Their Soul applies from your next message.` }
   })
 
@@ -270,6 +326,24 @@ export const register: Register = on => {
       svgCache.set(cacheKey, svg)
     }
 
+    if (await read($, mediaAtom)) {
+      return (
+        <Box flexDirection="column" alignItems="center" gap={1}>
+          <Text bold>Media test</Text>
+          <Text dimColor>Which ones move? Frames are numbered 1-8.</Text>
+          {mediaCases().map(one => (
+            <Box key={`media:${one.key}`} flexDirection="column" alignItems="center">
+              <Text>{one.label}</Text>
+              <Svg key={one.key} source={one.source} alt={one.label} width={96} isInteractive={one.isInteractive} />
+            </Box>
+          ))}
+          <Text dimColor>Control: the sprite below uses CSS animation, which is known to work.</Text>
+          <Svg key={`control:${cacheKey}`} source={svg} alt={`${engram.engram.name}: ${LABELS[state]}`} width={64} isInteractive />
+          <Button key="media-off" label="End media test" onPress={() => update($, mediaAtom, () => false)} />
+        </Box>
+      )
+    }
+
     return (
       <Box flexDirection="column" alignItems="center" gap={1}>
         <Text bold>{engram.engram.name}</Text>
@@ -290,10 +364,10 @@ export const register: Register = on => {
     )
   })
 
-  // ── The band above the prompt (fallback where no pane is placed) ──────
+  // ── The band above the prompt: shown only while no pane is placed ────
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey) {
+    if (e.props.hasSurvey || (await isPanePlaced($))) {
       return next(e)
     }
     const awake = engramOf(await read($, engramAtom))

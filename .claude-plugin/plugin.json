@@ -1,9 +1,30 @@
 {
   "name": "eidola",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A pixel Vessel that reacts to what Claude is doing, plus an Engram Soul injected into every session.",
   "types": "./types/index.d.ts",
   "author": {
     "name": "Jeremy Kaye"
+  },
+  "userConfig": {
+    "placement": {
+      "type": "string",
+      "title": "Where the Vessel appears",
+      "description": "default follows the awake Engram's suggestion (both if it has none). both: pane and band. pane: pane only. band: band only, and the pane opens only when you ask. auto: band only while no pane is placed.",
+      "options": [
+        "default",
+        "both",
+        "pane",
+        "band",
+        "auto"
+      ],
+      "default": "default"
+    },
+    "statusLine": {
+      "type": "boolean",
+      "title": "Show the Vessel's state in the status line",
+      "description": "The Engram's name and state, such as \"Wisp \u00b7 idle\", under the prompt.",
+      "default": true
+    }
   }
 }

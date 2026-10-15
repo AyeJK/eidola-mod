@@ -80,7 +80,7 @@ describe('network probes', () => {
 
     const out = await $.command.run({ command: 'eidola', args: '', ...TYPED })
     expect(out.text).toContain('Surfaces: desktop')
-    expect(out.text).toContain('Band: hidden while the pane is placed.')
+    expect(out.text).toContain('Placement: both (setting: default). Band: showing.')
     expect(out.text).toContain('eidola.app (hosted relay): reached, HTTP 200')
     expect(out.text).toContain('example.com (control): failed (')
     expect(out.text).toContain('Shrine on this host (127.0.0.1:9743): failed (')

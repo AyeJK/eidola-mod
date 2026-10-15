@@ -35,16 +35,31 @@ describe('pane', () => {
 
 describe('band', () => {
   for (const surface of SURFACES) {
-    test(`draws the Vessel line on ${surface} when no pane is placed`, async ($, on) => {
+    test(`draws the Vessel line on ${surface} under the default placement, pane or not`, async ($, on) => {
+      on('ui.panes', () => ({ value: PLACED }))
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect(await ui.find({ type: 'Text', text: /^Wisp · / })).toBeDefined()
+      await ui.unmount()
+    })
+
+    test(`under auto, draws on ${surface} when no pane is placed`, { options: { placement: 'auto' } }, async ($, on) => {
       on('ui.panes', () => ({ value: UNPLACED }))
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await ui.find({ type: 'Text', text: /^Wisp · / })).toBeDefined()
       await ui.unmount()
     })
 
-    test(`steps aside on ${surface} while the pane is placed`, async ($, on) => {
+    test(`under auto, steps aside on ${surface} while the pane is placed`, { options: { placement: 'auto' } }, async ($, on) => {
       on('ui.panes', () => ({ value: PLACED }))
       // Beneath the plugin, the engine's own band: empty here.
+      on('ui.render', { component: 'AbovePrompt' }, ($2, e) => $2.ui.resolve(e).Box({}))
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect(await ui.find({ type: 'Text', text: /^Wisp · / })).toBeUndefined()
+      await ui.unmount()
+    })
+
+    test(`under pane, never draws on ${surface}`, { options: { placement: 'pane' } }, async ($, on) => {
+      on('ui.panes', () => ({ value: UNPLACED }))
       on('ui.render', { component: 'AbovePrompt' }, ($2, e) => $2.ui.resolve(e).Box({}))
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await ui.find({ type: 'Text', text: /^Wisp · / })).toBeUndefined()

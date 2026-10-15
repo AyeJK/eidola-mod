@@ -3,13 +3,23 @@
 A pixel Vessel in a pane that reacts to what Claude is doing, plus the awake Engram's Soul in the system prompt.
 
 - States: idle, thinking, working, attention, success, responding, error, waiting (asleep when no Engram is awake)
-- Commands: `/eidola` (open the pane and print diagnostics), `/eidola media` (toggle the media test), `/awaken <engram>`, `/sleep`, `/engrams`
-- The band above the prompt is a fallback: it shows only while the pane isn't placed
+- Commands: `/eidola` (open the pane and print diagnostics), `/eidola place [setting]` (show or set where the Vessel appears), `/eidola media` (toggle the media test), `/awaken <engram>`, `/sleep`, `/engrams`
+
+## Options
+
+Both are in `/config` once the mod is installed.
+
+| Option | Default | What it does |
+|---|---|---|
+| `placement` | `default` | Where the Vessel appears. `default` follows the awake Engram's suggestion (`both` if it has none). `both`: pane and band. `pane`: pane only. `band`: band only, and the pane opens only when you run `/eidola`. `auto`: band only while no pane is placed. |
+| `statusLine` | on | The Engram's name and state, such as "Wisp · idle", in the status line. |
+
+An Engram suggests a placement in its Vessel (`placement`); your option always wins, and nothing an Engram sets stops you opening the pane.
 - Bundled Engrams: `wisp` (default, adds no voice of its own), `ember` (a demo Soul that changes the voice)
 
 ## Diagnostics
 
-`/eidola` prints the attached surfaces, whether the pane is placed, whether the band is showing, and three network probes run from wherever the session runs: `eidola.app` (a future hosted relay), `example.com` (control) and a Shrine on `127.0.0.1:9743`. In a cloud session that host is the cloud machine, not your computer.
+`/eidola` prints the attached surfaces, whether the pane is placed, whether the band is showing, and network probes run from wherever the session runs: `eidola.app` (a future hosted relay), `example.com` (control), `api.github.com` and a Shrine on `127.0.0.1:9743`. In a cloud session that host is the cloud machine, not your computer.
 
 `/eidola media` swaps the pane to three tiny clips (a GIF in an SVG drawn in a sandboxed frame, the same GIF drawn as a plain image, and a WebM in an SVG `foreignObject`) to see which ones animate on each surface. Run it again to go back.
 

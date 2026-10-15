@@ -6,6 +6,17 @@ import { DEFAULT_ENGRAM, ENGRAMS, RESTING, soulSection } from './engrams'
 import type { Engram } from './engrams'
 import { mediaCases } from './media-test'
 import { NET_PROBES, probeLine } from './net-probe'
+import {
+  PLACEMENT_HELP,
+  PLACEMENT_SETTINGS,
+  bandShows,
+  effectivePlacement,
+  isPlacementSetting,
+  opensPane,
+  readPlacement,
+  readStatusLine,
+} from './placement'
+import type { Placement, PlacementSetting } from './placement'
 import { EMPTY, step } from './resolver'
 import type { Model, Signal, TurnEndReason } from './resolver'
 import { FACES, vesselSvg } from './sprite'
@@ -41,8 +52,23 @@ let generation = 0
 let pending: Timer | undefined
 const svgCache = new Map<string, string>()
 
+// The person's options. A change in /config reloads the module, so these
+// are set once per load in register().
+let placementSetting: PlacementSetting = 'default'
+let isStatusLineOn = true
+
 function engramOf(id: string | null): Engram | undefined {
   return id === null ? undefined : ENGRAMS[id]
+}
+
+function setStatus($: EngineInterface, text: string | undefined): void {
+  $.ui.status(isStatusLineOn ? text : undefined)
+}
+
+/** Where the Vessel appears now: the person's option, else the Engram's suggestion. */
+async function currentPlacement($: EngineInterface): Promise<Placement> {
+  const engram = engramOf(await read($, engramAtom)) ?? RESTING
+  return effectivePlacement(placementSetting, engram.vessel.placement)
 }
 
 async function show($: EngineInterface, view: VesselView): Promise<void> {
@@ -52,7 +78,7 @@ async function show($: EngineInterface, view: VesselView): Promise<void> {
   }
   await update($, viewAtom, () => view)
   const engram = engramOf(await read($, engramAtom))
-  $.ui.status(engram ? `${engram.engram.name} · ${LABELS[view.state].toLowerCase()}` : undefined)
+  setStatus($, engram ? `${engram.engram.name} · ${LABELS[view.state].toLowerCase()}` : undefined)
 }
 
 // Every hook goes through here, and nothing here may break a tool call or
@@ -83,11 +109,13 @@ async function setEngram($: EngineInterface, id: string | null): Promise<void> {
   await $.store.set(STORE_KEY, id)
   await update($, engramAtom, () => id)
   const engram = engramOf(id)
-  $.ui.status(engram ? `${engram.engram.name} · awake` : undefined)
+  setStatus($, engram ? `${engram.engram.name} · awake` : undefined)
+  // A different Engram may suggest a different placement.
+  $.ui.invalidate('ui.render')
 }
 
-// The band is the fallback for when no pane is up, so it steps aside while
-// the pane is placed. Every open and close redraws it to keep that true.
+// Under the `auto` placement the band steps aside while the pane is placed.
+// Every open and close redraws it to keep that true.
 async function isPanePlaced($: EngineInterface): Promise<boolean> {
   try {
     const panes = await $.ui.panes()
@@ -113,7 +141,16 @@ function listText(active: string | null): string {
     .join('\n')
 }
 
-export const register: Register = on => {
+async function placeText($: EngineInterface): Promise<string> {
+  const now = await currentPlacement($)
+  const options = PLACEMENT_SETTINGS.map(one => `  ${one}: ${PLACEMENT_HELP[one]}`).join('\n')
+  return `Placement: ${now} (setting: ${placementSetting}).\nChange it with /eidola place <setting>:\n${options}`
+}
+
+export const register: Register = (on, options) => {
+  placementSetting = readPlacement(options)
+  isStatusLineOn = readStatusLine(options)
+
   // ── Session ────────────────────────────────────────────────────────────
 
   on('session.start', async ($, e, next) => {
@@ -130,7 +167,12 @@ export const register: Register = on => {
     const id = stored === undefined ? DEFAULT_ENGRAM : typeof stored === 'string' && ENGRAMS[stored] ? stored : null
     await update($, engramAtom, () => id)
 
-    void openPane($).catch(() => undefined)
+    if (!isStatusLineOn) {
+      $.ui.status(undefined)
+    }
+    if (opensPane(await currentPlacement($))) {
+      void openPane($).catch(() => undefined)
+    }
     await signal($, { kind: 'session' })
 
     return next(e)
@@ -138,7 +180,9 @@ export const register: Register = on => {
 
   on('session.attach', async ($, e, next) => {
     const result = await next(e)
-    void openPane($).catch(() => undefined)
+    if (opensPane(await currentPlacement($))) {
+      void openPane($).catch(() => undefined)
+    }
     return result
   })
 
@@ -219,10 +263,26 @@ export const register: Register = on => {
 
   // /eidola        diagnostics: surfaces, pane, band, network reach
   // /eidola media  toggles the media test in the pane
+  // /eidola place  shows or sets where the Vessel appears
   on('command.run', { command: 'eidola' }, async ($, e) => {
-    const arg = e.args.trim().toLowerCase()
+    const [sub = '', value = ''] = e.args.trim().toLowerCase().split(/\s+/)
 
-    if (arg === 'media') {
+    if (sub === 'place') {
+      if (!value) {
+        return { text: await placeText($) }
+      }
+      if (!isPlacementSetting(value)) {
+        return { text: `"${value}" isn't a placement.\n${await placeText($)}` }
+      }
+      // Written as the person's own /config choice; the module reloads with it.
+      const written = await $.config.set({ key: 'eidola.placement', value })
+      if ('deny' in written && written.deny !== undefined) {
+        return { text: `Couldn't change the placement here (${written.deny}). Set it in /config instead.` }
+      }
+      return { text: `Placement set to ${value}: ${PLACEMENT_HELP[value]}.` }
+    }
+
+    if (sub === 'media') {
       const isOn = !(await read($, mediaAtom))
       await update($, mediaAtom, () => isOn)
       const opened = await openPane($)
@@ -243,6 +303,7 @@ export const register: Register = on => {
 
     const surfaces = await $.session.surfaces()
     const opened = await openPane($)
+    const placement = await currentPlacement($)
     const panes = await $.ui.panes()
     const mine = panes.find(one => one.id === PANE)
     const probes = await Promise.all(NET_PROBES.map(probe => probeLine($, probe)))
@@ -250,7 +311,9 @@ export const register: Register = on => {
       `Surfaces: ${surfaces.length ? surfaces.join(', ') : 'none attached'}`,
       opened.isPlaced ? 'Pane: placed.' : `Pane: not placed (${opened.reason})`,
       mine ? `Pane state: shown=${mine.isShown} placed=${mine.isPlaced}` : 'Pane state: not in the pane list',
-      opened.isPlaced ? 'Band: hidden while the pane is placed.' : 'Band: showing, as the fallback.',
+      `Placement: ${placement} (setting: ${placementSetting}). Band: ${
+        bandShows(placement, opened.isPlaced) ? 'showing' : 'hidden'
+      }. Status line: ${isStatusLineOn ? 'on' : 'off'}.`,
       'Network, from where this session runs:',
       ...probes.map(line => `  ${line}`),
     ]
@@ -367,7 +430,11 @@ export const register: Register = on => {
   // ── The band above the prompt: shown only while no pane is placed ────
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey || (await isPanePlaced($))) {
+    if (e.props.hasSurvey) {
+      return next(e)
+    }
+    const placement = await currentPlacement($)
+    if (!bandShows(placement, placement === 'auto' && (await isPanePlaced($)))) {
       return next(e)
     }
     const awake = engramOf(await read($, engramAtom))

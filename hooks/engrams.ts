@@ -2,6 +2,7 @@
 // vessel.yaml) with one new Vessel type, `sprite`. The prototype inlines
 // them; loading Engram folders from disk is Phase 11 (plan Q5).
 
+import type { Placement } from './placement'
 import type { Palette } from './sprite'
 
 export type Engram = {
@@ -15,8 +16,11 @@ export type Engram = {
   }
   /** SOUL.md */
   soul: string
-  /** vessel.yaml, type "sprite" */
-  vessel: { type: 'sprite'; pack: string; palette: Palette }
+  /**
+   * vessel.yaml, type "sprite". `placement` is the creator's suggestion of
+   * where the Vessel appears; the person's `placement` option overrides it.
+   */
+  vessel: { type: 'sprite'; pack: string; palette: Palette; placement?: Placement }
 }
 
 const WISP_PALETTE: Palette = {

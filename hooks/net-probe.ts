@@ -9,6 +9,7 @@ export type NetProbe = { label: string; url: string }
 export const NET_PROBES: readonly NetProbe[] = [
   { label: 'eidola.app (hosted relay)', url: 'https://eidola.app/' },
   { label: 'example.com (control)', url: 'https://example.com/' },
+  { label: 'api.github.com (a host cloud environments usually allow)', url: 'https://api.github.com/' },
   { label: 'Shrine on this host (127.0.0.1:9743)', url: 'http://127.0.0.1:9743/shrine/' },
 ]
 

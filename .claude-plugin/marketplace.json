@@ -1,0 +1,5 @@
+{
+  "name": "eidola-mod",
+  "owner": { "name": "Jeremy Kaye" },
+  "plugins": [{ "name": "eidola", "source": "./" }]
+}

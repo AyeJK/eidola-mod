@@ -115,6 +115,12 @@ export const register: Register = on => {
     return next(e)
   })
 
+  on('session.attach', async ($, e, next) => {
+    const result = await next(e)
+    void $.ui.open({ id: PANE, title: 'Eidola' })
+    return result
+  })
+
   // ── Engine events → Vessel state ──────────────────────────────────────
 
   // The Soul also rides each typed prompt as hidden context. prompt.compose
@@ -192,8 +198,17 @@ export const register: Register = on => {
   // ── Commands ───────────────────────────────────────────────────────────
 
   on('command.run', { command: 'eidola' }, async $ => {
+    const surfaces = await $.session.surfaces()
     const opened = await $.ui.open({ id: PANE, title: 'Eidola' })
-    return { text: opened.isPlaced ? 'Eidola pane open.' : 'The Eidola pane is waiting for room on this surface.' }
+    const panes = await $.ui.panes()
+    const mine = panes.find(one => one.id === PANE)
+    const lines = [
+      `Surfaces: ${surfaces.length ? surfaces.join(', ') : 'none attached'}`,
+      opened.isPlaced ? 'Pane: placed.' : `Pane: not placed (${opened.reason})`,
+      mine ? `Pane state: shown=${mine.isShown} placed=${mine.isPlaced}` : 'Pane state: not in the pane list',
+      'The Vessel also shows in the band above the prompt.',
+    ]
+    return { text: lines.join('\n') }
   })
 
   on('command.run', { command: 'awaken' }, async ($, e) => {
@@ -272,6 +287,45 @@ export const register: Register = on => {
           )}
           <Button key="switch" label={`Switch to ${nextName}`} onPress={() => setEngram($, nextId)} />
         </Box>
+      </Box>
+    )
+  })
+
+  // ── The band above the prompt (fallback where no pane is placed) ──────
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey) {
+      return next(e)
+    }
+    const awake = engramOf(await read($, engramAtom))
+    const view = await read($, viewAtom)
+    const engram = awake ?? RESTING
+    const state: VesselState = awake ? view.state : 'sleeping'
+    const detail = awake ? view.detail : 'No Engram awake'
+    const line = `${engram.engram.name} · ${LABELS[state]}${detail ? ` · ${detail}` : ''}`
+
+    if (e.surface === 'terminal') {
+      const { Box, Text } = $.ui.resolve(e)
+      return (
+        <Box flexDirection="row" gap={1}>
+          <Text>{FACES[state]}</Text>
+          <Text dimColor>{line}</Text>
+        </Box>
+      )
+    }
+
+    const { Box, Text, Svg } = $.ui.resolve(e)
+    const size = 44
+    const cacheKey = `${engram.engram.id}:${state}:${size}`
+    let svg = svgCache.get(cacheKey)
+    if (svg === undefined) {
+      svg = vesselSvg(state, engram.vessel.palette, size)
+      svgCache.set(cacheKey, svg)
+    }
+    return (
+      <Box flexDirection="row" alignItems="center" gap={1}>
+        <Svg key={`band:${cacheKey}`} source={svg} alt={line} width={size} isInteractive />
+        <Text dimColor>{line}</Text>
       </Box>
     )
   })

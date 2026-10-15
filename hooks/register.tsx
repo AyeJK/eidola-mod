@@ -129,17 +129,16 @@ export const register: Register = on => {
   on('prompt.submit', async ($, e, next) => {
     await signal($, { kind: 'prompt' })
     const engram = engramOf(await read($, engramAtom))
-    if (!engram || e.command !== undefined) {
+    if (!engram) {
       return next(e)
     }
     const soul = `<eidola-soul engram="${engram.engram.id}">\n${soulSection(engram)}\n</eidola-soul>`
     return next({ ...e, context: [...(e.context ?? []), soul] })
   }).catch(($, e, next) => next(e))
 
+  // turn.start carries no agentId: it fires for the main loop only.
   on('turn.start', async ($, e, next) => {
-    if (e.agentId === undefined) {
-      await signal($, { kind: 'turnStart' })
-    }
+    await signal($, { kind: 'turnStart' })
     return next(e)
   })
 
@@ -273,9 +272,9 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column" alignItems="center" gap={1}>
-        <Text weight="semibold">{engram.engram.name}</Text>
+        <Text bold>{engram.engram.name}</Text>
         <Svg key={cacheKey} source={svg} alt={`${engram.engram.name}: ${LABELS[state]}`} width={size} isInteractive />
-        <Text size="footnote" dimColor>
+        <Text dimColor>
           {LABELS[state]}
           {detail ? ` · ${detail}` : ''}
         </Text>

@@ -25,3 +25,15 @@ claude plugin install eidola --marketplace AyeJK/eidola-mod
 In the desktop app, where `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `AyeJK/eidola-mod`, then Add plugin.
 
 Answer `y` to add the marketplace, then pick a scope (user scope loads it in every session).
+
+## Develop
+
+Run these from this folder before pushing:
+
+```
+claude plugin validate .
+npx -p typescript tsc -p .
+claude plugin test .
+```
+
+`tsc` needs the engine's types at `.claude-plugin/types/claude-code/index.d.ts` (git-ignored). The engine writes them there when it loads the mod from this folder (`claude --plugin-dir .`). The render tests mount the pane and the band on terminal and desktop. A mount fails when a surface refuses the tree (an element it lacks, a prop it doesn't take), which is how an empty desktop pane shows up in a test.

@@ -7,10 +7,10 @@ const PLACED: UiPane[] = [{ id: 'eidola', title: 'Eidola', isShown: true, isFocu
 const TYPED = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
 
 describe('placement rules', () => {
-  test('the person wins; default defers to the Engram, then to both', () => {
+  test('the person wins; default defers to the Engram, then to auto', () => {
     expect(effectivePlacement('pane', 'band')).toBe('pane')
     expect(effectivePlacement('default', 'band')).toBe('band')
-    expect(effectivePlacement('default', undefined)).toBe('both')
+    expect(effectivePlacement('default', undefined)).toBe('auto')
   })
 
   test('the band follows the placement', () => {
@@ -40,7 +40,7 @@ describe('placement rules', () => {
 describe('/eidola place', () => {
   test('with no setting, says where the Vessel is and what the choices are', async $ => {
     const out = await $.command.run({ command: 'eidola', args: 'place', ...TYPED })
-    expect(out.text).toContain('Placement: both (setting: default)')
+    expect(out.text).toContain('Placement: auto (setting: default)')
     expect(out.text).toContain('auto: band only while no pane is placed')
   })
 

@@ -4,6 +4,7 @@
 // loading Engram folders from disk is Phase 11 (plan Q5).
 
 import type { Placement } from './placement'
+import type { SceneId } from './scenes'
 
 export type Engram = {
   /** engram.yaml */
@@ -22,8 +23,15 @@ export type Engram = {
    * suggestion of where the Vessel appears; the person's `placement` option
    * overrides it.
    */
-  vessel: { type: 'svg'; pack: string; forge: { source: string; style: string; look: string }; placement?: Placement }
+  vessel: { type: 'svg'; pack: string; forge: { source: string; style: string; look: string }; placement?: Placement; scene?: Scene }
 }
+
+/**
+ * A scene the mod draws at the size of its slot, filling the pane or band,
+ * in place of baked per-state SVGs (see scenes.ts). Code for now; a
+ * data-only scene format comes once the presets show what one needs.
+ */
+export type Scene = SceneId
 
 /** A Soul that adds no voice: these Engrams are visual only. */
 function quietSoul(name: string): string {
@@ -84,6 +92,22 @@ export const ENGRAMS: Record<string, Engram> = {
     style: 'particle',
     look: 'Embers',
   }),
+  kraken: {
+    engram: {
+      engram_version: '1.0.0',
+      id: 'kraken',
+      name: 'Kraken',
+      voice_id: null,
+      meta: {
+        author: 'eidola',
+        created: '2026-10-16',
+        description: 'Something vast in the deep water beside your work. It surfaces when there is work to do.',
+        tags: ['scene', 'ocean'],
+      },
+    },
+    soul: quietSoul('Kraken'),
+    vessel: { type: 'svg', pack: 'kraken', forge: { source: 'kraken', style: 'scene', look: 'Pixel Kraken in particle water' }, scene: 'kraken' },
+  },
   starfield: visual('starfield', 'Starfield', 'Stars streaming past at warp, quicker when busy.', ['particle'], {
     source: 'stars',
     style: 'particle',

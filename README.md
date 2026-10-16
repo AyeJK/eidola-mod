@@ -11,7 +11,7 @@ Both are in `/config` once the mod is installed.
 
 | Option | Default | What it does |
 |---|---|---|
-| `placement` | `default` | Where the Vessel appears. `default` follows the awake Engram's suggestion (`both` if it has none). `both`: pane and band. `pane`: pane only. `band`: band only, and the pane opens only when you run `/eidola`. `auto`: band only while no pane is placed. |
+| `placement` | `default` | Where the Vessel appears. `default` follows the awake Engram's suggestion (`auto` if it has none). `both`: pane and band. `pane`: pane only. `band`: band only, and the pane opens only when you run `/eidola`. `auto`: band only while no pane is placed. |
 | `statusLine` | on | The Engram's name and state, such as "Wisp · idle", in the status line. |
 
 An Engram suggests a placement in its Vessel (`placement`); your option always wins, and nothing an Engram sets stops you opening the pane.

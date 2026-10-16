@@ -7,13 +7,53 @@ import { ANIMATIONS, compose, GRID, SPRITE_PALETTE, vesselSvg } from './sprite'
 function run(signals: Signal[], from: Model = EMPTY) {
   let model = from
   const states: string[] = []
+  const moods: string[] = []
   for (const s of signals) {
     const out = step(model, s)
     model = out.model
     states.push(out.view.state)
+    moods.push(model.mood)
   }
-  return { model, states }
+  return { model, states, moods }
 }
+
+describe('mood', () => {
+  test('a turn is working throughout, whatever its tools do, then idle', () => {
+    const { moods } = run([
+      { kind: 'prompt' },
+      { kind: 'toolStart', tool: 'Read' },
+      { kind: 'toolEnd', tool: 'Read', isOk: true },
+      { kind: 'toolStart', tool: 'Bash' },
+      { kind: 'toolEnd', tool: 'Bash', isOk: false },
+      { kind: 'compact' },
+      { kind: 'turnEnd', reason: 'answer' },
+    ])
+    expect(moods).toEqual(['working', 'working', 'working', 'working', 'working', 'working', 'idle'])
+  })
+
+  test('a permission ask needs attention until the tool goes on', () => {
+    const { moods } = run([
+      { kind: 'prompt' },
+      { kind: 'toolStart', tool: 'Bash' },
+      { kind: 'ask', tool: 'Bash' },
+      { kind: 'toolEnd', tool: 'Bash', isOk: true },
+    ])
+    expect(moods).toEqual(['working', 'working', 'attention', 'working'])
+  })
+
+  test('a question or a plan to approve needs attention while it waits', () => {
+    for (const tool of ['AskUserQuestion', 'ExitPlanMode']) {
+      const { moods } = run([{ kind: 'prompt' }, { kind: 'toolStart', tool }, { kind: 'toolEnd', tool, isOk: true }])
+      expect(moods, tool).toEqual(['working', 'attention', 'working'])
+    }
+  })
+
+  test('every way a turn ends is idle', () => {
+    for (const reason of ['answer', 'aborted', 'refusal', 'error'] as const) {
+      expect(step({ ...EMPTY, mood: 'working' }, { kind: 'turnEnd', reason }).model.mood, reason).toBe('idle')
+    }
+  })
+})
 
 describe('resolver', () => {
   test('a prompt thinks, a tool works, the turn ends in success', () => {
@@ -43,7 +83,7 @@ describe('resolver', () => {
   })
 
   test('a failed tool shows error, then falls back to thinking', () => {
-    const out = step({ inFlight: 1, toolsThisTurn: 1 }, { kind: 'toolEnd', tool: 'Bash', isOk: false })
+    const out = step({ mood: 'working', inFlight: 1, toolsThisTurn: 1 }, { kind: 'toolEnd', tool: 'Bash', isOk: false })
     expect(out.view.state).toBe('error')
     expect(out.then?.ms).toBe(HOLD.errorMs)
     expect(out.then?.view.state).toBe('thinking')

@@ -2,9 +2,15 @@
 // rules in eidola-runtime/docs/spec/vessel-reactivity.md, driven by engine
 // events instead of editor shell hooks.
 
-import type { VesselView } from '../types'
+import type { Mood, VesselView } from '../types'
 
 export type Model = {
+  /**
+   * What the drawings follow. Working from a prompt to the turn's end,
+   * through every tool and gap; attention while blocked on the person;
+   * idle otherwise. Tools never change it, so it holds steady.
+   */
+  mood: Mood
   /** Tool calls running right now (parallel tools keep `working` steady). */
   inFlight: number
   /** Tool calls since the turn began: decides `success` vs `responding`. */
@@ -39,7 +45,10 @@ export const HOLD = {
   turnErrorMs: 4000,
 } as const
 
-export const EMPTY: Model = { inFlight: 0, toolsThisTurn: 0 }
+export const EMPTY: Model = { mood: 'idle', inFlight: 0, toolsThisTurn: 0 }
+
+/** Tools whose call waits on the person's answer: a question, a plan to approve. */
+export const ASKING_TOOLS: ReadonlySet<string> = new Set(['AskUserQuestion', 'ExitPlanMode'])
 
 const IDLE: VesselView = { state: 'idle', detail: '' }
 const THINKING: VesselView = { state: 'thinking', detail: '' }
@@ -62,10 +71,11 @@ export function step(model: Model, signal: Signal): Step {
 
     case 'prompt':
     case 'turnStart':
-      return { model: { inFlight: 0, toolsThisTurn: 0 }, view: THINKING }
+      return { model: { mood: 'working', inFlight: 0, toolsThisTurn: 0 }, view: THINKING }
 
     case 'toolStart': {
-      const next = {
+      const next: Model = {
+        mood: ASKING_TOOLS.has(signal.tool) ? 'attention' : 'working',
         inFlight: model.inFlight + 1,
         toolsThisTurn: model.toolsThisTurn + 1,
       }
@@ -73,7 +83,7 @@ export function step(model: Model, signal: Signal): Step {
     }
 
     case 'toolEnd': {
-      const next = { ...model, inFlight: Math.max(0, model.inFlight - 1) }
+      const next: Model = { ...model, mood: 'working', inFlight: Math.max(0, model.inFlight - 1) }
       if (!signal.isOk) {
         return {
           model: next,
@@ -93,15 +103,15 @@ export function step(model: Model, signal: Signal): Step {
 
     case 'ask':
       return {
-        model,
+        model: { ...model, mood: 'attention' },
         view: { state: 'attention', detail: `${signal.tool} needs your OK` },
       }
 
     case 'compact':
-      return { model, view: { state: 'attention', detail: 'Compacting' } }
+      return { model: { ...model, mood: 'working' }, view: { state: 'attention', detail: 'Compacting' } }
 
     case 'turnEnd': {
-      const next = { inFlight: 0, toolsThisTurn: model.toolsThisTurn }
+      const next: Model = { mood: 'idle', inFlight: 0, toolsThisTurn: model.toolsThisTurn }
       if (signal.reason === 'aborted') {
         return { model: next, view: IDLE }
       }

@@ -10,7 +10,7 @@
     "placement": {
       "type": "string",
       "title": "Where the Vessel appears",
-      "description": "default follows the awake Engram's suggestion (both if it has none). both: pane and band. pane: pane only. band: band only, and the pane opens only when you ask. auto: band only while no pane is placed.",
+      "description": "default follows the awake Engram's suggestion (auto if it has none). both: pane and band. pane: pane only. band: band only, and the pane opens only when you ask. auto: band only while no pane is placed.",
       "options": [
         "default",
         "both",

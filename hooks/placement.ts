@@ -9,10 +9,10 @@ export type PlacementSetting = (typeof PLACEMENT_SETTINGS)[number]
 export type Placement = Exclude<PlacementSetting, 'default'>
 
 /** What an Engram that names no placement gets. */
-export const FALLBACK_PLACEMENT: Placement = 'both'
+export const FALLBACK_PLACEMENT: Placement = 'auto'
 
 export const PLACEMENT_HELP: Record<PlacementSetting, string> = {
-  default: "the awake Engram's suggestion (both, if it has none)",
+  default: "the awake Engram's suggestion (auto, if it has none)",
   both: 'pane and band',
   pane: 'pane only',
   band: 'band only; the pane opens only when you ask (/eidola)',

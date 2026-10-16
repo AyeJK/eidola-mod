@@ -58,10 +58,27 @@ describe('baked Vessels', () => {
       props: { title: 'Eidola', isFocused: false, bodyColumns: 32, placement: 'dock', scroll: SCROLL, view: {} },
     })
     const svg = await ui.find({ type: 'Svg' })
-    expect(svg?.props?.source).toBe(BAKED)
-    // 30x60 inside a 192 box: half as wide as it is tall.
-    expect(svg?.props?.width).toBe(96)
+    // Set on a stage the size of the body: 31 columns × 8px, 39 rows × 19px.
+    expect(svg?.props?.width).toBe(248)
+    expect(svg?.props?.height).toBe(741)
+    const source = String(svg?.props?.source)
+    expect(source).toContain('viewBox="0 0 248 741"')
+    expect(source).toContain('viewBox="0 0 30 60"><rect width="30" height="60"/></svg>')
     expect(asked.some(path => path.replace(/\\/g, '/').endsWith('vessels/wisp/idle.svg'))).toBe(true)
+    await ui.unmount()
+  })
+
+  test('a Vessel with no viewBox is drawn alone, without a stage', async ($, on) => {
+    const BARE = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40"/></svg>'
+    on('fs.read', () => ({ value: BARE }))
+    const ui = await $.ui.mount({
+      plugin: 'eidola',
+      surface: 'desktop',
+      component: 'Pane',
+      requestId: 'eidola',
+      props: { title: 'Eidola', isFocused: false, bodyColumns: 32, placement: 'dock', scroll: SCROLL, view: {} },
+    })
+    expect((await ui.find({ type: 'Svg' }))?.props?.source).toBe(BARE)
     await ui.unmount()
   })
 
@@ -79,10 +96,18 @@ describe('baked Vessels', () => {
 
 describe('band', () => {
   for (const surface of SURFACES) {
-    test(`draws the Vessel line on ${surface} under the default placement, pane or not`, async ($, on) => {
+    test(`under both, draws on ${surface} beside a placed pane`, { options: { placement: 'both' } }, async ($, on) => {
       on('ui.panes', () => ({ value: PLACED }))
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await findVessel(ui, surface)).toBeDefined()
+      await ui.unmount()
+    })
+
+    test(`under the default placement, steps aside on ${surface} while the pane is placed`, async ($, on) => {
+      on('ui.panes', () => ({ value: PLACED }))
+      on('ui.render', { component: 'AbovePrompt' }, ($2, e) => $2.ui.resolve(e).Box({}))
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect(await findVessel(ui, surface)).toBeUndefined()
       await ui.unmount()
     })
 
@@ -99,6 +124,31 @@ describe('band', () => {
       on('ui.render', { component: 'AbovePrompt' }, ($2, e) => $2.ui.resolve(e).Box({}))
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await findVessel(ui, surface)).toBeUndefined()
+      await ui.unmount()
+    })
+
+    if (surface === 'desktop') {
+      test('on desktop the band is a status strip: the Vessel, then name and state', async ($, on) => {
+        on('ui.panes', () => ({ value: UNPLACED }))
+        const ui = await $.ui.mount({ ...BAND, surface })
+        const svg = await ui.find({ type: 'Svg' })
+        // A square stage that fills the band's height.
+        expect(svg?.props?.width).toBe(140)
+        expect(svg?.props?.height).toBe(140)
+        expect(await ui.find({ type: 'Text', text: /^Wisp · / })).toBeDefined()
+        await ui.unmount()
+      })
+    }
+
+    test(`a survey draws under the Vessel on ${surface}, not instead of it`, async ($, on) => {
+      on('ui.panes', () => ({ value: UNPLACED }))
+      on('ui.render', { component: 'AbovePrompt' }, ($2, e) => {
+        const { Text } = $2.ui.resolve(e)
+        return Text({ children: 'How is Claude doing?' })
+      })
+      const ui = await $.ui.mount({ ...BAND, surface, props: { ...BAND.props, hasSurvey: true } })
+      expect(await findVessel(ui, surface)).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: 'How is Claude doing?' })).toBeDefined()
       await ui.unmount()
     })
 

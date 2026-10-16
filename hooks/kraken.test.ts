@@ -112,7 +112,7 @@ describe('the Kraken Engram', () => {
     // On desktop: still water drawn once, the Kraken drawn live over it.
     const water = await pane.find({ type: 'Svg' })
     expect(water?.props?.width).toBe(252)
-    expect(water?.props?.height).toBe(758)
+    expect(water?.props?.height).toBe(739)
     const live = await pane.find({ type: 'Client' })
     expect(String(live?.props?.module)).toMatch(/kraken-live.tsx$/)
     expect((live?.props?.props as { mood?: string; ink?: number } | undefined)?.mood).toBe('idle')

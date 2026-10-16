@@ -16,10 +16,11 @@ import type { ClientModule } from 'claude-code'
 import { noise } from './field'
 
 import type { Mood } from '../types'
-import { BODY, DETAIL, GLOW, IRIS, layers } from './kraken'
+import { BODY, CRIMSON, DETAIL, GLOW, GOLD, IRIS, layers } from './kraken'
 import { buildModel, eyeAt, len3, modelBounds, norm3, sampleModel } from './kraken3d'
 import type { ArmPose, Body, Camera, V3 } from './kraken3d'
-import { PX_H, PX_W, drawPixels, pick, short } from './live-pixels'
+import { PX_H, PX_W, drawPixels, mixRamp, pick, short } from './live-pixels'
+import type { Steady } from './live-pixels'
 
 /** The grid comes in props, never from the region: a drawing sized by its region resizes it. */
 type Props = { mood: Mood; cols: number; rows: number; view?: View; ink?: number }
@@ -64,6 +65,8 @@ type Plan = {
   every?: [number, number]
   /** Ticks a peer holds. */
   hold?: [number, number]
+  /** It leaves and returns through the sides only. */
+  sideways?: boolean
 }
 
 type Act = 'peer' | 'pass' | 'cruise' | 'ink'
@@ -77,9 +80,9 @@ const PLANS: Record<Mood, Plan> = {
   // Back in the murk: drifting, half asleep, turning lazily so its arms wheel about.
   idle: { home: [0.5, 0.58, 120], spread: [0.55, 0.3, 80], light: 0.6, rune: 0.25, runePulse: 4, sway: 0.28, pace: 0.35, lid: 0.25, wander: [90, 200], stroke: 2.6, turn: 1.3, turnBias: 0, darts: false, flexes: false, rest: 0.1, acts: [{ kind: 'cruise', weight: 3 }, { kind: 'pass', weight: 1 }, { kind: 'ink', weight: 0.25 }], every: [250, 500] },
   // Up in the light, restless: shifting spot, eyes darting, arms busy, runes racing.
-  working: { home: [0.5, 0.45, -380], spread: [0.55, 0.3, 60], light: 1, rune: 1, runePulse: 1.4, sway: 0.5, pace: 0.9, lid: 0, wander: [50, 110], stroke: 1.6, turn: 0.7, turnBias: 0, darts: true, flexes: true, rest: 0, acts: [{ kind: 'cruise', weight: 2 }, { kind: 'pass', weight: 2 }, { kind: 'ink', weight: 0.4 }], every: [180, 360] },
+  working: { home: [0.5, 0.45, -380], spread: [0.55, 0.3, 60], light: 0.6, rune: 1, runePulse: 1.4, sway: 0.5, pace: 0.9, lid: 0, wander: [50, 110], stroke: 1.6, turn: 0.7, turnBias: 0, darts: true, flexes: true, rest: 0, acts: [{ kind: 'cruise', weight: 3 }, { kind: 'pass', weight: 3 }, { kind: 'ink', weight: 0.4 }], every: [80, 160], sideways: true },
   // At the glass, facing the conversation, leaning in now and then.
-  attention: { home: [0.5, 0.4, -480], spread: [0.08, 0.06, 40], light: 1, rune: 0.9, runePulse: 2, sway: 0.25, pace: 0.5, lid: 0, wander: [70, 140], stroke: 1.8, turn: 0.15, turnBias: -0.35, darts: false, flexes: false, rest: 0, acts: [{ kind: 'peer', weight: 1 }], every: [15, 45], hold: [50, 80] },
+  attention: { home: [0.5, 0.4, -480], spread: [0.08, 0.06, 40], light: 0.6, rune: 0.9, runePulse: 2, sway: 0.25, pace: 0.5, lid: 0, wander: [70, 140], stroke: 1.8, turn: 0.15, turnBias: -0.35, darts: false, flexes: false, rest: 0, acts: [{ kind: 'peer', weight: 1 }], every: [15, 45], hold: [50, 80] },
 }
 
 /**
@@ -93,8 +96,10 @@ type ArmLife = ArmPose & {
   lag: number
   /** How quickly it moves toward its intent. */
   ease: number
-  intent: { curl: number; sweep: number; reach: number; splay: number; wave: number; toward: number }
+  intent: { curl: number; sweep: number; reach: number; splay: number; wave: number; toward: number; tuck: number }
   next: number
+  /** How far this arm alone is drawn in under the head, 0 to 1, whatever the others do. */
+  tuck: number
 }
 
 /** -1 or 1, evenly. */
@@ -105,11 +110,13 @@ const either = () => (Math.random() < 0.5 ? -1 : 1)
  * or inward, back toward the body; and to either side.
  */
 const INTENTS = {
-  drift: () => ({ curl: -0.6 + Math.random() * 2, sweep: (Math.random() - 0.5) * 1.2, reach: 0.9 + Math.random() * 0.15, splay: (Math.random() - 0.5) * 0.5, wave: 0.6 + Math.random() * 0.7, toward: 0 }),
-  coil: () => ({ curl: either() * (2 + Math.random() * 1), sweep: (Math.random() - 0.5) * 1.6, reach: 0.75, splay: -0.1, wave: 0.3, toward: 0 }),
-  hook: () => ({ curl: -(1.8 + Math.random() * 1), sweep: (Math.random() - 0.5) * 0.8, reach: 0.95, splay: 0.15, wave: 0.35, toward: 0 }),
-  reach: () => ({ curl: (Math.random() - 0.5) * 0.6, sweep: (Math.random() - 0.5) * 0.6, reach: 1.25 + Math.random() * 0.15, splay: -0.35, wave: 0.4, toward: Math.random() < 0.5 ? 0.55 : 0 }),
-  creep: () => ({ curl: (Math.random() - 0.5) * 1.2, sweep: (Math.random() - 0.5) * 1, reach: 1.1, splay: -0.2, wave: 0.25, toward: 0.6 + Math.random() * 0.2 }),
+  drift: () => ({ curl: -0.6 + Math.random() * 2, sweep: (Math.random() - 0.5) * 1.2, reach: 0.9 + Math.random() * 0.15, splay: (Math.random() - 0.5) * 0.5, wave: 0.6 + Math.random() * 0.7, toward: 0, tuck: 0 }),
+  coil: () => ({ curl: either() * (2 + Math.random() * 1), sweep: (Math.random() - 0.5) * 1.6, reach: 0.75, splay: -0.1, wave: 0.3, toward: 0, tuck: 0 }),
+  hook: () => ({ curl: -(1.8 + Math.random() * 1), sweep: (Math.random() - 0.5) * 0.8, reach: 0.95, splay: 0.15, wave: 0.35, toward: 0, tuck: 0 }),
+  reach: () => ({ curl: (Math.random() - 0.5) * 0.6, sweep: (Math.random() - 0.5) * 0.6, reach: 1.25 + Math.random() * 0.15, splay: -0.35, wave: 0.4, toward: Math.random() < 0.5 ? 0.55 : 0, tuck: 0 }),
+  creep: () => ({ curl: (Math.random() - 0.5) * 1.2, sweep: (Math.random() - 0.5) * 1, reach: 1.1, splay: -0.2, wave: 0.25, toward: 0.6 + Math.random() * 0.2, tuck: 0 }),
+  // Drawn in under the head, hanging, the tip curling a little as it trails.
+  tuck: () => ({ curl: -0.5 + Math.random() * 0.9, sweep: (Math.random() - 0.5) * 0.6, reach: 0.85 + Math.random() * 0.1, splay: 0.25, wave: 0.5, toward: 0, tuck: 0.7 + Math.random() * 0.25 }),
 } as const
 
 type Intent = keyof typeof INTENTS | 'twitch'
@@ -117,6 +124,7 @@ type Intent = keyof typeof INTENTS | 'twitch'
 /** Each mood's mix of what its arms get up to. */
 const ARM_MIX: Record<Mood, Array<[Intent, number]>> = {
   idle: [
+    ['tuck', 5],
     ['drift', 7],
     ['coil', 1.5],
     ['hook', 1],
@@ -124,6 +132,7 @@ const ARM_MIX: Record<Mood, Array<[Intent, number]>> = {
     ['twitch', 0.5],
   ],
   working: [
+    ['tuck', 2.5],
     ['drift', 3],
     ['coil', 2],
     ['hook', 1.5],
@@ -131,6 +140,7 @@ const ARM_MIX: Record<Mood, Array<[Intent, number]>> = {
     ['twitch', 2],
   ],
   attention: [
+    ['tuck', 3],
     ['creep', 4],
     ['drift', 2],
     ['hook', 1],
@@ -172,6 +182,11 @@ type Live = {
   sway: number
   pace: number
   lid: number
+  /** How fine it drew last, so it holds a resolution rather than flickering between two. */
+  steady: Steady
+  /** How far its eyes and runes have gone to crimson (working), and to gold (attention): 0 to 1 each. */
+  flush: number
+  glow: number
   /** What it is doing: roaming its home, or a close encounter in stages. */
   act: 'roam' | Act
   actStage: number
@@ -198,7 +213,8 @@ type State = { live: Live }
 
 const TICK_MS = 100
 const DT = TICK_MS / 1000
-const STYLES = layers(false).map(style => ({ ...style, shades: style.shades.map(short) }))
+const RAW = layers(false)
+const STYLES = RAW.map(style => ({ ...style, shades: style.shades.map(short) }))
 
 /** A layer's shade for a brightness, from at most `levels` of its shades. */
 function shade(layer: number, v: number, levels: number): string {
@@ -339,6 +355,8 @@ function step(live: Live, W: number, H: number, s: number): void {
   live.sway = ease(live.sway, plan.sway, 0.05)
   live.pace = ease(live.pace, plan.pace, 0.05)
   live.lid = ease(live.lid, plan.lid, 0.08)
+  live.flush = ease(live.flush, live.mood === 'working' ? 1 : 0, 0.05)
+  live.glow = ease(live.glow, live.mood === 'attention' ? 1 : 0, 0.06)
 
   // A new mood ends any encounter and sets when the next one comes.
   const nextActAt = () => live.tick + (plan.every ? between(live, plan.every) : Infinity)
@@ -402,8 +420,8 @@ function step(live: Live, W: number, H: number, s: number): void {
         ]
       } else {
         // Out through one edge, and back in through another, at another depth.
-        // The band is a strip: it leaves and returns through the sides.
-        const edges = live.view === 'band' ? EDGES.filter(([dx]) => dx !== 0) : EDGES
+        // The band is a strip, and at work it crosses side to side: through the sides.
+        const edges = live.view === 'band' || plan.sideways ? EDGES.filter(([dx]) => dx !== 0) : EDGES
         const out = edges[Math.floor(random(live) * edges.length)]!
         let back = edges[Math.floor(random(live) * edges.length)]!
         if (back[0] === out[0] && back[1] === out[1]) {
@@ -604,7 +622,9 @@ function step(live: Live, W: number, H: number, s: number): void {
   const total = mix.reduce((sum, [, w]) => sum + w, 0)
   for (const arm of live.arms) {
     arm.phase += DT * live.pace * arm.speed * (live.stroke >= 0 ? 1.8 : 1)
-    arm.gather += (live.gather - arm.gather) * arm.lag
+    // An arm follows the body's gather, lagging; one tucked in stays drawn in whatever the body does.
+    arm.tuck = ease(arm.tuck, arm.intent.tuck, arm.ease)
+    arm.gather += (Math.max(live.gather, arm.tuck) - arm.gather) * arm.lag
     if (live.tick >= arm.next) {
       let roll = random(live) * total
       let pick: Intent = 'drift'
@@ -660,8 +680,9 @@ const KrakenLive: ClientModule<Props, State> = (props, surface) => {
         speed: 0.6 + ((i * 0.37) % 1),
         lag: 0.35 + ((i * 0.53) % 0.4),
         ease: 0.05,
-        intent: { curl: 1, sweep: 0, reach: 1, splay: 0, wave: 1, toward: 0 },
+        intent: { curl: 1, sweep: 0, reach: 1, splay: 0, wave: 1, toward: 0, tuck: 0 },
         next: i * 7,
+        tuck: 0,
       })),
       planned: '',
       tick: 0,
@@ -689,6 +710,9 @@ const KrakenLive: ClientModule<Props, State> = (props, surface) => {
       sway: plan.sway,
       pace: plan.pace,
       lid: plan.lid,
+      steady: { step: 0, calm: 0 },
+      flush: props.mood === 'working' ? 1 : 0,
+      glow: props.mood === 'attention' ? 1 : 0,
       act: 'roam',
       actStage: 0,
       actUntil: 0,
@@ -794,14 +818,20 @@ const KrakenLive: ClientModule<Props, State> = (props, surface) => {
   }
 
   // Ink covers the Kraken, except once it is back and swimming through it.
+  // Its eyes and runes in the mood's colour, all of them at once.
+  const runes = mixRamp(mixRamp(RAW[GLOW]!.shades, CRIMSON.glow, live.flush), GOLD.glow, live.glow).map(short)
+  const iris = mixRamp(mixRamp(RAW[IRIS]!.shades, CRIMSON.iris, live.flush), GOLD.iris, live.glow).map(short)
   return drawPixels(Box, props.cols, props.rows, (x, py, levels) => {
     const cell = cells[py]![x]
     const ink = inkAt(x, py)
     if (ink && !(cell && inkBehind)) {
       return ink
     }
-    return cell ? shade(cell[0], cell[1], levels) : ink
-  })
+    if (!cell) {
+      return ink
+    }
+    return cell[0] === GLOW ? pick(runes, cell[1], levels) : cell[0] === IRIS ? pick(iris, cell[1], levels) : shade(cell[0], cell[1], levels)
+  }, undefined, live.steady)
 }
 
 export default KrakenLive

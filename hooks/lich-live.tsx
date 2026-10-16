@@ -18,7 +18,7 @@ import type { View } from './lich'
 import { BONE, CROWN, GEM, MANTLE, buildModel, modelBounds, sampleModel } from './lich3d'
 import type { Pose } from './lich3d'
 import { drawGlyphs } from './live-glyphs'
-import { pick, short } from './live-pixels'
+import { mixRamp, pick, short } from './live-pixels'
 
 /**
  * The grid comes in props, never from the region: a drawing sized by its
@@ -187,21 +187,6 @@ const EMBER = COLOURS.map(ramp => ramp.map(short))
 const COLD = WITCHLIGHT.map(short)
 const GREEN = ARCANE.map(short)
 const RED = SCORCHED.map(short)
-/** One colour part way to another, as #rrggbb. */
-function mixHex(a: string, b: string, k: number): string {
-  const ca = parseInt(a.slice(1), 16)
-  const cb = parseInt(b.slice(1), 16)
-  const channel = (shift: number) => Math.round(((ca >> shift) & 255) * (1 - k) + ((cb >> shift) & 255) * k)
-  return '#' + ((channel(16) << 16) | (channel(8) << 8) | channel(0)).toString(16).padStart(6, '0')
-}
-
-/** A ramp part way to another, shade by shade; the shorter one stretched to the longer. */
-function mixRamp(a: readonly string[], b: readonly string[], k: number): string[] {
-  const n = Math.max(a.length, b.length)
-  const at = (r: readonly string[], i: number) => r[Math.round((i * (r.length - 1)) / (n - 1))]!
-  return Array.from({ length: n }, (_, i) => mixHex(at(a, i), at(b, i), k))
-}
-
 function random(live: Live): number {
   live.seed = (live.seed + 0x6d2b79f5) >>> 0
   let t = live.seed

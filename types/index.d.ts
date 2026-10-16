@@ -41,6 +41,12 @@ declare module 'claude-code' {
        * the Lich is scorched.
        */
       ink: number
+      /**
+       * The HUD frame over the Vessel, as the person has toggled it for each
+       * Engram (`/eidola frame`), by Engram id; an Engram not here shows its
+       * own default.
+       */
+      frame: Record<string, boolean>
       /** When the mood last changed, and when the ink last rose (ms). */
       moodAt: number
       /** The mood before the last change. */

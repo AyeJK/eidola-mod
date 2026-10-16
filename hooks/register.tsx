@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderElement } from 'claude-code'
+import type { Elements, EngineInterface, Register, RenderElement } from 'claude-code'
 
 import type { Mood, VesselState, VesselView } from '../types'
 import { DEFAULT_ENGRAM, ENGRAMS, RESTING, soulSection } from './engrams'
@@ -26,11 +26,14 @@ import { FACES, SPRITE_PALETTE, vesselSvg } from './sprite'
 import { renderScene } from './field'
 import { krakenWaterScene } from './kraken'
 import { voidScene } from './lich'
+import { LABEL_PX, labelSvg } from './hud'
 import { SCENES } from './scenes'
 import { BAND_SCENE_PX, BAND_STAGE_PX, PX_PER_COLUMN, PX_PER_ROW, sceneSize, stageSize, stageSvg } from './stage'
 
 const PANE = 'eidola'
 const STORE_KEY = 'engram'
+/** Where the frame's toggles are kept between sessions: by Engram id. */
+const FRAME_KEY = 'frames'
 
 const viewAtom = atom({ plugin: 'eidola', key: 'view' } as const, {
   state: 'idle',
@@ -44,6 +47,12 @@ const measureAtom = atom({ plugin: 'eidola', key: 'measure' } as const, false)
 const blendAtom = atom({ plugin: 'eidola', key: 'blend' } as const, null as number | null)
 const liveAtom = atom({ plugin: 'eidola', key: 'live' } as const, null as Mood | null)
 const inkAtom = atom({ plugin: 'eidola', key: 'ink' } as const, 0)
+const frameAtom = atom({ plugin: 'eidola', key: 'frame' } as const, {} as Record<string, boolean>)
+
+/** Whether an Engram's HUD frame shows: as the person toggled it, else as it ships. */
+function isFramed(frames: Record<string, boolean>, engram: Engram | undefined): boolean {
+  return engram ? (frames[engram.engram.id] ?? engram.vessel.hud?.show ?? false) : false
+}
 const moodAtAtom = atom({ plugin: 'eidola', key: 'moodAt' } as const, 0)
 const moodBeforeAtom = atom({ plugin: 'eidola', key: 'moodBefore' } as const, 'idle' as Mood)
 const inkAtAtom = atom({ plugin: 'eidola', key: 'inkAt' } as const, 0)
@@ -186,6 +195,108 @@ async function show($: EngineInterface, view: VesselView): Promise<void> {
   setStatus($, engram ? `${engram.engram.name} · ${LABELS[view.state].toLowerCase()}` : undefined)
 }
 
+/** The frame's look for each state: its colour, its name, and the line under it when there is no detail. */
+const FRAME_STATES: Record<VesselState, { colour: string; name: string; line: string }> = {
+  idle: { colour: '#8a93a6', name: 'IDLE', line: 'at rest' },
+  thinking: { colour: '#4f7cff', name: 'THINKING', line: 'processing depth' },
+  working: { colour: '#ff9d3a', name: 'WORKING', line: 'executing' },
+  attention: { colour: '#ff3b3b', name: 'ATTENTION', line: 'priority interrupt' },
+  success: { colour: '#46d27a', name: 'DONE', line: 'complete' },
+  responding: { colour: '#ffd23a', name: 'RESPONDING', line: 'transmitting' },
+  error: { colour: '#ff3b3b', name: 'ERROR', line: 'fault' },
+  waiting: { colour: '#b48cff', name: 'WAITING', line: 'standing by' },
+  sleeping: { colour: '#5a6070', name: 'ASLEEP', line: 'dormant' },
+}
+
+/** How busy a HUD's recording runs in a state. */
+function waveLevel(state: VesselState): 'idle' | 'working' | 'attention' {
+  return state === 'attention' ? 'attention' : state === 'thinking' || state === 'working' || state === 'responding' || state === 'error' ? 'working' : 'idle'
+}
+
+/** The frame's brass: its brackets and its quieter lines. */
+const FRAME_GOLD = '#b8913a'
+/** The detail under the state: what it is doing, in grey. */
+const FRAME_GREY = '#9aa3b2'
+
+/**
+ * The Vessel in a HUD frame: brackets at the corners, its state in its
+ * colour with the detail under it, the Engram's name at the top right, and
+ * a level meter in the bottom left.
+ */
+function framed(
+  els: Pick<Elements['desktop'], 'Box' | 'Text' | 'Client' | 'Svg'>,
+  tree: RenderElement,
+  cols: number,
+  rows: number,
+  view: VesselView,
+  awake: Engram | undefined,
+): RenderElement {
+  const { Box, Text, Client, Svg } = els
+  const own = awake?.vessel.hud?.colours?.[view.state]
+  const look = { ...FRAME_STATES[view.state], colour: own?.label ?? FRAME_STATES[view.state].colour }
+  const detailColour = own?.detail ?? FRAME_GREY
+  const width = Math.max(4, cols - 6)
+  const clip = (text: string) => (text.length > width ? text.slice(0, width - 1) + '…' : text)
+  const detail = clip((view.detail || look.line).toLowerCase())
+  const tag = (awake?.engram.name ?? 'Eidola').toUpperCase()
+  const label = labelSvg(look.name, look.colour)
+  const at = (key: string, top: number, left: number, child: RenderElement) => (
+    <Box key={key} position="absolute" top={top} left={left}>
+      {child}
+    </Box>
+  )
+  // A bracket is two thin bars of brass, the same length and weight each way:
+  // drawn as Boxes, not glyphs, so no font can make them uneven.
+  const bracket = (key: string, top: number, left: number, isRight: boolean, isBottom: boolean) => {
+    // A cell is 8 × 19 px: 8% of its height and 10% of its 2-cell width are both about 1.5 px.
+    const across = <Box key="across" width="100%" height="8%" backgroundColor={FRAME_GOLD} />
+    const down = (
+      <Box key="down" flexDirection="row" height="92%" justifyContent={isRight ? 'flex-end' : 'flex-start'}>
+        <Box width="10%" height="100%" backgroundColor={FRAME_GOLD} />
+      </Box>
+    )
+    return at(
+      key,
+      top,
+      left,
+      <Box flexDirection="column" width={2} height={1}>
+        {isBottom ? [down, across] : [across, down]}
+      </Box>,
+    )
+  }
+  return (
+    <Box width={cols} height={rows}>
+      {tree}
+      {bracket('frame-tl', 0, 0, false, false)}
+      {bracket('frame-tr', 0, cols - 2, true, false)}
+      {bracket('frame-bl', rows - 1, 0, false, true)}
+      {bracket('frame-br', rows - 1, cols - 2, true, true)}
+      {at(
+        'frame-state',
+        1,
+        3,
+        <Box width={Math.ceil(label.width / PX_PER_COLUMN)} height={2}>
+          <Svg key={`frame-label:${view.state}`} source={label.svg} alt={look.name} width={label.width} height={LABEL_PX} />
+        </Box>,
+      )}
+      {at('frame-detail', 3, 3, <Text color={detailColour}>{detail}</Text>)}
+      {cols >= 44 &&
+        (awake?.vessel.hud?.tag === 'livecam'
+          ? at('frame-tag', 1, cols - 23, <Client key="frame-cam" module="./frame-cam.tsx" props={{ name: tag, camera: awake.vessel.hud.camera ?? 'CAM 01' }} width={20} height={2} />)
+          : at('frame-tag', 1, cols - tag.length - 3, <Text color={FRAME_GOLD}>{tag}</Text>))}
+      {rows >= 6 &&
+        (awake?.vessel.hud?.meter === 'wave'
+          ? at(
+              'frame-wave',
+              rows - 3,
+              2,
+              <Client key="frame-wave" module="./frame-wave.tsx" props={{ colour: look.colour, level: waveLevel(view.state), cols: cols - 4 }} width={cols - 4} height={3} />,
+            )
+          : at('frame-meter', rows - 2, 3, <Client key="frame-meter" module="./frame-meter.tsx" props={{ state: view.state, colour: look.colour }} width={12} height={1} />))}
+    </Box>
+  )
+}
+
 /** Something went wrong: count it, and when. */
 async function bumpInk($: EngineInterface): Promise<void> {
   const at = await $.clock.now()
@@ -324,6 +435,12 @@ export const register: Register = (on, options) => {
       await update($, epochAtom, () => now)
     }
 
+    const frames = await $.store.get(FRAME_KEY)
+    if (frames && typeof frames === 'object') {
+      const kept = frames as Record<string, boolean>
+      await update($, frameAtom, () => ({ ...kept }))
+    }
+
     const stored = await $.store.get(STORE_KEY)
     const id = stored === undefined ? DEFAULT_ENGRAM : typeof stored === 'string' && ENGRAMS[stored] ? stored : null
     await update($, engramAtom, () => id)
@@ -383,12 +500,12 @@ export const register: Register = (on, options) => {
     }
   }).catch(($, e, next) => next(e))
 
-  on('tool.check', async ($, e, next) => {
-    const verdict = await next(e)
-    if (verdict.decision === 'ask') {
-      await signal($, { kind: 'ask', tool: e.tool })
-    }
-    return verdict
+  // A permission dialog actually put to the person. (tool.check's 'ask' is
+  // not enough: in auto mode the mode settles most asks itself, and nobody
+  // is waiting on the person at all.)
+  on('classic.PermissionRequest', async ($, e, next) => {
+    await signal($, { kind: 'ask', tool: e.tool_name })
+    return next(e)
   }).catch(($, e, next) => next(e))
 
   on('session.compact', async ($, e, next) => {
@@ -441,6 +558,19 @@ export const register: Register = (on, options) => {
         return { text: `Couldn't change the placement here (${written.deny}). Set it in /config instead.` }
       }
       return { text: `Placement set to ${value}: ${PLACEMENT_HELP[value]}.` }
+    }
+
+    if (sub === 'frame') {
+      const awake = engramOf(await read($, engramAtom))
+      if (!awake) {
+        return { text: 'Nothing is awake to frame. /awaken an Engram first.' }
+      }
+      const frames = await read($, frameAtom)
+      const isOn = !isFramed(frames, awake)
+      const next = { ...frames, [awake.engram.id]: isOn }
+      await update($, frameAtom, () => next)
+      await $.store.set(FRAME_KEY, next)
+      return { text: isOn ? `Frame on for ${awake.engram.name}.` : `Frame off for ${awake.engram.name}.` }
     }
 
     if (sub === 'ink') {
@@ -586,6 +716,7 @@ export const register: Register = (on, options) => {
   // ── The pane ───────────────────────────────────────────────────────────
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    const vessel = async () => {
     const id = await read($, engramAtom)
     const mood = await read($, moodAtom)
     const awake = engramOf(id)
@@ -643,11 +774,12 @@ export const register: Register = (on, options) => {
     // it. A new mood reaches the running Client as props: no reload, no cut.
     if (awake?.vessel.scene === 'kraken' && e.surface === 'desktop' && e.props.placement === 'dock' && !(await read($, mediaAtom))) {
       const { Client } = $.ui.resolve(e)
-      const { width, height } = sceneSize(e.props.bodyColumns, e.props.scroll.bodyRows, e.props.placement)
-      const now = await $.clock.now()
-      const water = sceneFor('pane', `kraken-water:${width}x${height}`, () => renderScene(krakenWaterScene(width, height), now))
       const cols = e.props.bodyColumns
       const rows = Math.max(4, e.props.scroll.bodyRows - 1)
+      // The water the same height as the drawing over it: any taller and the pane scrolls.
+      const { width, height } = sceneSize(cols, rows, e.props.placement)
+      const now = await $.clock.now()
+      const water = sceneFor('pane', `kraken-water:${width}x${height}`, () => renderScene(krakenWaterScene(width, height), now))
       return (
         <Box width={cols} height={rows}>
           {/* Nothing here may change with the mood, alt included: a changed prop reloads the drawing. */}
@@ -663,11 +795,12 @@ export const register: Register = (on, options) => {
     // drawn over that in glyphs, in four slices, top to bottom, that keep in step.
     if (awake?.vessel.scene === 'lich' && e.surface === 'desktop' && e.props.placement === 'dock' && !(await read($, mediaAtom))) {
       const { Client } = $.ui.resolve(e)
-      const { width, height } = sceneSize(e.props.bodyColumns, e.props.scroll.bodyRows, e.props.placement)
-      const now = await $.clock.now()
-      const backdrop = sceneFor('pane', `lich-void:${width}x${height}`, () => renderScene(voidScene(width, height, 'pane'), now))
       const cols = e.props.bodyColumns
       const rows = Math.max(6, e.props.scroll.bodyRows - 1)
+      // The dark the same height as the drawing over it: any taller and the pane scrolls.
+      const { width, height } = sceneSize(cols, rows, e.props.placement)
+      const now = await $.clock.now()
+      const backdrop = sceneFor('pane', `lich-void:${width}x${height}`, () => renderScene(voidScene(width, height, 'pane'), now))
       const shared = { ...(await liveProps($)), cols, rows }
       const [a, b, c, d] = lichSlices(rows)
       return (
@@ -740,6 +873,17 @@ export const register: Register = (on, options) => {
         <Svg key={cacheKey} source={svg} alt={alt} width={fitWidth(svg, size)} isInteractive />
       </Box>
     )
+    }
+    const tree = await vessel()
+    // The HUD frame over whatever the Vessel is, when it is on; never over a test.
+    const isTest = (await read($, measureAtom)) || (await read($, blendAtom)) !== null || (await read($, liveAtom)) !== null || (await read($, mediaAtom))
+    const awake = engramOf(await read($, engramAtom))
+    if (e.surface !== 'desktop' || isTest || !isFramed(await read($, frameAtom), awake)) {
+      return tree
+    }
+    const cols = e.props.bodyColumns
+    const rows = Math.max(4, e.props.scroll.bodyRows - 1)
+    return framed($.ui.resolve(e) as Elements['desktop'], tree, cols, rows, awake ? await read($, viewAtom) : { state: 'sleeping', detail: '' }, awake)
   })
 
   // ── The band above the prompt: shown only while no pane is placed ────

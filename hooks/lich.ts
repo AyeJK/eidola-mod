@@ -135,8 +135,8 @@ export function voidScene(W: number, H: number, view: View): FieldScene {
     layers: lichLayers(),
     ink: 'glyph',
     period: 6,
-    under: `<rect width="${W}" height="${H}" rx="12" fill="url(#dark)"/><g>${embers}</g>`,
-    over: `<rect width="${W}" height="${H}" rx="12" fill="url(#vig)"/><rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="11" fill="none" stroke="#ffcf8a" stroke-opacity=".1" stroke-width="2"/>`,
+    under: `<rect width="${W}" height="${H}" fill="url(#dark)"/><g>${embers}</g>`,
+    over: `<rect width="${W}" height="${H}" fill="url(#vig)"/><rect x="1" y="1" width="${W - 2}" height="${H - 2}" fill="none" stroke="#ffcf8a" stroke-opacity=".1" stroke-width="2"/>`,
     defs,
     css: [css],
     sample() {

@@ -16,6 +16,21 @@ export function short(hex: string): string {
   return '#' + [16, 8, 0].map(k => Math.round(((n >> k) & 255) / 17).toString(16)).join('')
 }
 
+/** One colour part way to another, as #rrggbb. */
+export function mixHex(a: string, b: string, k: number): string {
+  const ca = parseInt(a.slice(1), 16)
+  const cb = parseInt(b.slice(1), 16)
+  const channel = (shift: number) => Math.round(((ca >> shift) & 255) * (1 - k) + ((cb >> shift) & 255) * k)
+  return '#' + ((channel(16) << 16) | (channel(8) << 8) | channel(0)).toString(16).padStart(6, '0')
+}
+
+/** A ramp part way to another, shade by shade; the shorter one stretched to the longer. */
+export function mixRamp(a: readonly string[], b: readonly string[], k: number): string[] {
+  const n = Math.max(a.length, b.length)
+  const at = (r: readonly string[], i: number) => r[Math.round((i * (r.length - 1)) / (n - 1))]!
+  return Array.from({ length: n }, (_, i) => mixHex(at(a, i), at(b, i), k))
+}
+
 /** A shade for a brightness, from at most `levels` of a ramp. */
 export function pick(ramp: readonly string[], v: number, levels: number): string {
   const n = Math.min(levels, ramp.length)
@@ -37,7 +52,7 @@ type Box = ClientElements['Box']
  * (a cell row), detail is spent where it matters: full-size pixels from that
  * row outward for as far as the budget goes, and twice the size beyond it.
  */
-export function drawPixels(Box: Box, cols: number, rows: number, colour: Colour, focus?: number) {
+export function drawPixels(Box: Box, cols: number, rows: number, colour: Colour, focus?: number, steady?: Steady) {
   /** One pixel row as Boxes: a bare Box per gap, a coloured one per run of one shade. */
   const pixelRow = (py: number, levels: number, step: number) => {
     const boxes = []
@@ -99,19 +114,70 @@ export function drawPixels(Box: Box, cols: number, rows: number, colour: Colour,
   if (focus !== undefined) {
     return focused(Box, cols, rows, pixelRow, focus)
   }
+  if (steady) {
+    return held(Box, cols, rows, draw, steady)
+  }
   let drawn = draw(8, false)
-  for (const [levels, isCoarse] of [
-    [6, false],
-    [4, false],
-    [6, true],
-    [4, true],
-    [3, true],
-  ] as const) {
+  for (const [levels, isCoarse] of STEPS.slice(1)) {
     if (drawn.boxes <= BOX_BUDGET) {
       break
     }
     drawn = draw(levels, isCoarse)
   }
+  return (
+    <Box flexDirection="column" width={cols} height={rows}>
+      {drawn.out}
+    </Box>
+  )
+}
+
+/** The ways a frame may be drawn, finest first: shades, and whether its pixels are doubled. */
+const STEPS = [
+  [8, false],
+  [6, false],
+  [4, false],
+  [6, true],
+  [4, true],
+  [3, true],
+] as const
+
+/**
+ * A drawing's memory of how fine it drew last, so it does not flicker:
+ * deciding afresh each frame, one hovering at the budget flips between
+ * resolutions several times a second.
+ */
+export type Steady = { step: number; calm: number }
+
+/** Frames a drawing must fit comfortably before it tries a finer step again. */
+const CALM = 25
+/** How far under the budget a finer step must come to be taken. */
+const ROOM = 0.82
+
+type Draw = (levels: number, isCoarse: boolean) => { out: ReturnType<typeof h>[]; boxes: number }
+
+/**
+ * With hysteresis: coarser at once when a frame will not fit; finer only
+ * once frames have fitted for a while and the finer one fits with room.
+ */
+function held(Box: Box, cols: number, rows: number, draw: Draw, steady: Steady) {
+  let step = Math.min(Math.max(0, steady.step), STEPS.length - 1)
+  const at = (i: number) => draw(STEPS[i]![0], STEPS[i]![1])
+  let drawn = at(step)
+  if (drawn.boxes > BOX_BUDGET) {
+    while (drawn.boxes > BOX_BUDGET && step < STEPS.length - 1) {
+      step += 1
+      drawn = at(step)
+    }
+    steady.calm = 0
+  } else if (step > 0 && ++steady.calm >= CALM) {
+    const finer = at(step - 1)
+    if (finer.boxes <= BOX_BUDGET * ROOM) {
+      step -= 1
+      drawn = finer
+    }
+    steady.calm = 0
+  }
+  steady.step = step
   return (
     <Box flexDirection="column" width={cols} height={rows}>
       {drawn.out}

@@ -19,6 +19,13 @@ const BUBBLE = 5
 /** The iris up close: a palette of its own, from a deep teal rim to a pale centre. */
 export const IRIS = 6
 
+/**
+ * The live Kraken's eyes and runes by mood: cyan at rest (the layers' own),
+ * crimson at work, gold when it needs you. Its glow first, then its iris.
+ */
+export const CRIMSON = { glow: ['#5a0a10', '#b81a24', '#ff3a40', '#ffc0c0'], iris: ['#2a0608', '#480a0e', '#6a1016', '#8e1a20', '#b4282c', '#d64a48', '#f08a80', '#ffd6d0'] }
+export const GOLD = { glow: ['#5a3a06', '#c08a10', '#ffcf3a', '#fff2b0'], iris: ['#2a1a04', '#483008', '#6a480c', '#8e6612', '#b4881c', '#d6aa36', '#f0d070', '#fff4c8'] }
+
 export function layers(isAngry: boolean): LayerStyle[] {
   const glow = isAngry ? '#ff5a4a' : '#5ff6ff'
   return [
@@ -274,11 +281,11 @@ function backdrop(W: number, H: number, top: string, mid: string, defs: string[]
     `<linearGradient id="skin" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${H}"><stop offset="0" stop-color="#d4e8eb"/><stop offset="1" stop-color="#7c9ba2"/></linearGradient>`,
     `<radialGradient id="vig" cx=".5" cy=".5" r=".75"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></radialGradient>`,
   )
-  return `<rect width="${W}" height="${H}" rx="12" fill="url(#deep)"/>`
+  return `<rect width="${W}" height="${H}" fill="url(#deep)"/>`
 }
 
 const OVER = (W: number, H: number) =>
-  `<rect width="${W}" height="${H}" rx="12" fill="url(#vig)"/><rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="11" fill="none" stroke="#bfefff" stroke-opacity=".12" stroke-width="2"/>`
+  `<rect width="${W}" height="${H}" fill="url(#vig)"/><rect x="1" y="1" width="${W - 2}" height="${H - 2}" fill="none" stroke="#bfefff" stroke-opacity=".12" stroke-width="2"/>`
 
 // ── Scenes ─────────────────────────────────────────────────────────────
 

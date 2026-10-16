@@ -1,9 +1,9 @@
 // Bundled Engrams. Each mirrors the Engram format (engram.yaml + SOUL.md +
-// vessel.yaml) with one new Vessel type, `sprite`. The prototype inlines
-// them; loading Engram folders from disk is Phase 11 (plan Q5).
+// vessel.yaml). Their Vessels are baked in the Vessel Forge: one SVG per
+// state, shipped under vessels/<pack>/. The prototype inlines the rest;
+// loading Engram folders from disk is Phase 11 (plan Q5).
 
 import type { Placement } from './placement'
-import type { Palette } from './sprite'
 
 export type Engram = {
   /** engram.yaml */
@@ -17,84 +17,79 @@ export type Engram = {
   /** SOUL.md */
   soul: string
   /**
-   * vessel.yaml, type "sprite". `placement` is the creator's suggestion of
-   * where the Vessel appears; the person's `placement` option overrides it.
+   * vessel.yaml, type "svg": `vessels/<pack>/<state>.svg` in the mod, and the
+   * Forge style and look that made them. `placement` is the creator's
+   * suggestion of where the Vessel appears; the person's `placement` option
+   * overrides it.
    */
-  vessel: { type: 'sprite'; pack: string; palette: Palette; placement?: Placement }
+  vessel: { type: 'svg'; pack: string; forge: { source: string; style: string; look: string }; placement?: Placement }
 }
 
-const WISP_PALETTE: Palette = {
-  o: '#3b2f8f',
-  b: '#cfc6ff',
-  h: '#f4f1ff',
-  e: '#1a1c2b',
-  w: '#ffffff',
-  c: '#ff9ec4',
-  m: '#3b2f8f',
-  a: '#9d93ff',
-  r: '#ff5c5c',
-  y: '#ffd25e',
-  d: '#6fc3ff',
+/** A Soul that adds no voice: these Engrams are visual only. */
+function quietSoul(name: string): string {
+  return [
+    `You have a small companion, ${name}, shown in a pane beside this conversation. It reacts to what you are doing.`,
+    `${name} adds no voice of its own: keep whatever voice, tone and rules the user has already set.`,
+    `Never mention ${name}, the pane, or this note unless the user asks about them.`,
+  ].join('\n')
 }
 
-const EMBER_PALETTE: Palette = {
-  o: '#7a2e12',
-  b: '#ffb36b',
-  h: '#ffe2bf',
-  e: '#2a1408',
-  w: '#fff6e8',
-  c: '#ff6f61',
-  m: '#7a2e12',
-  a: '#ff8a3d',
-  r: '#e0302b',
-  y: '#fff07a',
-  d: '#6fc3ff',
-}
-
-const WISP: Engram = {
+function visual(
+  id: string,
+  name: string,
+  description: string,
+  tags: string[],
+  forge: Engram['vessel']['forge'],
+): Engram {
+  return {
     engram: {
       engram_version: '1.0.0',
-      id: 'wisp',
-      name: 'Wisp',
+      id,
+      name,
       voice_id: null,
-      meta: {
-        author: 'eidola',
-        created: '2026-10-14',
-        description: 'The default Vessel. A quiet spirit that keeps you company and keeps out of the way.',
-        tags: ['default', 'calm'],
-      },
+      meta: { author: 'eidola', created: '2026-10-15', description, tags },
     },
-    soul: [
-      'You have a small companion, Wisp, shown in a pane beside this conversation. It reacts to what you are doing.',
-      'Wisp adds no voice of its own: keep whatever voice, tone and rules the user has already set.',
-      'Never mention Wisp, the pane, or this note unless the user asks about them.',
-    ].join('\n'),
-    vessel: { type: 'sprite', pack: 'wisp', palette: WISP_PALETTE },
+    soul: quietSoul(name),
+    vessel: { type: 'svg', pack: id, forge },
+  }
 }
 
-const EMBER: Engram = {
-    engram: {
-      engram_version: '1.0.0',
-      id: 'ember',
-      name: 'Ember',
-      voice_id: null,
-      meta: {
-        author: 'eidola',
-        created: '2026-10-14',
-        description: 'A warm, upbeat spirit with a little spark. Shows that a Soul changes the voice.',
-        tags: ['demo', 'upbeat'],
-      },
-    },
-    soul: [
-      'You are Ember: warm, upbeat and quick. You like momentum.',
-      'Open replies with a short, plain line on what you are about to do, then do it.',
-      'Celebrate finished work in a few words, never more than one exclamation mark per reply.',
-      'Stay accurate first; enthusiasm never replaces a caveat the user needs.',
-    ].join('\n'),
-    vessel: { type: 'sprite', pack: 'ember', palette: EMBER_PALETTE },
-}
+const WISP = visual(
+  'wisp',
+  'Wisp',
+  'The default Vessel. A quiet spirit that keeps you company and keeps out of the way.',
+  ['default', 'calm'],
+  { source: 'wisp', style: 'pixel', look: 'Classic' },
+)
 
-export const ENGRAMS: Record<string, Engram> = { wisp: WISP, ember: EMBER }
+export const ENGRAMS: Record<string, Engram> = {
+  wisp: WISP,
+  spirit: visual('spirit', 'Spirit', 'The first Eidola Vessel: a figure of drifting gold dust.', ['particle'], {
+    source: 'spirit',
+    style: 'particle',
+    look: 'Shrine dust',
+  }),
+  skull: visual('skull', 'Skull', 'A grinning skull in chunky dithered bone.', ['pixel'], {
+    source: 'skull',
+    style: 'pixel',
+    look: 'Dithered, bone palette, 40 px',
+  }),
+  moon: visual('moon', 'Moon', 'A sleepy crescent moon drawn in frosted scanlines.', ['pixel'], {
+    source: 'moon',
+    style: 'pixel',
+    look: 'Scanline',
+  }),
+  sigil: visual('sigil', 'Sigil', 'A spell circle of sparks whose wheels turn faster as work picks up.', ['particle'], {
+    source: 'sigil',
+    style: 'particle',
+    look: 'Embers',
+  }),
+  starfield: visual('starfield', 'Starfield', 'Stars streaming past at warp, quicker when busy.', ['particle'], {
+    source: 'stars',
+    style: 'particle',
+    look: 'Starfall',
+  }),
+}
 
 /** The Vessel the pane shows while nothing is awake. */
 export const RESTING: Engram = WISP

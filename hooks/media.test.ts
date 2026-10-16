@@ -56,7 +56,7 @@ describe('media test', () => {
     expect(turnedOff.text).toBe('Media test off.')
     const back = await $.ui.mount({ ...PANE, surface: 'desktop' })
     expect(await back.find({ type: 'Text', text: 'Media test' })).toBeUndefined()
-    expect(await back.find({ key: 'sleep' })).toBeDefined()
+    expect(await back.find({ type: 'Svg' })).toBeDefined()
     await back.unmount()
   })
 })
@@ -84,5 +84,25 @@ describe('network probes', () => {
     expect(out.text).toContain('eidola.app (hosted relay): reached, HTTP 200')
     expect(out.text).toContain('example.com (control): failed (')
     expect(out.text).toContain('Shrine on this host (127.0.0.1:9743): failed (')
+  })
+})
+
+describe('pane title', () => {
+  test('names the awake Engram, and follows it when another awakens', async ($, on) => {
+    const titles: (string | undefined)[] = []
+    on('ui.open', ($2, e) => {
+      titles.push(e.title)
+      return { value: { isPlaced: true as const } }
+    })
+    on('ui.panes', () => ({ value: PLACED }))
+    on('ui.invalidate', () => ({ value: undefined }))
+    on('store.set', () => ({ value: undefined }))
+
+    await $.command.run({ command: 'awaken', args: 'skull', ...TYPED })
+    expect(titles).toContain('Skull')
+    expect(titles).not.toContain('Eidola')
+
+    await $.command.run({ command: 'sleep', args: '', ...TYPED })
+    expect(titles.at(-1)).toBe('Eidola')
   })
 })

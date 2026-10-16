@@ -5,7 +5,8 @@ import type { VesselState, VesselView } from '../types'
 import { DEFAULT_ENGRAM, ENGRAMS, RESTING, soulSection } from './engrams'
 import type { Engram } from './engrams'
 import { mediaCases } from './media-test'
-import { NET_PROBES, probeLine } from './net-probe'
+import { NET_PROBES, PROBE_TIMEOUT_MS, describeOutcome } from './net-probe'
+import type { NetProbe, Outcome } from './net-probe'
 import {
   PLACEMENT_HELP,
   PLACEMENT_SETTINGS,
@@ -19,7 +20,7 @@ import {
 import type { Placement, PlacementSetting } from './placement'
 import { EMPTY, step } from './resolver'
 import type { Model, Signal, TurnEndReason } from './resolver'
-import { FACES, vesselSvg } from './sprite'
+import { FACES, SPRITE_PALETTE, vesselSvg } from './sprite'
 
 const PANE = 'eidola'
 const STORE_KEY = 'engram'
@@ -51,6 +52,8 @@ let model: Model = EMPTY
 let generation = 0
 let pending: Timer | undefined
 const svgCache = new Map<string, string>()
+// Baked Vessel files, read once each. null: the file couldn't be read.
+const fileCache = new Map<string, string | null>()
 
 // The person's options. A change in /config reloads the module, so these
 // are set once per load in register().
@@ -59,6 +62,60 @@ let isStatusLineOn = true
 
 function engramOf(id: string | null): Engram | undefined {
   return id === null ? undefined : ENGRAMS[id]
+}
+
+/** The built-in sprite for a state, at a size. */
+function spriteSvg(state: VesselState, size: number): string {
+  const key = `sprite:${state}:${size}`
+  let svg = svgCache.get(key)
+  if (svg === undefined) {
+    svg = vesselSvg(state, SPRITE_PALETTE, size)
+    svgCache.set(key, svg)
+  }
+  return svg
+}
+
+/**
+ * The Engram's baked SVG for a state, from vessels/<pack>/<state>.svg in
+ * the mod. A file that can't be read falls back to the built-in sprite, so
+ * a Vessel always shows.
+ */
+async function vesselFor($: EngineInterface, engram: Engram, state: VesselState, size: number): Promise<string> {
+  const key = `${engram.vessel.pack}/${state}`
+  if (!fileCache.has(key)) {
+    try {
+      fileCache.set(key, await $.fs.read(`${$.plugin.root}/vessels/${key}.svg`))
+    } catch {
+      fileCache.set(key, null)
+    }
+  }
+  return fileCache.get(key) ?? spriteSvg(state, size)
+}
+
+/** The width that fits a drawing inside a size-by-size box, read from its viewBox. */
+function fitWidth(svg: string, size: number): number {
+  const box = /viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"/.exec(svg)
+  const w = Number(box?.[1])
+  const h = Number(box?.[2])
+  return w > 0 && h > w ? Math.round((size * w) / h) : size
+}
+
+/** One probe, never rejecting: the line says what happened. */
+async function probeLine($: EngineInterface, probe: NetProbe): Promise<string> {
+  let timer: Timer | undefined
+  const timeout = new Promise<Outcome>(resolve => {
+    timer = $.clock.after(PROBE_TIMEOUT_MS, () => resolve({ kind: 'timeout' }))
+  })
+  const fetched = $.http
+    .fetch(probe.url, { method: 'GET' })
+    .then((res): Outcome => ({ kind: 'status', status: res.status }))
+    .catch((error: unknown): Outcome => ({
+      kind: 'error',
+      message: error instanceof Error ? error.message : String(error),
+    }))
+  const outcome = await Promise.race([fetched, timeout])
+  timer?.cancel()
+  return describeOutcome(probe, outcome)
 }
 
 function setStatus($: EngineInterface, text: string | undefined): void {
@@ -110,8 +167,22 @@ async function setEngram($: EngineInterface, id: string | null): Promise<void> {
   await update($, engramAtom, () => id)
   const engram = engramOf(id)
   setStatus($, engram ? `${engram.engram.name} · awake` : undefined)
+  // An open pane is retitled with the new name; a closed one stays closed.
+  try {
+    const panes = await $.ui.panes()
+    if (panes.some(one => one.id === PANE)) {
+      await $.ui.open({ id: PANE, title: paneTitle(engram) })
+    }
+  } catch {
+    // The old title is only cosmetic.
+  }
   // A different Engram may suggest a different placement.
   $.ui.invalidate('ui.render')
+}
+
+/** The pane's title: the awake Engram's name, else Eidola. */
+function paneTitle(engram: Engram | undefined): string {
+  return engram ? engram.engram.name : 'Eidola'
 }
 
 // Under the `auto` placement the band steps aside while the pane is placed.
@@ -127,7 +198,7 @@ async function isPanePlaced($: EngineInterface): Promise<boolean> {
 }
 
 async function openPane($: EngineInterface) {
-  const opened = await $.ui.open({ id: PANE, title: 'Eidola' })
+  const opened = await $.ui.open({ id: PANE, title: paneTitle(engramOf(await read($, engramAtom))) })
   $.ui.invalidate('ui.render')
   return opened
 }
@@ -356,38 +427,17 @@ export const register: Register = (on, options) => {
     const awake = engramOf(id)
     const engram = awake ?? RESTING
     const state: VesselState = awake ? view.state : 'sleeping'
-    const detail = awake ? view.detail : 'No Engram awake'
-    const ids = Object.keys(ENGRAMS)
-    const nextId = ids[(ids.indexOf(engram.engram.id) + 1) % ids.length] ?? DEFAULT_ENGRAM
-    const nextName = ENGRAMS[nextId]?.engram.name ?? nextId
 
+    // The Vessel alone: the pane's title names the Engram and the status
+    // line carries the state, so the body repeats neither.
     if (e.surface === 'terminal') {
-      const { Box, Text, Button } = $.ui.resolve(e)
-      return (
-        <Box flexDirection="column">
-          <Text bold>{engram.engram.name}</Text>
-          <Text>{FACES[state]}</Text>
-          <Text dimColor>
-            {LABELS[state]}
-            {detail ? ` · ${detail}` : ''}
-          </Text>
-          {awake ? (
-            <Button key="sleep" label="Sleep" onPress={() => setEngram($, null)} />
-          ) : (
-            <Button key="awaken" label={`Awaken ${engram.engram.name}`} onPress={() => setEngram($, engram.engram.id)} />
-          )}
-        </Box>
-      )
+      const { Text } = $.ui.resolve(e)
+      return <Text>{FACES[state]}</Text>
     }
 
     const { Box, Text, Button, Svg } = $.ui.resolve(e)
     const size = Math.max(112, Math.min(208, (e.props.bodyColumns ?? 28) * 6))
     const cacheKey = `${engram.engram.id}:${state}:${size}`
-    let svg = svgCache.get(cacheKey)
-    if (svg === undefined) {
-      svg = vesselSvg(state, engram.vessel.palette, size)
-      svgCache.set(cacheKey, svg)
-    }
 
     if (await read($, mediaAtom)) {
       return (
@@ -401,28 +451,16 @@ export const register: Register = (on, options) => {
             </Box>
           ))}
           <Text dimColor>Control: the sprite below uses CSS animation, which is known to work.</Text>
-          <Svg key={`control:${cacheKey}`} source={svg} alt={`${engram.engram.name}: ${LABELS[state]}`} width={64} isInteractive />
+          <Svg key={`control:${state}`} source={spriteSvg(state, 64)} alt={`Sprite: ${LABELS[state]}`} width={64} isInteractive />
           <Button key="media-off" label="End media test" onPress={() => update($, mediaAtom, () => false)} />
         </Box>
       )
     }
 
+    const svg = await vesselFor($, engram, state, size)
     return (
-      <Box flexDirection="column" alignItems="center" gap={1}>
-        <Text bold>{engram.engram.name}</Text>
-        <Svg key={cacheKey} source={svg} alt={`${engram.engram.name}: ${LABELS[state]}`} width={size} isInteractive />
-        <Text dimColor>
-          {LABELS[state]}
-          {detail ? ` · ${detail}` : ''}
-        </Text>
-        <Box flexDirection="row" gap={1}>
-          {awake ? (
-            <Button key="sleep" label="Sleep" onPress={() => setEngram($, null)} />
-          ) : (
-            <Button key="awaken" variant="primary" label={`Awaken ${engram.engram.name}`} onPress={() => setEngram($, engram.engram.id)} />
-          )}
-          <Button key="switch" label={`Switch to ${nextName}`} onPress={() => setEngram($, nextId)} />
-        </Box>
+      <Box flexDirection="column" alignItems="center">
+        <Svg key={cacheKey} source={svg} alt={`${engram.engram.name}: ${LABELS[state]}`} width={fitWidth(svg, size)} isInteractive />
       </Box>
     )
   })
@@ -444,28 +482,19 @@ export const register: Register = (on, options) => {
     const detail = awake ? view.detail : 'No Engram awake'
     const line = `${engram.engram.name} · ${LABELS[state]}${detail ? ` · ${detail}` : ''}`
 
+    // The Vessel alone, as in the pane; the line stays as its alt text.
     if (e.surface === 'terminal') {
-      const { Box, Text } = $.ui.resolve(e)
-      return (
-        <Box flexDirection="row" gap={1}>
-          <Text>{FACES[state]}</Text>
-          <Text dimColor>{line}</Text>
-        </Box>
-      )
+      const { Text } = $.ui.resolve(e)
+      return <Text>{FACES[state]}</Text>
     }
 
-    const { Box, Text, Svg } = $.ui.resolve(e)
+    const { Box, Svg } = $.ui.resolve(e)
     const size = 44
     const cacheKey = `${engram.engram.id}:${state}:${size}`
-    let svg = svgCache.get(cacheKey)
-    if (svg === undefined) {
-      svg = vesselSvg(state, engram.vessel.palette, size)
-      svgCache.set(cacheKey, svg)
-    }
+    const svg = await vesselFor($, engram, state, size)
     return (
-      <Box flexDirection="row" alignItems="center" gap={1}>
-        <Svg key={`band:${cacheKey}`} source={svg} alt={line} width={size} isInteractive />
-        <Text dimColor>{line}</Text>
+      <Box flexDirection="row" alignItems="center">
+        <Svg key={`band:${cacheKey}`} source={svg} alt={line} width={fitWidth(svg, size)} isInteractive />
       </Box>
     )
   })

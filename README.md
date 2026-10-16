@@ -15,7 +15,7 @@ Both are in `/config` once the mod is installed.
 | `statusLine` | on | The Engram's name and state, such as "Wisp · idle", in the status line. |
 
 An Engram suggests a placement in its Vessel (`placement`); your option always wins, and nothing an Engram sets stops you opening the pane.
-- Bundled Engrams: `wisp` (default, adds no voice of its own), `ember` (a demo Soul that changes the voice)
+- Bundled Engrams: `wisp` (default), `spirit`, `skull`, `moon`, `sigil`, `starfield`. All are visual only: their Souls add no voice. Each Vessel is baked in the Vessel Forge as one SVG per state under `vessels/<engram>/`; a file that can't be read falls back to the built-in pixel sprite.
 
 ## Diagnostics
 

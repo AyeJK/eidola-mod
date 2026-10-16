@@ -2,8 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { EMPTY, HOLD, step } from './resolver'
 import type { Model, Signal } from './resolver'
-import { ANIMATIONS, compose, GRID, vesselSvg } from './sprite'
-import { ENGRAMS } from './engrams'
+import { ANIMATIONS, compose, GRID, SPRITE_PALETTE, vesselSvg } from './sprite'
 
 function run(signals: Signal[], from: Model = EMPTY) {
   let model = from
@@ -71,12 +70,10 @@ describe('sprite', () => {
   })
 
   test('every state renders under the 131,072-character Svg limit', () => {
-    for (const engram of Object.values(ENGRAMS)) {
-      for (const state of Object.keys(ANIMATIONS)) {
-        const svg = vesselSvg(state as keyof typeof ANIMATIONS, engram.vessel.palette, 208)
-        expect(svg.startsWith('<svg')).toBe(true)
-        expect(svg.length < 131072).toBe(true)
-      }
+    for (const state of Object.keys(ANIMATIONS)) {
+      const svg = vesselSvg(state as keyof typeof ANIMATIONS, SPRITE_PALETTE, 208)
+      expect(svg.startsWith('<svg')).toBe(true)
+      expect(svg.length < 131072).toBe(true)
     }
   })
 })

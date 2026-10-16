@@ -1,6 +1,7 @@
-// Sprite Vessel: 20x20 pixel frames composed from layers, emitted as one
+// Built-in sprite: 20x20 pixel frames composed from layers, emitted as one
 // SVG whose frames cycle with CSS steps(). No redraw per frame: the pane
-// redraws only when the state changes.
+// redraws only when the state changes. Bundled Engrams now ship baked SVGs
+// from the Vessel Forge; this is the fallback and the media test's control.
 
 import type { VesselState } from '../types'
 
@@ -19,6 +20,24 @@ export type Palette = {
   r: string // alert
   y: string // sparkle
   d: string // sweat drop
+}
+
+/**
+ * The built-in sprite's colors. It draws the media test's control and
+ * stands in when a baked Vessel's file can't be read.
+ */
+export const SPRITE_PALETTE: Palette = {
+  o: '#3b2f8f',
+  b: '#cfc6ff',
+  h: '#f4f1ff',
+  e: '#1a1c2b',
+  w: '#ffffff',
+  c: '#ff9ec4',
+  m: '#3b2f8f',
+  a: '#9d93ff',
+  r: '#ff5c5c',
+  y: '#ffd25e',
+  d: '#6fc3ff',
 }
 
 type Grid = string[][]

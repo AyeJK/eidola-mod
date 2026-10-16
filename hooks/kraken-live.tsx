@@ -19,6 +19,7 @@ import type { Mood } from '../types'
 import { BODY, DETAIL, GLOW, IRIS, layers } from './kraken'
 import { buildModel, eyeAt, len3, modelBounds, norm3, sampleModel } from './kraken3d'
 import type { ArmPose, Body, Camera, V3 } from './kraken3d'
+import { PX_H, PX_W, drawPixels, pick, short } from './live-pixels'
 
 /** The grid comes in props, never from the region: a drawing sized by its region resizes it. */
 type Props = { mood: Mood; cols: number; rows: number; view?: View; ink?: number }
@@ -197,25 +198,11 @@ type State = { live: Live }
 
 const TICK_MS = 100
 const DT = TICK_MS / 1000
-const PX_W = 8
-const PX_H = 9.5
-/** Boxes a frame may hold: about 60,000 characters, well inside the 100,000 bound. */
-const BOX_BUDGET = 700
-
-/** #rrggbb as #rgb, nearest: a few characters less on every Box. */
-function short(hex: string): string {
-  const n = parseInt(hex.slice(1), 16)
-  return '#' + [16, 8, 0].map(k => Math.round(((n >> k) & 255) / 17).toString(16)).join('')
-}
-
 const STYLES = layers(false).map(style => ({ ...style, shades: style.shades.map(short) }))
 
 /** A layer's shade for a brightness, from at most `levels` of its shades. */
 function shade(layer: number, v: number, levels: number): string {
-  const all = STYLES[layer]!.shades
-  const n = Math.min(levels, all.length)
-  const k = Math.min(n - 1, Math.max(0, Math.floor(v * n)))
-  return all[n === 1 ? all.length - 1 : Math.round((k * (all.length - 1)) / (n - 1))]!
+  return pick(STYLES[layer]!.shades, v, levels)
 }
 
 /** A fixed sequence in [0, 1), carried in the state. */
@@ -806,91 +793,15 @@ const KrakenLive: ClientModule<Props, State> = (props, surface) => {
     return colour
   }
 
-  /** One pixel row as Boxes: a bare Box per gap, a coloured one per run of one shade. */
-  const pixelRow = (py: number, levels: number, step: number) => {
-    const boxes = []
-    let start = 0
-    const at = (x: number): string => {
-      const sx = x - (x % step)
-      const cell = cells[py]![sx]
-      const ink = inkAt(sx, py)
-      if (ink && !(cell && inkBehind)) {
-        return ink
-      }
-      return cell ? shade(cell[0], cell[1], levels) : ink
+  // Ink covers the Kraken, except once it is back and swimming through it.
+  return drawPixels(Box, props.cols, props.rows, (x, py, levels) => {
+    const cell = cells[py]![x]
+    const ink = inkAt(x, py)
+    if (ink && !(cell && inkBehind)) {
+      return ink
     }
-    let c = at(0)
-    for (let x = 1; x <= props.cols; x += 1) {
-      const n = x < props.cols ? at(x) : '\u0000'
-      if (n !== c) {
-        if (c) {
-          boxes.push(<Box width={x - start} backgroundColor={c} />)
-        } else if (n !== '\u0000') {
-          boxes.push(<Box width={x - start} />)
-        }
-        start = x
-        c = n
-      }
-    }
-    return boxes
-  }
-
-  // Full detail if it fits: 8 × 9.5 px pixels, two rows to a cell row. Else
-  // fewer shades; and last, pixels twice as big each way (16 × 19 px, a row
-  // to a cell row), so a Kraken up at the glass reads as pixel art zoomed in.
-  const draw = (levels: number, isCoarse: boolean) => {
-    const out = []
-    let boxes = 0
-    let empty = 0
-    for (let y = 0; y < props.rows; y += 1) {
-      const halves = isCoarse ? [pixelRow(y * 2, levels, 2)] : [pixelRow(y * 2, levels, 1), pixelRow(y * 2 + 1, levels, 1)]
-      if (halves.every(h => !h.length)) {
-        empty += 1
-        continue
-      }
-      if (empty) {
-        out.push(<Box height={empty} />)
-        empty = 0
-      }
-      boxes += halves.reduce((sum, h) => sum + h.length, 0)
-      out.push(
-        isCoarse ? (
-          <Box flexDirection="row" height={1} alignItems="stretch">
-            {halves[0]}
-          </Box>
-        ) : (
-          <Box flexDirection="column" height={1}>
-            <Box flexDirection="row" height="50%" alignItems="stretch">
-              {halves[0]}
-            </Box>
-            <Box flexDirection="row" height="50%" alignItems="stretch">
-              {halves[1]}
-            </Box>
-          </Box>
-        ),
-      )
-    }
-    return { out, boxes }
-  }
-  let drawn = draw(8, false)
-  for (const [levels, isCoarse] of [
-    [6, false],
-    [4, false],
-    [6, true],
-    [4, true],
-    [3, true],
-  ] as const) {
-    if (drawn.boxes <= BOX_BUDGET) {
-      break
-    }
-    drawn = draw(levels, isCoarse)
-  }
-  const out = drawn.out
-  return (
-    <Box flexDirection="column" width={props.cols} height={props.rows}>
-      {out}
-    </Box>
-  )
+    return cell ? shade(cell[0], cell[1], levels) : ink
+  })
 }
 
 export default KrakenLive

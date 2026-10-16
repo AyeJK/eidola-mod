@@ -16,6 +16,7 @@ Both are in `/config` once the mod is installed.
 
 An Engram suggests a placement in its Vessel (`placement`); your option always wins, and nothing an Engram sets stops you opening the pane.
 - Bundled Engrams: `wisp` (default), `spirit`, `skull`, `moon`, `sigil`, `starfield`. All are visual only: their Souls add no voice. Each Vessel is baked in the Vessel Forge as one SVG per state under `vessels/<engram>/`; a file that can't be read falls back to the built-in pixel sprite.
+- Live Engrams: `kraken`, something vast in deep water, and `lich`, a crowned skull of alchemical glyphs with soul-fire in its sockets. On desktop each is drawn live over a still backdrop and moves through three moods (idle, working, attention) without a cut; something going wrong makes the Kraken ink and scorches the Lich (`/eidola ink` to see it). Elsewhere each draws as a field scene, one per state.
 
 ## Diagnostics
 

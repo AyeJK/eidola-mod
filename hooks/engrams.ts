@@ -108,6 +108,22 @@ export const ENGRAMS: Record<string, Engram> = {
     soul: quietSoul('Kraken'),
     vessel: { type: 'svg', pack: 'kraken', forge: { source: 'kraken', style: 'scene', look: 'Pixel Kraken in particle water' }, scene: 'kraken' },
   },
+  lich: {
+    engram: {
+      engram_version: '1.0.0',
+      id: 'lich',
+      name: 'Lich',
+      voice_id: null,
+      meta: {
+        author: 'eidola',
+        created: '2026-10-16',
+        description: 'A crowned skull of alchemical signs, soul-fire in its sockets. It burns brighter while you work.',
+        tags: ['scene', 'glyph'],
+      },
+    },
+    soul: quietSoul('Lich'),
+    vessel: { type: 'svg', pack: 'lich', forge: { source: 'lich', style: 'scene', look: 'Glyph lich in ember gold' }, scene: 'lich' },
+  },
   starfield: visual('starfield', 'Starfield', 'Stars streaming past at warp, quicker when busy.', ['particle'], {
     source: 'stars',
     style: 'particle',

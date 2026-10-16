@@ -3,6 +3,7 @@
 
 import type { VesselState } from '../types'
 import type { FieldScene } from './field'
+import { lichBandScene, lichPaneScene } from './lich'
 import { krakenBandScene, krakenPaneScene } from './kraken'
 
 export type SceneViews = {
@@ -14,6 +15,7 @@ export type SceneViews = {
 
 export const SCENES = {
   kraken: { pane: krakenPaneScene, band: krakenBandScene },
+  lich: { pane: lichPaneScene, band: lichBandScene },
 } satisfies Record<string, SceneViews>
 
 export type SceneId = keyof typeof SCENES

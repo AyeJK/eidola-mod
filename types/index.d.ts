@@ -37,9 +37,20 @@ declare module 'claude-code' {
       live: Mood | null
       /**
        * How many times something has gone wrong: a failed tool, a turn ended in
-       * error, or `/eidola ink`. A live Kraken that sees it rise inks and flees.
+       * error, or `/eidola ink`. A live Kraken that sees it rise inks and flees;
+       * the Lich is scorched.
        */
       ink: number
+      /** When the mood last changed, and when the ink last rose (ms). */
+      moodAt: number
+      /** The mood before the last change. */
+      moodBefore: Mood
+      inkAt: number
+      /**
+       * When the session's live drawings started counting (ms): a drawing split
+       * across several keeps them in step by it.
+       */
+      epoch: number
     }
   }
 }

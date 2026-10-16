@@ -25,6 +25,7 @@ import type { Model, Signal, TurnEndReason } from './resolver'
 import { FACES, SPRITE_PALETTE, vesselSvg } from './sprite'
 import { renderScene } from './field'
 import { krakenWaterScene } from './kraken'
+import { voidScene } from './lich'
 import { SCENES } from './scenes'
 import { BAND_SCENE_PX, BAND_STAGE_PX, PX_PER_COLUMN, PX_PER_ROW, sceneSize, stageSize, stageSvg } from './stage'
 
@@ -43,6 +44,10 @@ const measureAtom = atom({ plugin: 'eidola', key: 'measure' } as const, false)
 const blendAtom = atom({ plugin: 'eidola', key: 'blend' } as const, null as number | null)
 const liveAtom = atom({ plugin: 'eidola', key: 'live' } as const, null as Mood | null)
 const inkAtom = atom({ plugin: 'eidola', key: 'ink' } as const, 0)
+const moodAtAtom = atom({ plugin: 'eidola', key: 'moodAt' } as const, 0)
+const moodBeforeAtom = atom({ plugin: 'eidola', key: 'moodBefore' } as const, 'idle' as Mood)
+const inkAtAtom = atom({ plugin: 'eidola', key: 'inkAt' } as const, 0)
+const epochAtom = atom({ plugin: 'eidola', key: 'epoch' } as const, 0)
 
 const LABELS: Record<VesselState, string> = {
   idle: 'Idle',
@@ -71,10 +76,14 @@ const svgCache = new Map<string, string>()
 const fileCache = new Map<string, string | null>()
 /** Cell rows the live band takes: it fills the band's own minimum height. */
 const BAND_ROWS = 7
+/** The Lich's band: tall enough for brow, eyes, nose and teeth at the pane's scale. */
+const LICH_BAND_ROWS = 12
 
 // What the band hook saw and drew last, for /eidola. Not drawn from.
 type BandSeen = { surface: string; hasSurvey: boolean; isWorking: boolean; drew: 'engine' | 'strip' | 'strip+survey' }
 let lastBand: BandSeen | undefined
+/** Which clock each live drawing keeps, as it reported on starting: for /eidola. */
+const liveClocks = new Map<string, string>()
 // The scene last built for the pane and the band. A scene's loops are locked
 // to the clock when it is built, so it is rebuilt only when its state or
 // size changes; a redraw for anything else (a tool's detail) reuses it and
@@ -177,6 +186,31 @@ async function show($: EngineInterface, view: VesselView): Promise<void> {
   setStatus($, engram ? `${engram.engram.name} · ${LABELS[view.state].toLowerCase()}` : undefined)
 }
 
+/** Something went wrong: count it, and when. */
+async function bumpInk($: EngineInterface): Promise<void> {
+  const at = await $.clock.now()
+  await update($, inkAtom, n => n + 1)
+  await update($, inkAtAtom, () => at)
+}
+
+/** What the live drawings share in their props: the mood, the ink, and the clock that keeps split drawings in step. */
+async function liveProps($: EngineInterface) {
+  return {
+    mood: await read($, moodAtom),
+    moodAt: await read($, moodAtAtom),
+    moodBefore: await read($, moodBeforeAtom),
+    ink: await read($, inkAtom),
+    inkAt: await read($, inkAtAtom),
+    epoch: await read($, epochAtom),
+  }
+}
+
+/** The Lich's pane is drawn by four drawings, one above the next, each within its own bound. */
+function lichSlices(rows: number): Array<[number, number]> {
+  const cuts = [0, 1, 2, 3, 4].map(i => Math.round((rows * i) / 4))
+  return [0, 1, 2, 3].map(i => [cuts[i]!, cuts[i + 1]! - cuts[i]!] as [number, number])
+}
+
 // Every hook goes through here, and nothing here may break a tool call or
 // a turn: failures are swallowed and the Vessel just misses a beat.
 async function signal($: EngineInterface, s: Signal): Promise<void> {
@@ -189,11 +223,15 @@ async function signal($: EngineInterface, s: Signal): Promise<void> {
     pending = undefined
     if ((await read($, moodAtom)) !== model.mood) {
       const mood = model.mood
+      const at = await $.clock.now()
+      const before = await read($, moodAtom)
+      await update($, moodBeforeAtom, () => before)
       await update($, moodAtom, () => mood)
+      await update($, moodAtAtom, () => at)
     }
-    // Something went wrong: the live Kraken inks.
+    // Something went wrong: the live Kraken inks; the Lich is scorched.
     if ((s.kind === 'toolEnd' && !s.isOk) || (s.kind === 'turnEnd' && (s.reason === 'error' || s.reason === 'refusal'))) {
-      await update($, inkAtom, n => n + 1)
+      await bumpInk($)
     }
     await show($, out.view)
     if (out.then) {
@@ -280,6 +318,11 @@ export const register: Register = (on, options) => {
     })
     await $.command.register({ name: 'sleep', description: 'Put the awake Engram to sleep and remove its Soul' })
     await $.command.register({ name: 'engrams', description: 'List the bundled Engrams' })
+
+    if (!(await read($, epochAtom))) {
+      const now = await $.clock.now()
+      await update($, epochAtom, () => now)
+    }
 
     const stored = await $.store.get(STORE_KEY)
     const id = stored === undefined ? DEFAULT_ENGRAM : typeof stored === 'string' && ENGRAMS[stored] ? stored : null
@@ -401,8 +444,9 @@ export const register: Register = (on, options) => {
     }
 
     if (sub === 'ink') {
-      await update($, inkAtom, n => n + 1)
-      return { text: 'The Kraken inks.' }
+      await bumpInk($)
+      const awake = engramOf(await read($, engramAtom))
+      return { text: awake?.vessel.scene === 'lich' ? 'The Lich is scorched.' : 'The Kraken inks.' }
     }
 
     if (sub === 'live') {
@@ -492,6 +536,9 @@ export const register: Register = (on, options) => {
       lastBand
         ? `Band hook last saw: ${lastBand.surface}, survey=${lastBand.hasSurvey}, working=${lastBand.isWorking}; drew ${lastBand.drew}.`
         : 'Band hook: not asked to draw since the mod loaded.',
+      liveClocks.size
+        ? `Live drawings' clocks: ${[...liveClocks].map(([k, v]) => `${k} ${v}`).join(', ')}.`
+        : "Live drawings' clocks: none reported.",
       'Network, from where this session runs:',
       ...probes.map(line => `  ${line}`),
     ]
@@ -499,6 +546,16 @@ export const register: Register = (on, options) => {
   })
 
   // The person closing the pane brings the band back.
+  // A live drawing reports, on starting, whether it keeps the shared clock.
+  on('ui.message', async ($, e, next) => {
+    const data = e.data as { clock?: unknown } | null
+    if (data && typeof data === 'object' && typeof data.clock === 'string') {
+      liveClocks.set(e.element, data.clock)
+      return {}
+    }
+    return next(e)
+  })
+
   on('ui.close', async ($, e, next) => {
     const result = await next(e)
     if (e.id === PANE) {
@@ -597,6 +654,31 @@ export const register: Register = (on, options) => {
           <Svg key="scene:water" source={water} alt={`${awake.engram.name} in deep water`} width={width} height={height} isInteractive />
           <Box position="absolute" top={0} left={0}>
             <Client key="kraken-live" module="./kraken-live.tsx" props={{ mood, cols, rows, ink: await read($, inkAtom) }} width={cols} height={rows} />
+          </Box>
+        </Box>
+      )
+    }
+
+    // The Lich live, the same way: the dark it hangs in drawn once, and it
+    // drawn over that in glyphs, in four slices, top to bottom, that keep in step.
+    if (awake?.vessel.scene === 'lich' && e.surface === 'desktop' && e.props.placement === 'dock' && !(await read($, mediaAtom))) {
+      const { Client } = $.ui.resolve(e)
+      const { width, height } = sceneSize(e.props.bodyColumns, e.props.scroll.bodyRows, e.props.placement)
+      const now = await $.clock.now()
+      const backdrop = sceneFor('pane', `lich-void:${width}x${height}`, () => renderScene(voidScene(width, height, 'pane'), now))
+      const cols = e.props.bodyColumns
+      const rows = Math.max(6, e.props.scroll.bodyRows - 1)
+      const shared = { ...(await liveProps($)), cols, rows }
+      const [a, b, c, d] = lichSlices(rows)
+      return (
+        <Box width={cols} height={rows}>
+          {/* Nothing here may change with the mood, alt included: a changed prop reloads the drawing. */}
+          <Svg key="scene:void" source={backdrop} alt={`${awake.engram.name} in the dark`} width={width} height={height} isInteractive />
+          <Box position="absolute" top={0} left={0} flexDirection="column">
+            <Client key="lich-0" module="./lich-live.tsx" props={{ ...shared, slice: a! }} width={cols} height={a![1]} />
+            <Client key="lich-1" module="./lich-live.tsx" props={{ ...shared, slice: b! }} width={cols} height={b![1]} />
+            <Client key="lich-2" module="./lich-live.tsx" props={{ ...shared, slice: c! }} width={cols} height={c![1]} />
+            <Client key="lich-3" module="./lich-live.tsx" props={{ ...shared, slice: d! }} width={cols} height={d![1]} />
           </Box>
         </Box>
       )
@@ -739,6 +821,26 @@ export const register: Register = (on, options) => {
           <Svg key="scene:band-water" source={water} alt={`${engram.engram.name} in deep water`} width={width} height={height} isInteractive />
           <Box position="absolute" top={0} left={0}>
             <Client key="kraken-band" module="./kraken-live.tsx" props={{ mood, cols, rows, view: 'band', ink: await read($, inkAtom) }} width={cols} height={rows} />
+          </Box>
+        </Box>,
+      )
+    }
+
+    // The Lich in the band: a strip across its face, over the dark, as tall
+    // as the band allows up to twelve rows: fewer, and its face is a smear.
+    if (awake?.vessel.scene === 'lich' && e.surface === 'desktop') {
+      const { Box, Svg, Client } = $.ui.resolve(e)
+      const cols = e.props.bodyColumns
+      const rows = e.props.hasSurvey ? BAND_ROWS : Math.max(BAND_ROWS, Math.min(LICH_BAND_ROWS, e.props.maxRows))
+      const width = Math.max(96, cols * PX_PER_COLUMN - 4)
+      const height = rows * PX_PER_ROW - 2
+      const now = await $.clock.now()
+      const backdrop = sceneFor('band', `lich-void:${width}x${height}`, () => renderScene(voidScene(width, height, 'band'), now))
+      return withSurvey(
+        <Box width={cols} height={rows}>
+          <Svg key="scene:band-void" source={backdrop} alt={`${engram.engram.name} in the dark`} width={width} height={height} isInteractive />
+          <Box position="absolute" top={0} left={0}>
+            <Client key="lich-band" module="./lich-live.tsx" props={{ ...(await liveProps($)), cols, rows, view: 'band' }} width={cols} height={rows} />
           </Box>
         </Box>,
       )

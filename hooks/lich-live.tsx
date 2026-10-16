@@ -13,9 +13,9 @@ import type { ClientModule } from 'claude-code'
 
 import type { Mood } from '../types'
 import { hash } from './field'
-import { ARCANE, COLOURS, FIRE, SCORCHED, WITCHLIGHT, framing, glyphFor } from './lich'
+import { ARCANE, COLOURS, ROBE_EMERALD, ROBE_PURPLE, FIRE, SCORCHED, WITCHLIGHT, framing, glyphFor } from './lich'
 import type { View } from './lich'
-import { BONE, CROWN, GEM, buildModel, modelBounds, sampleModel } from './lich3d'
+import { BONE, CROWN, GEM, MANTLE, buildModel, modelBounds, sampleModel } from './lich3d'
 import type { Pose } from './lich3d'
 import { drawGlyphs } from './live-glyphs'
 import { pick, short } from './live-pixels'
@@ -58,9 +58,10 @@ type Carry = Pick<Live, 'mood' | 'moodNext' | 'moodTick' | 'inkSeen' | 'inkPendi
  * And it flies: a `swoop` dives out through one side and comes back from the
  * other; a `dip` sinks out of the bottom and rises again; a `pass` sweeps
  * past right against the glass. A `vanish` dissolves it into drifting motes,
- * and it gathers itself again somewhere else.
+ * and it gathers itself again somewhere else. Its arms hang at its sides
+ * but for a `gesture`, one hand lifted, and a `beckon` to you.
  */
-type Act = 'turn' | 'chuckle' | 'drift' | 'gutter' | 'loom' | 'chant' | 'surge' | 'tilt' | 'speak' | 'swoop' | 'dip' | 'pass' | 'vanish'
+type Act = 'turn' | 'chuckle' | 'drift' | 'gutter' | 'loom' | 'chant' | 'surge' | 'tilt' | 'speak' | 'swoop' | 'dip' | 'pass' | 'vanish' | 'gesture' | 'beckon'
 
 /**
  * A waypoint: across and down the glass (fractions) and depth (pixels). A
@@ -90,11 +91,11 @@ type Plan = {
 
 const PLANS: Record<Mood, Plan> = {
   // Hanging in the dark, fire low, a few runes drifting round.
-  idle: { home: [0.5, 0, 0.27], spread: 0.1, pitch: 0.1, eyes: 0.55, flame: 0.15, runes: 0.5, spin: 0.15, churn: 0.6, light: 0.75, acts: [['turn', 3], ['chuckle', 1.5], ['drift', 2], ['gutter', 1.5], ['loom', 1], ['swoop', 2], ['dip', 1.5], ['pass', 1], ['vanish', 1.5]], every: [50, 140] },
+  idle: { home: [0.5, 0, 0.27], spread: 0.1, pitch: 0.1, eyes: 0.55, flame: 0.15, runes: 0.5, spin: 0.15, churn: 0.6, light: 0.75, acts: [['turn', 3], ['chuckle', 1.5], ['drift', 2], ['gutter', 1.5], ['loom', 1], ['swoop', 2], ['dip', 1.5], ['pass', 1], ['vanish', 1.5], ['gesture', 1.5]], every: [50, 140] },
   // Burning: flame streaming from its sockets, every rune racing.
   working: { home: [0.5, -80, 0.26], spread: 0.06, pitch: -0.04, eyes: 1.1, flame: 1, runes: 1, spin: 0.9, churn: 3, light: 1, acts: [['chant', 3], ['surge', 2], ['turn', 1], ['swoop', 0.8], ['dip', 0.6], ['vanish', 0.6]], every: [40, 100] },
   // At the glass, eyes gone to witchlight, looking at you.
-  attention: { home: [0.5, -380, 0.3], spread: 0.03, pitch: -0.02, eyes: 1.6, flame: 0.5, runes: 0.6, spin: 0.3, churn: 1, light: 1, acts: [['tilt', 3], ['speak', 2], ['loom', 1]], every: [20, 50] },
+  attention: { home: [0.5, -380, 0.3], spread: 0.03, pitch: -0.02, eyes: 1.6, flame: 0.5, runes: 0.6, spin: 0.3, churn: 1, light: 1, acts: [['tilt', 3], ['speak', 2], ['loom', 1], ['beckon', 2]], every: [20, 50] },
 }
 
 /**
@@ -142,6 +143,9 @@ type Live = {
   witch: number
   /** How far arcane fire has kindled across its signs: 1 while it works. */
   arcane: number
+  /** How far its robe has gone to purple (working), and to emerald (attention): 0 to 1 each. */
+  heat: number
+  alarm: number
   blinkUntil: number
   nextBlink: number
   act: Act | 'none'
@@ -155,6 +159,11 @@ type Live = {
   route: Waypoint[]
   /** How much of it is here: 1 whole, 0 dissolved to nothing. */
   presence: number
+  /** Its arms, x < 0 then x > 0: how raised and how flung out, easing to where they are going. */
+  arms: [{ raise: number; spread: number }, { raise: number; spread: number }]
+  /** A gesture greeting a new mood, and until when. */
+  greet: 'conjure' | 'beckon' | 'none'
+  greetUntil: number
   inkSeen: number
   scorchUntil: number
   scorch: number
@@ -178,6 +187,20 @@ const EMBER = COLOURS.map(ramp => ramp.map(short))
 const COLD = WITCHLIGHT.map(short)
 const GREEN = ARCANE.map(short)
 const RED = SCORCHED.map(short)
+/** One colour part way to another, as #rrggbb. */
+function mixHex(a: string, b: string, k: number): string {
+  const ca = parseInt(a.slice(1), 16)
+  const cb = parseInt(b.slice(1), 16)
+  const channel = (shift: number) => Math.round(((ca >> shift) & 255) * (1 - k) + ((cb >> shift) & 255) * k)
+  return '#' + ((channel(16) << 16) | (channel(8) << 8) | channel(0)).toString(16).padStart(6, '0')
+}
+
+/** A ramp part way to another, shade by shade; the shorter one stretched to the longer. */
+function mixRamp(a: readonly string[], b: readonly string[], k: number): string[] {
+  const n = Math.max(a.length, b.length)
+  const at = (r: readonly string[], i: number) => r[Math.round((i * (r.length - 1)) / (n - 1))]!
+  return Array.from({ length: n }, (_, i) => mixHex(at(a, i), at(b, i), k))
+}
 
 function random(live: Live): number {
   live.seed = (live.seed + 0x6d2b79f5) >>> 0
@@ -219,6 +242,7 @@ function poseOf(live: Live, W: number, H: number): Pose {
     spin: live.spin,
     t: live.t,
     light: live.light,
+    arms: [{ ...live.arms[0] }, { ...live.arms[1] }],
   }
 }
 
@@ -253,6 +277,10 @@ function step(live: Live, W: number, H: number): void {
     live.xTarget = plan.home[0]
     endAct()
     live.nextAct = live.tick + between(live, [10, 30])
+    // A new mood is greeted with its hands: raised to conjure as work begins, one lifted to you when it needs you.
+    live.greet = live.mood === 'working' ? 'conjure' : live.mood === 'attention' ? 'beckon' : 'none'
+    live.greetUntil = live.tick + 45
+    live.side = random(live) < 0.5 ? -1 : 1
   }
   if (live.act !== 'none' && live.tick >= live.actUntil) {
     endAct()
@@ -310,9 +338,8 @@ function step(live: Live, W: number, H: number): void {
       spinRate *= 2.5
       break
     case 'surge':
-      spinRate *= 4
-      runes = 1
       eyes += 0.3
+      flame = 1
       break
     case 'tilt':
       roll = live.side * 0.22
@@ -330,6 +357,46 @@ function step(live: Live, W: number, H: number): void {
     jaw = Math.max(jaw, 0.5 * k)
     eyes = Math.max(eyes, 1.5)
     z += 120 * k
+  }
+
+  // Its arms: down at its sides unless it is greeting a mood or doing something with them.
+  const arms = [
+    { raise: 0, spread: 0 },
+    { raise: 0, spread: 0 },
+  ]
+  const one = live.side < 0 ? 0 : 1
+  if (live.tick < live.greetUntil) {
+    if (live.greet === 'conjure') {
+      arms[0]!.raise = arms[1]!.raise = 1
+    } else if (live.greet === 'beckon') {
+      arms[one]!.raise = 0.85
+    }
+  }
+  switch (live.act) {
+    case 'chant':
+      arms[0]!.raise = arms[1]!.raise = 1
+      break
+    case 'surge':
+      arms[0]!.spread = arms[1]!.spread = 1
+      arms[0]!.raise = arms[1]!.raise = 0.5
+      break
+    case 'gesture':
+      arms[one]!.raise = 0.75
+      break
+    case 'beckon':
+      arms[one]!.raise = 0.8 + 0.12 * Math.sin(live.t * 4)
+      break
+    case 'speak':
+      arms[one]!.raise = 0.45 + 0.2 * Math.sin(live.t * 2.5)
+      break
+  }
+  if (scorched) {
+    const k = (live.scorchUntil - live.tick) / 30
+    arms[0]!.spread = arms[1]!.spread = 0.7 * k
+  }
+  for (const i of [0, 1] as const) {
+    live.arms[i].raise = ease(live.arms[i].raise, arms[i]!.raise, 0.1)
+    live.arms[i].spread = ease(live.arms[i].spread, arms[i]!.spread, 0.1)
   }
 
   // Dissolving and gathering again: gone for a moment in the middle, it
@@ -399,6 +466,8 @@ function step(live: Live, W: number, H: number): void {
   live.light = ease(live.light, plan.light, 0.05)
   live.witch = ease(live.witch, live.mood === 'attention' ? 1 : 0, 0.1)
   live.arcane = ease(live.arcane, live.mood === 'working' ? (live.act === 'chant' || live.act === 'surge' ? 1.5 : 1) : 0, 0.05)
+  live.heat = ease(live.heat, live.mood === 'working' ? 1 : 0, 0.06)
+  live.alarm = ease(live.alarm, live.mood === 'attention' ? 1 : 0, 0.08)
   live.scorch = ease(live.scorch, scorched ? 1 : 0, scorched ? 0.4 : 0.06)
 
   if (live.tick >= live.nextLook && live.act === 'none') {
@@ -497,6 +566,8 @@ function born(carry: Carry, view: View, tick: number): Live {
     light: plan.light,
     witch: carry.mood === 'attention' ? 1 : 0,
     arcane: carry.mood === 'working' ? 1 : 0,
+    heat: carry.mood === 'working' ? 1 : 0,
+    alarm: carry.mood === 'attention' ? 1 : 0,
     blinkUntil: 0,
     nextBlink: tick + 50,
     act: isResync ? 'vanish' : 'none',
@@ -507,6 +578,12 @@ function born(carry: Carry, view: View, tick: number): Live {
     vy: 0,
     route: [],
     presence: isResync ? 0 : 1,
+    arms: [
+      { raise: 0, spread: 0 },
+      { raise: 0, spread: 0 },
+    ],
+    greet: 'none',
+    greetUntil: 0,
     scorchUntil: 0,
     scorch: 0,
   }
@@ -591,6 +668,9 @@ const LichLive: ClientModule<Props, State> = (props, surface) => {
   const scorch = live.scorch
   const witch = live.witch
   const arcane = live.arcane
+  // The robe's colour this frame: dark red, going to purple as it works or
+  // emerald when it needs you, the whole robe at once.
+  const robeRamp = mixRamp(mixRamp(COLOURS[MANTLE]!, ROBE_PURPLE, live.heat), ROBE_EMERALD, live.alarm).map(short)
   // Which crown signs burn arcane changes a few times a second.
   const kindle = Math.floor(live.t * 3)
   const presence = live.presence
@@ -601,11 +681,16 @@ const LichLive: ClientModule<Props, State> = (props, surface) => {
     // Half here: each sign is in or out by its own lot, and those on the
     // edge of going are motes, shifting cell to cell.
     if (presence < 0.999) {
-      const lot = hash(x * 5 + 1, y * 7 + 3)
-      if (lot > presence + 0.12) {
+      if (presence < 0.03) {
         return undefined
       }
-      if (lot > presence - 0.12) {
+      const lot = hash(x * 5 + 1, y * 7 + 3)
+      // The band of motes at the edge of what is left narrows as it goes, to nothing.
+      const band = 0.12 * Math.min(1, presence * 5)
+      if (lot > presence + band) {
+        return undefined
+      }
+      if (lot > presence - band) {
         if (hash(x + live.tick, y * 3 - live.tick) > 0.45) {
           return undefined
         }
@@ -613,13 +698,16 @@ const LichLive: ClientModule<Props, State> = (props, surface) => {
         return [GREEN[2]!, hash(x, y + live.tick) < 0.5 ? '·' : '∴'] as const
       }
     }
-    const isScorched = scorch > 0.02 && hash(x, y) < scorch
+    // In patches, not cell by cell: a colour a cell would be a run a cell.
+    const isScorched = scorch > 0.02 && hash(Math.floor(x / 5), y) < scorch
     // While it works its gem burns arcane green, as its flame does, and a few
     // arcane sparks run over its crown; never over the skull.
     const isArcane =
       arcane > 0.02 && ((cell.layer === GEM && arcane > 0.5) || (cell.layer === CROWN && hash(x * 3 + kindle, y * 5 - kindle) < arcane * (0.02 + 0.1 * cell.v)))
-    const ramp = isScorched ? RED : isArcane ? GREEN : cell.layer === FIRE && hash(y, x) < witch ? COLD : EMBER[cell.layer]!
+    // The robe wears the mood's colour.
+    const robe = cell.layer === MANTLE ? robeRamp : undefined
     const v = cell.v
+    const ramp = isScorched ? RED : isArcane ? GREEN : robe ?? (cell.layer === FIRE && hash(y, Math.floor(x / 3)) < witch ? COLD : EMBER[cell.layer]!)
     // Lifted: a sign in the dark wants to be seen.
     const colour = pick(ramp, 0.2 + 0.85 * Math.pow(v, 0.7), levels)
     // Scorched signs glitch: any glyph at all, for a moment.
@@ -627,7 +715,7 @@ const LichLive: ClientModule<Props, State> = (props, surface) => {
     return [colour, glyph] as const
   }
   const model = buildModel(poseOf(live, W, H), framing(view, W, H).cam)
-  // Each cell sampled once a frame, at three heights: a glyph is tall.
+  // Each cell sampled once a frame, at two heights: a glyph is tall.
   const cells = new Map<number, Sampled | null>()
   const cellAt = (x: number, y: number): Sampled | null => {
     const key = y * props.cols + x
@@ -636,20 +724,20 @@ const LichLive: ClientModule<Props, State> = (props, surface) => {
       let cell: Sampled | null = null
       let sum = 0
       let hits = 0
-      for (const f of [0.25, 0.5, 0.75]) {
+      for (const f of [0.3, 0.7]) {
         const hit = sampleModel(model, (x + 0.5) * CW, (y + f) * CH)
         if (hit) {
           hits += 1
           sum += hit.cell[1]
           const before = cell as Sampled | null
-          if (!before || f === 0.5 || hit.glyph) {
+          if (!before || hit.glyph) {
             cell = { layer: hit.cell[0], v: 0, glyph: hit.glyph ?? before?.glyph }
           }
         }
       }
       if (cell) {
         // Edges, half in and half out, draw lighter signs.
-        cell.v = (sum / Math.max(1, hits)) * (0.55 + 0.15 * hits)
+        cell.v = (sum / Math.max(1, hits)) * (0.7 + 0.15 * hits)
       }
       cells.set(key, cell)
       return cell

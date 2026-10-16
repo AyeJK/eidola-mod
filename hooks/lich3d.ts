@@ -1,13 +1,13 @@
 // The Lich in three dimensions, for the live drawing: a crowned skull with
 // soul-fire in its sockets, a high collar rising behind it, a mantle over
-// bony shoulders, and runes wheeling about its head. Seen close through the
-// glass, in perspective; each point takes whatever is nearest.
+// bony shoulders, robes whose ragged hem frays into ash. Seen close through the glass, in perspective;
+// each point takes whatever is nearest.
 //
 // World: x right, y down, z away from the glass, in pixels; the glass is
 // z 0. The skull and crown are one distance field, the body another, each
-// marched per point; the fire, its flames and the runes are points on the glass.
+// marched per point; the fire, its flames and the ash are points on the glass.
 
-import { clamp01 } from './field'
+import { clamp01, hash, noise } from './field'
 import type { Cell } from './field'
 
 export type V3 = [number, number, number]
@@ -53,7 +53,21 @@ export type Pose = {
   t: number
   /** How much light reaches it, 0 to 1. */
   light: number
+  /** Each arm, its left then its right (our right, then our left): how far raised and how far flung out. */
+  arms: [ArmPose, ArmPose]
 }
+
+/**
+ * An arm: 0 hanging at its side, hand down; `raise` 1 bent up before the
+ * chest, hand up; `spread` 1 flung out wide, palm up.
+ */
+export type ArmPose = { raise: number; spread: number }
+
+/** Arms at rest: down at its sides. */
+export const ARMS_DOWN: [ArmPose, ArmPose] = [
+  { raise: 0, spread: 0 },
+  { raise: 0, spread: 0 },
+]
 
 type Mat = [V3, V3, V3]
 
@@ -171,17 +185,23 @@ function head(px: number, py: number, pz: number, jaw: number): { d: number; isC
 }
 
 /**
- * The body from the base of the neck: shoulders under a mantle, heavy
- * pauldrons, a chest, robes falling away below, and a high collar that
- * rises behind the head like a fan.
+ * The body from the base of the neck: a cultist's robe. Shoulders, a chest,
+ * the robe falling long below; a high collar behind the head; arms bent at
+ * the elbow in wide bell sleeves; bony hands raised from the cuffs; a cord
+ * knotted at the waist with two tassels hanging.
  */
 function body(px: number, py: number, pz: number): number {
+  return Math.min(robe(px, py, pz), sleeves(px, py, pz), hands(px, py, pz), cord(px, py, pz))
+}
+
+/** Shoulders, chest and the long robe, and the collar rising behind the head. */
+function robe(px: number, py: number, pz: number): number {
   const ax = Math.abs(px)
   let d = capsule(ax, py, pz, [0, 0.05, 0.25], [0, 0.4, 0.3], 0.17)
-  d = smin(d, capsule(ax, py, pz, [0.05, 0.42, 0.32], [0.6, 0.6, 0.34], 0.2), 0.25)
-  d = smin(d, ell(ax, py, pz, 0.66, 0.58, 0.3, 0.3, 0.26, 0.32), 0.1)
-  d = smin(d, ell(px, py, pz, 0, 1.15, 0.42, 0.6, 0.72, 0.42), 0.3)
-  d = smin(d, ell(px, py, pz, 0, 2.3, 0.5, 0.68, 1.3, 0.5), 0.3)
+  d = smin(d, capsule(ax, py, pz, [0.05, 0.42, 0.32], [0.58, 0.58, 0.34], 0.2), 0.25)
+  d = smin(d, ell(ax, py, pz, 0.6, 0.6, 0.32, 0.24, 0.24, 0.28), 0.1)
+  d = smin(d, ell(px, py, pz, 0, 1.15, 0.42, 0.56, 0.72, 0.42), 0.3)
+  d = smin(d, ell(px, py, pz, 0, 2.4, 0.5, 0.66, 1.4, 0.5), 0.3)
   // The collar: a thin shell behind the head, open at the front, its rim scalloped.
   let collar = Math.abs(ell(px, py, pz, 0, -0.4, 0.5, 0.72, 0.95, 0.38)) - 0.03
   collar = Math.max(collar, 0.2 - pz)
@@ -189,6 +209,98 @@ function body(px: number, py: number, pz: number): number {
   collar = Math.max(collar, -1.15 - 0.12 * Math.abs(Math.sin(px * 7)) - py)
   return Math.min(d, collar)
 }
+
+/** The distance to a box (centre, half sizes): never more than the distance to anything inside it. */
+function boxDistance(px: number, py: number, pz: number, c: V3, h: V3): number {
+  const qx = Math.max(Math.abs(px - c[0]) - h[0], 0)
+  const qy = Math.max(Math.abs(py - c[1]) - h[1], 0)
+  const qz = Math.max(Math.abs(pz - c[2]) - h[2], 0)
+  return Math.hypot(qx, qy, qz)
+}
+
+/** The shoulder, where each arm hangs from (on the side x > 0; the other mirrors it). */
+const SHOULDER: V3 = [0.6, 0.62, 0.3]
+
+/** An arm's joints for a pose: elbow, wrist, the way its fingers point, and its sleeve's bell. */
+type Joints = { elbow: V3; wrist: V3; up: V3; side: V3; bell: V3; palm: V3; box: [V3, V3] }
+
+/** Three poses an arm moves between: hanging, raised before the chest, flung out wide. */
+const POSES = {
+  down: { elbow: [0.74, 1.15, 0.32] as V3, wrist: [0.72, 1.62, 0.26] as V3, up: [0.02, 1, 0] as V3 },
+  raised: { elbow: [0.74, 1.12, 0.02] as V3, wrist: [0.46, 0.86, -0.36] as V3, up: [-0.12, -1, -0.12] as V3 },
+  spread: { elbow: [0.98, 0.94, 0.16] as V3, wrist: [1.18, 0.7, 0.0] as V3, up: [0.22, -1, -0.12] as V3 },
+}
+
+const lerp3 = (a: V3, b: V3, k: number): V3 => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]
+
+/** Where an arm's joints are, for its pose. */
+function jointsFor(a: ArmPose): Joints {
+  const r = clamp01(a.raise)
+  const sp = clamp01(a.spread)
+  const pick = (k: 'elbow' | 'wrist' | 'up') => lerp3(lerp3(POSES.down[k], POSES.raised[k], r), POSES.spread[k], sp)
+  const elbow = pick('elbow')
+  const wrist = pick('wrist')
+  const up = norm(pick('up'))
+  // Across the hand: square to the way it points, in the plane of the glass.
+  const side = norm([up[1], -up[0], 0])
+  // The bell hangs below the forearm, nearer the cuff.
+  const mid = lerp3(elbow, wrist, 0.6)
+  const bell: V3 = [mid[0], mid[1] + 0.16, mid[2]]
+  const palm = add(wrist, mul(up, 0.15))
+  const reach = 0.42
+  return { elbow, wrist, up, side, bell, palm, box: [palm, [reach, reach, reach]] }
+}
+
+/** This frame's arms, [x < 0, x > 0]: set from the model before its body is marched. */
+let ARMS: [Joints, Joints] = [jointsFor(ARMS_DOWN[0]), jointsFor(ARMS_DOWN[1])]
+
+/** Arms bent at the elbow, in sleeves that hang in a wide bell below the forearm. */
+function sleeves(px: number, py: number, pz: number): number {
+  const ax = Math.abs(px)
+  const a = ARMS[px < 0 ? 0 : 1]
+  let d = capsule(ax, py, pz, SHOULDER, a.elbow, 0.15)
+  d = smin(d, capsule(ax, py, pz, a.elbow, a.wrist, 0.12), 0.08)
+  // The bell: cloth hanging from the forearm, widest and lowest at the cuff.
+  return smin(d, ell(ax, py, pz, a.bell[0], a.bell[1], a.bell[2], 0.26, 0.34, 0.2), 0.14)
+}
+
+/** Bony hands from the cuffs, fingers a little spread, thumbs out. */
+function hands(px: number, py: number, pz: number): number {
+  const ax = Math.abs(px)
+  const a = ARMS[px < 0 ? 0 : 1]
+  // Far from the hand, the distance to its box is near enough, and cheap.
+  const box = boxDistance(ax, py, pz, a.box[0], a.box[1])
+  if (box > 0.1) {
+    return box
+  }
+  let d = ell(ax, py, pz, a.palm[0], a.palm[1], a.palm[2], 0.09, 0.09, 0.06)
+  for (let f = 0; f < 4; f += 1) {
+    const across = (f - 1.5) * 0.05
+    const length = f === 1 || f === 2 ? 0.24 : 0.19
+    const root = add(add(a.wrist, mul(a.up, 0.2)), mul(a.side, across))
+    const tip = add(add(root, mul(a.up, length)), mul(a.side, across * 0.5))
+    d = Math.min(d, capsule(ax, py, pz, root, tip, 0.028))
+  }
+  const thumb = add(add(a.wrist, mul(a.up, 0.1)), mul(a.side, 0.09))
+  return Math.min(d, capsule(ax, py, pz, thumb, add(add(thumb, mul(a.up, 0.08)), mul(a.side, 0.1)), 0.03))
+}
+
+/** The cord round the waist, its knot at the front, two tassels hanging from it. */
+function cord(px: number, py: number, pz: number): number {
+  const box = boxDistance(px, py, pz, [0, 1.62, 0.2], [0.65, 0.4, 0.5])
+  if (box > 0.1) {
+    return box
+  }
+  const ring = (Math.hypot(px / 0.55, (pz - 0.42) / 0.43) - 1) * 0.5
+  let d = Math.hypot(ring, py - 1.32) - 0.035
+  d = Math.min(d, ell(px, py, pz, 0, 1.34, -0.03, 0.07, 0.06, 0.05))
+  const ax = Math.abs(px)
+  d = Math.min(d, capsule(ax, py, pz, [0.04, 1.36, -0.04], [0.08, 1.82, -0.07], 0.025))
+  return Math.min(d, ell(ax, py, pz, 0.085, 1.9, -0.07, 0.04, 0.09, 0.04))
+}
+
+/** The robe's ragged hem, by its x, shifting slowly. */
+const hemAt = (px: number, t: number) => 2.3 + 0.2 * noise(px * 5 + 3, t * 0.3) + 0.08 * Math.sin(px * 9)
 
 function normalOf(f: (x: number, y: number, z: number) => number, px: number, py: number, pz: number, e: number): V3 {
   const a = f(px + e, py - e, pz - e)
@@ -214,6 +326,8 @@ export type Model = {
   /** The vertebrae under the jaw: centres and radii on the glass. */
   neck: Array<{ x: number; y: number; z: number; r: number }>
   headBox: [number, number, number, number]
+  /** Its arms' joints this frame. */
+  arms: [Joints, Joints]
 }
 
 /** The runes, drawn as themselves: planets and metals of the old work. */
@@ -248,13 +362,14 @@ export function buildModel(p: Pose, cam: Camera): Model {
   const gem = project(cam, H(0, -0.5, -0.56))
   sparks.push({ x: gem.x, y: gem.y, z: gem.z - 2, r: s * 0.05 * gem.k, v: 0.6 + 0.4 * p.eyes * 0.6, layer: GEM, glyph: '●' })
 
-  // Runes wheel about the head on a tilted ring, nearer ones bigger and brighter.
-  const shown = Math.round(RUNES.length * p.runes)
-  for (let i = 0; i < shown; i += 1) {
-    const a = p.spin + (i / RUNES.length) * TAU
-    const q = add(p.pos, [Math.sin(a) * s * 1.35, -s * 0.15 + Math.cos(a) * s * 0.28 + Math.sin(p.t * 1.3 + i) * s * 0.05, Math.cos(a) * s * 0.9])
+  // The robe frays at its hem into ash, drifting down and thinning to nothing.
+  for (let i = 0; i < 34; i += 1) {
+    const x0 = (hash(i, 101) * 2 - 1) * 0.62
+    const phase = (p.t * (0.05 + 0.06 * hash(i, 102)) + hash(i, 103)) % 1
+    const x = x0 + Math.sin(p.t * 0.7 + i) * 0.05 + phase * (hash(i, 104) - 0.5) * 0.3
+    const q = Bw(x, hemAt(x0, p.t) - 0.05 + phase * 0.8, 0.1)
     const pr = project(cam, q)
-    sparks.push({ x: pr.x, y: pr.y, z: q[2], r: s * 0.06 * pr.k, v: 0.5 + 0.5 * clamp01(-Math.cos(a) * 0.5 + 0.5), layer: RUNE, glyph: RUNES[i]! })
+    sparks.push({ x: pr.x, y: pr.y, z: q[2], r: 1, v: (1 - phase) * 0.6 * p.light, layer: MANTLE, glyph: phase < 0.3 ? '∴' : phase < 0.6 ? ':' : phase < 0.85 ? '∙' : '·' })
   }
 
   const neck = [0, 1, 2].map(i => {
@@ -264,7 +379,7 @@ export function buildModel(p: Pose, cam: Camera): Model {
 
   const c = project(cam, p.pos)
   const reach = s * 1.05 * c.k
-  return { cam, pose: p, R, B, base, sparks, neck, headBox: [c.x - reach, c.y - reach * 1.2, c.x + reach, c.y + reach * 1.1] }
+  return { cam, pose: p, R, B, base, sparks, neck, headBox: [c.x - reach, c.y - reach * 1.2, c.x + reach, c.y + reach * 1.1], arms: [jointsFor(p.arms[0]), jointsFor(p.arms[1])] }
 }
 
 /** Where on the glass it could draw anything, side to side and from the top. */
@@ -276,8 +391,8 @@ export function modelBounds(m: Model): [number, number, number, number] {
 
 // ── What the viewer sees at a point ───────────────────────────────────────
 
-/** [layer, brightness], and how near. */
-type Hit = { z: number; cell: Cell }
+/** [layer, brightness], how near, and the glyph it insists on, if any. */
+type Hit = { z: number; cell: Cell; glyph?: string }
 
 /** From above and in front, a little to the left: the light the fire throws up is separate. */
 const KEY = norm([-0.35, -0.7, -0.6])
@@ -361,46 +476,77 @@ function bodyHit(m: Model, X: number, Y: number): Hit | undefined {
   const D = norm([X - cam.cx, Y - cam.cy, cam.f])
   const o = mul(applyT(B, sub(O, base)), 1 / s)
   const d = applyT(B, D)
-  const oc = sub(o, [0, 1.2, 0.4])
-  const b = dot(oc, d)
-  const c = dot(oc, oc) - 2.9 * 2.9
-  const disc = b * b - c
-  if (disc < 0) {
+  // Only the stretch of the line of sight inside the body's box is marched.
+  let t = 0
+  let tEnd = Infinity
+  for (const [lo, hi, k] of [
+    [-1.6, 1.6, 0],
+    [-1.7, 3.1, 1],
+    [-0.75, 1.05, 2],
+  ] as const) {
+    if (Math.abs(d[k]) < 1e-9) {
+      if (o[k] < lo || o[k] > hi) {
+        return undefined
+      }
+      continue
+    }
+    const a = (lo - o[k]) / d[k]
+    const b = (hi - o[k]) / d[k]
+    t = Math.max(t, Math.min(a, b))
+    tEnd = Math.min(tEnd, Math.max(a, b))
+  }
+  if (t >= tEnd) {
     return undefined
   }
-  let t = Math.max(0, -b - Math.sqrt(disc))
-  const tEnd = -b + Math.sqrt(disc)
   for (let i = 0; i < 64 && t < tEnd; i += 1) {
     const px = o[0] + d[0] * t
     const py = o[1] + d[1] * t
     const pz = o[2] + d[2] * t
     const dist = body(px, py, pz)
     if (dist < 0.006) {
-      const nw = apply(B, normalOf(body, px, py, pz, 0.006))
-      const lambert = Math.max(0, dot(nw, KEY))
-      const rim = Math.pow(1 - Math.abs(nw[2]), 3) * 0.35
-      // Folds that run down the robes, and below the chest they dissolve into the dark.
-      const fold = 0.85 + 0.15 * Math.sin(px * 14 + py * 1.5)
-      const fade = clamp01(1 - (py - 0.9) / 1.3)
-      const v = (0.12 + 0.6 * lambert * fold + rim) * pose.light * fade
-      if (v < 0.07) {
-        return undefined
-      }
-      return { z: O[2] + D[2] * t * s, cell: [MANTLE, clamp01(v)] }
+      return robeAt(m, px, py, pz, O[2] + D[2] * t * s)
     }
     t += dist * 0.85
   }
   return undefined
 }
 
-/** What the viewer sees at a point on the glass: the nearest part of the Lich, if any, and a glyph if it is a rune. */
+/**
+ * The robes: folds that run down them, lit from above and darker where the
+ * cloth folds in, thinning toward a ragged hem that shifts slowly and frays
+ * into the ash below it; the hands bone, the cord a lighter rope.
+ */
+function robeAt(m: Model, px: number, py: number, pz: number, z: number): Hit | undefined {
+  const { pose } = m
+  const n = normalOf(body, px, py, pz, 0.006)
+  const nw = apply(m.B, n)
+  const lambert = Math.max(0, dot(nw, KEY))
+  const rim = Math.pow(1 - Math.abs(nw[2]), 3) * 0.35
+  // The hands are bone, lit as the skull is.
+  if (hands(px, py, pz) < 0.012) {
+    return { z, cell: [BONE, clamp01((0.15 + 0.7 * lambert + rim) * pose.light)] }
+  }
+  // The cord is rope, a lighter red than the cloth it binds.
+  if (cord(px, py, pz) < 0.012) {
+    return { z, cell: [MANTLE, clamp01((0.45 + 0.4 * lambert) * pose.light)] }
+  }
+  // The cloth darkens where it folds in: under the arms, inside the bells.
+  const shade = 0.45 + 0.55 * clamp01(body(px + n[0] * 0.09, py + n[1] * 0.09, pz + n[2] * 0.09) / 0.09)
+  const fold = 0.85 + 0.15 * Math.sin(px * 14 + py * 1.5)
+  const fade = clamp01((hemAt(px, pose.t) - py) / 0.85)
+  const v = (0.12 + 0.6 * lambert * fold + rim) * shade * pose.light * fade
+  return v < 0.07 ? undefined : { z, cell: [MANTLE, clamp01(v)] }
+}
+
+/** What the viewer sees at a point on the glass: the nearest part of the Lich, if any, and a glyph if it insists on one. */
 export function sampleModel(m: Model, X: number, Y: number): { cell: Cell; glyph?: string } | undefined {
+  ARMS = m.arms
   let best = headHit(m, X, Y)
   let glyph: string | undefined
-  const consider = (hit: Hit | undefined, g?: string) => {
+  const consider = (hit: Hit | undefined) => {
     if (hit && (!best || hit.z < best.z)) {
       best = hit
-      glyph = g
+      glyph = hit.glyph
     }
   }
   consider(bodyHit(m, X, Y))

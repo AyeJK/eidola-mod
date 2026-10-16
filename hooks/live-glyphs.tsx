@@ -19,9 +19,13 @@ export type GlyphAt = (x: number, y: number, levels: number) => readonly [string
 
 type Elements = Pick<ClientElements, 'Box' | 'Text'>
 
-/** The glyphs as one column of rows, within the budget: fewer shades if need be. */
+/**
+ * The glyphs as one column of rows, within the budget: fewer shades if need
+ * be, and past that, short runs merged into their neighbours' colour until
+ * it fits. Whatever a frame holds, it is never drawn past the bound.
+ */
 export function drawGlyphs({ Box, Text }: Elements, cols: number, rows: number, glyphAt: GlyphAt) {
-  const draw = (levels: number) => {
+  const draw = (levels: number, minRun: number) => {
     const out: RenderElement[] = []
     let size = 0
     let empty = 0
@@ -51,12 +55,18 @@ export function drawGlyphs({ Box, Text }: Elements, cols: number, rows: number, 
         const cell = glyphAt(x, y, levels)
         const c = cell ? cell[0] : ''
         if (c !== colour) {
-          flush(x)
-          start = x
-          colour = c
-          text = ''
+          if (minRun > 1 && x - start < minRun) {
+            // Too short to stand alone: it joins the run, in the run's colour.
+            colour ||= c
+          } else {
+            flush(x)
+            start = x
+            colour = c
+            text = ''
+          }
         }
-        text += cell ? cell[1] : ''
+        // A space keeps the glyphs after an empty cell in their columns.
+        text += cell ? cell[1] : ' '
       }
       if (colour) {
         flush(cols)
@@ -86,12 +96,22 @@ export function drawGlyphs({ Box, Text }: Elements, cols: number, rows: number, 
       return d.size
     }
   }
-  let drawn = draw(6)
-  for (const levels of [4, 3, 2, 1]) {
+  let drawn = draw(6, 1)
+  for (const [levels, minRun] of [
+    [4, 1],
+    [3, 1],
+    [2, 1],
+    [1, 1],
+    [1, 2],
+    [1, 3],
+    [1, 5],
+    [1, 8],
+    [1, 13],
+  ] as const) {
     if (measure(drawn) <= GLYPH_BUDGET) {
       break
     }
-    drawn = draw(levels)
+    drawn = draw(levels, minRun)
   }
   return (
     <Box flexDirection="column" width={cols} height={rows}>

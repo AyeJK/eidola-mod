@@ -5,7 +5,7 @@
 import type { VesselState } from '../types'
 import { EMPTY, hash } from './field'
 import type { FieldScene, LayerStyle } from './field'
-import { BONE, CROWN, FIRE, FLAME, GEM, MANTLE, RUNE, buildModel, sampleModel } from './lich3d'
+import { ARMS_DOWN, BONE, CROWN, FIRE, FLAME, GEM, MANTLE, RUNE, buildModel, sampleModel } from './lich3d'
 import type { Camera, Pose } from './lich3d'
 
 export type View = 'pane' | 'band'
@@ -27,6 +27,10 @@ export const ARCANE = ['#0a3a12', '#1a7a2a', '#3ad04a', '#8cff7a', '#e0ffd0']
 
 /** Its eyes when it needs you: witchlight, a pale violet gone almost white. */
 export const WITCHLIGHT = ['#3a1a5a', '#7a4ab0', '#c49aff', '#ead8ff', '#ffffff']
+
+/** Its robe's colour by mood: dark red at rest (the mantle's own), purple at work, emerald when it needs you. */
+export const ROBE_PURPLE = ['#1c0a2c', '#30124c', '#4a1e72', '#662c98', '#8240b8', '#9e5ad2']
+export const ROBE_EMERALD = ['#06261a', '#0c3e2a', '#145a3c', '#1e7a52', '#2a9a68', '#3cba82']
 
 /** Scorched: everything gone to red, for a moment, when something went wrong. */
 export const SCORCHED = ['#1a0404', '#3a0808', '#6a1010', '#a01c14', '#d0301c', '#ff5a3a', '#ff9a7a', '#ffd0c0']
@@ -84,18 +88,18 @@ export function framing(view: View, W: number, H: number): { cam: Camera; s: num
 /** A still pose for a state: for the field scenes. */
 export function restingPose(state: VesselState, view: View, W: number, H: number, t = 0): Pose {
   const { s, home } = framing(view, W, H)
-  const base: Pose = { pos: [W * home[0], H * home[1], 0], s, yaw: 0, pitch: 0.1, roll: 0, bodyYaw: 0, jaw: 0, eyes: 0.55, look: [0, 0], flame: 0.15, runes: 0.5, spin: t * 0.15, t, light: 0.75 }
+  const base: Pose = { pos: [W * home[0], H * home[1], 0], s, yaw: 0, pitch: 0.1, roll: 0, bodyYaw: 0, jaw: 0, eyes: 0.55, look: [0, 0], flame: 0.15, runes: 0, spin: t * 0.15, t, light: 0.75, arms: ARMS_DOWN }
   switch (state) {
     case 'thinking':
     case 'working':
     case 'responding':
-      return { ...base, pitch: -0.04, eyes: 1.1, flame: 1, runes: 1, spin: t * 0.9, light: 1 }
+      return { ...base, pitch: -0.04, eyes: 1.1, flame: 1, light: 1, arms: [{ raise: 1, spread: 0 }, { raise: 1, spread: 0 }] }
     case 'attention':
-      return { ...base, pos: [W * home[0], H * home[1], view === 'band' ? -90 : -380], eyes: 1.6, flame: 0.5, runes: 0.6, jaw: 0.2, light: 1 }
+      return { ...base, pos: [W * home[0], H * home[1], view === 'band' ? -90 : -380], eyes: 1.6, flame: 0.5, jaw: 0.2, light: 1, arms: [{ raise: 0, spread: 0 }, { raise: 0.85, spread: 0 }] }
     case 'error':
       return { ...base, eyes: 1.4, flame: 0.8, jaw: 0.5, roll: 0.12 }
     case 'sleeping':
-      return { ...base, pitch: 0.3, eyes: 0.1, flame: 0, runes: 0, light: 0.5 }
+      return { ...base, pitch: 0.3, eyes: 0.1, flame: 0, light: 0.5 }
     default:
       return base
   }

@@ -43,14 +43,18 @@ describe('the frame', () => {
     expect(await pane.find({ type: 'Client', key: 'frame-cam' })).toBeUndefined()
     await pane.unmount()
 
-    // Another Engram keeps its own setting: the Lich ships without one.
+    // Another Engram keeps its own setting: the Lich ships with its own HUD on, sparks and a sigil.
     await $.command.run({ command: 'awaken', args: 'lich', ...TYPED })
     pane = await $.ui.mount({ ...PANE, props: { ...PANE.props, title: 'Lich' } })
-    expect(await pane.find({ type: 'Client', key: 'frame-meter' })).toBeUndefined()
+    expect(await pane.find({ type: 'Client', key: 'frame-sparks' })).toBeDefined()
+    expect(svgsOf(await pane.findAll({ type: 'Svg' })).some(source => source.includes('@keyframes ink'))).toBe(true)
+    expect(svgsOf(await pane.findAll({ type: 'Svg' })).some(source => source.includes('font-variant="small-caps"'))).toBe(true)
+    await pane.advance(3000)
+    expect((await pane.findAll({ type: 'Box', in: 'frame-sparks' })).length).toBeGreaterThan(5)
     await pane.unmount()
-    expect((await $.command.run({ command: 'eidola', args: 'frame', ...TYPED })).text).toBe('Frame on for Lich.')
+    expect((await $.command.run({ command: 'eidola', args: 'frame', ...TYPED })).text).toBe('Frame off for Lich.')
     pane = await $.ui.mount({ ...PANE, props: { ...PANE.props, title: 'Lich' } })
-    expect(await pane.find({ type: 'Client', key: 'frame-meter' })).toBeDefined()
+    expect(await pane.find({ type: 'Client', key: 'frame-sparks' })).toBeUndefined()
     await pane.unmount()
   })
 })

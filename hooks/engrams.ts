@@ -33,14 +33,22 @@ export type Engram = {
  */
 export type Hud = {
   show?: boolean
-  /** `bars`, a level meter in the corner (the default), or `wave`, a recording scrolling along the bottom. */
-  meter?: 'bars' | 'wave'
   /**
-   * The corner tag: `name` (the default), or `livecam`, a camera feed's
-   * stamp, a blinking recording dot, LIVE and `camera`, the name and the time.
+   * `bars`, a level meter in the corner (the default); `wave`, a recording
+   * scrolling along the bottom; `sparks`, arcane sparks rising from it.
    */
-  tag?: 'name' | 'livecam'
+  meter?: 'bars' | 'wave' | 'sparks'
+  /**
+   * The corner tag: `name` (the default); `livecam`, a camera feed's stamp,
+   * a blinking recording dot, LIVE and `camera`, the name and the time; or
+   * `sigil`, an arcane sigil turning in the mood's colour.
+   */
+  tag?: 'name' | 'livecam' | 'sigil'
   camera?: string
+  /** The state's label: `bold` sans (the default), or `serif`, an old-style serif in small capitals. */
+  label?: 'bold' | 'serif'
+  /** The corner brackets' colour (the default is brass). */
+  bracket?: string
   /** Its own colours for each state's label and the detail under it: shades of its moods. */
   colours?: Partial<Record<VesselState, { label: string; detail: string }>>
 }
@@ -135,6 +143,7 @@ export const ENGRAMS: Record<string, Engram> = {
         meter: 'wave',
         tag: 'livecam',
         camera: 'DEEPCAM 02',
+        bracket: '#3c9aa6',
         // Its eyes' colours: cyan at rest, red at work, gold when it needs you.
         colours: {
           idle: { label: '#5ff6ff', detail: '#3c9aa6' },
@@ -164,7 +173,31 @@ export const ENGRAMS: Record<string, Engram> = {
       },
     },
     soul: quietSoul('Lich'),
-    vessel: { type: 'svg', pack: 'lich', forge: { source: 'lich', style: 'scene', look: 'Glyph lich in ember gold' }, scene: 'lich' },
+    vessel: {
+      type: 'svg',
+      pack: 'lich',
+      forge: { source: 'lich', style: 'scene', look: 'Glyph lich in ember gold' },
+      scene: 'lich',
+      hud: {
+        show: true,
+        meter: 'sparks',
+        tag: 'sigil',
+        label: 'serif',
+        bracket: '#9a3c28',
+        // Its robe's colours: embers at rest, violet at work, emerald when it needs you.
+        colours: {
+          idle: { label: '#e0603e', detail: '#9a3c28' },
+          waiting: { label: '#d0583a', detail: '#8a3424' },
+          success: { label: '#f08a5a', detail: '#a85a38' },
+          sleeping: { label: '#8a3424', detail: '#5e2418' },
+          thinking: { label: '#c08aff', detail: '#7a4ab8' },
+          working: { label: '#a860f0', detail: '#6c34a8' },
+          responding: { label: '#d4a8ff', detail: '#8a5cc0' },
+          error: { label: '#e0603e', detail: '#9a3c28' },
+          attention: { label: '#3ccf8a', detail: '#22905e' },
+        },
+      },
+    },
   },
   starfield: visual('starfield', 'Starfield', 'Stars streaming past at warp, quicker when busy.', ['particle'], {
     source: 'stars',

@@ -26,7 +26,7 @@ import { FACES, SPRITE_PALETTE, vesselSvg } from './sprite'
 import { renderScene } from './field'
 import { krakenWaterScene } from './kraken'
 import { voidScene } from './lich'
-import { LABEL_PX, labelSvg } from './hud'
+import { LABEL_PX, SIGIL_PX, labelSvg, sigilSvg } from './hud'
 import { SCENES } from './scenes'
 import { BAND_SCENE_PX, BAND_STAGE_PX, PX_PER_COLUMN, PX_PER_ROW, sceneSize, stageSize, stageSvg } from './stage'
 
@@ -208,6 +208,16 @@ const FRAME_STATES: Record<VesselState, { colour: string; name: string; line: st
   sleeping: { colour: '#5a6070', name: 'ASLEEP', line: 'dormant' },
 }
 
+/** The colour each Engram's sigil was last drawn in: the next one fades in from it. */
+const sigilColours = new Map<string, string>()
+
+/** The colour a new sigil fades in from, and remember the one it fades to. */
+function sigilFrom(id: string, colour: string): string {
+  const from = sigilColours.get(id) ?? colour
+  sigilColours.set(id, colour)
+  return from
+}
+
 /** How busy a HUD's recording runs in a state. */
 function waveLevel(state: VesselState): 'idle' | 'working' | 'attention' {
   return state === 'attention' ? 'attention' : state === 'thinking' || state === 'working' || state === 'responding' || state === 'error' ? 'working' : 'idle'
@@ -239,7 +249,7 @@ function framed(
   const clip = (text: string) => (text.length > width ? text.slice(0, width - 1) + '…' : text)
   const detail = clip((view.detail || look.line).toLowerCase())
   const tag = (awake?.engram.name ?? 'Eidola').toUpperCase()
-  const label = labelSvg(look.name, look.colour)
+  const label = labelSvg(look.name, look.colour, awake?.vessel.hud?.label)
   const at = (key: string, top: number, left: number, child: RenderElement) => (
     <Box key={key} position="absolute" top={top} left={left}>
       {child}
@@ -247,12 +257,13 @@ function framed(
   )
   // A bracket is two thin bars of brass, the same length and weight each way:
   // drawn as Boxes, not glyphs, so no font can make them uneven.
+  const brass = awake?.vessel.hud?.bracket ?? FRAME_GOLD
   const bracket = (key: string, top: number, left: number, isRight: boolean, isBottom: boolean) => {
     // A cell is 8 × 19 px: 8% of its height and 10% of its 2-cell width are both about 1.5 px.
-    const across = <Box key="across" width="100%" height="8%" backgroundColor={FRAME_GOLD} />
+    const across = <Box key="across" width="100%" height="8%" backgroundColor={brass} />
     const down = (
       <Box key="down" flexDirection="row" height="92%" justifyContent={isRight ? 'flex-end' : 'flex-start'}>
-        <Box width="10%" height="100%" backgroundColor={FRAME_GOLD} />
+        <Box width="10%" height="100%" backgroundColor={brass} />
       </Box>
     )
     return at(
@@ -276,14 +287,23 @@ function framed(
         1,
         3,
         <Box width={Math.ceil(label.width / PX_PER_COLUMN)} height={2}>
-          <Svg key={`frame-label:${view.state}`} source={label.svg} alt={look.name} width={label.width} height={LABEL_PX} />
+          <Svg key={`frame-label:${view.state}:${awake?.vessel.hud?.label ?? 'bold'}`} source={label.svg} alt={look.name} width={label.width} height={LABEL_PX} />
         </Box>,
       )}
       {at('frame-detail', 3, 3, <Text color={detailColour}>{detail}</Text>)}
       {cols >= 44 &&
         (awake?.vessel.hud?.tag === 'livecam'
           ? at('frame-tag', 1, cols - 23, <Client key="frame-cam" module="./frame-cam.tsx" props={{ name: tag, camera: awake.vessel.hud.camera ?? 'CAM 01' }} width={20} height={2} />)
-          : at('frame-tag', 1, cols - tag.length - 3, <Text color={FRAME_GOLD}>{tag}</Text>))}
+          : awake?.vessel.hud?.tag === 'sigil'
+            ? at(
+                'frame-tag',
+                1,
+                cols - 3 - Math.ceil(SIGIL_PX / PX_PER_COLUMN),
+                <Box width={Math.ceil(SIGIL_PX / PX_PER_COLUMN)} height={Math.ceil(SIGIL_PX / PX_PER_ROW)}>
+                  <Svg key={`frame-sigil:${view.state}`} source={sigilSvg(look.colour, sigilFrom(awake.engram.id, look.colour), waveLevel(view.state))} alt="Sigil" width={SIGIL_PX} height={SIGIL_PX} isInteractive />
+                </Box>,
+              )
+            : at('frame-tag', 1, cols - tag.length - 3, <Text color={FRAME_GOLD}>{tag}</Text>))}
       {rows >= 6 &&
         (awake?.vessel.hud?.meter === 'wave'
           ? at(
@@ -292,6 +312,13 @@ function framed(
               2,
               <Client key="frame-wave" module="./frame-wave.tsx" props={{ colour: look.colour, level: waveLevel(view.state), cols: cols - 4 }} width={cols - 4} height={3} />,
             )
+          : awake?.vessel.hud?.meter === 'sparks'
+            ? at(
+                'frame-sparks',
+                rows - 6,
+                2,
+                <Client key="frame-sparks" module="./frame-sparks.tsx" props={{ colour: look.colour, level: waveLevel(view.state), cols: cols - 4, rows: 5 }} width={cols - 4} height={5} />,
+              )
           : at('frame-meter', rows - 2, 3, <Client key="frame-meter" module="./frame-meter.tsx" props={{ state: view.state, colour: look.colour }} width={12} height={1} />))}
     </Box>
   )

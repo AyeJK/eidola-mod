@@ -56,7 +56,8 @@ describe('the Lich Engram', () => {
 
     const pane = await $.ui.mount(PANE)
     expect(String((await pane.find({ type: 'Svg' }))?.props?.alt)).toBe('Lich in the dark')
-    const slices = await pane.findAll({ type: 'Client' })
+    // Its own drawings: the HUD's drawings are in the pane too.
+    const slices = (await pane.findAll({ type: 'Client' })).filter(c => String(c.key ?? c.props?.key).startsWith('lich-'))
     expect(slices.map(c => c.key ?? c.props?.key)).toEqual(['lich-0', 'lich-1', 'lich-2', 'lich-3'])
     let next = 0
     for (const c of slices) {

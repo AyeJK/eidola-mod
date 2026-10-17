@@ -57,6 +57,11 @@
         "licensed"
       ]
     },
+    "remixOf": {
+      "type": "string",
+      "description": "An Engram plugin's: the id of the Engram it was remixed from, drawn while its own drawing can't be.",
+      "pattern": "^[a-z0-9-]{2,32}$"
+    },
     "vessel": {
       "type": "object",
       "required": [
@@ -65,11 +70,12 @@
       "properties": {
         "scene": {
           "type": "string",
-          "description": "The scene it draws, built into the mod.",
+          "description": "The scene it draws, built into the mod; self in an Engram plugin, which draws its own (docs/spec/engram-plugin.md).",
           "enum": [
             "kraken",
             "lich",
-            "wisp"
+            "wisp",
+            "self"
           ]
         },
         "shows": {

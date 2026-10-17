@@ -42,3 +42,7 @@ export const MEASURE_HELP =
   '  blue fills a Box at height 100%, if the surface honours it\n' +
   '  yellow outlines a Box sized bodyColumns × bodyRows in cells\n' +
   'Screenshot the whole window and send it. Run /eidola measure again to turn it off.'
+
+/** The measure view's colours: a blue ground, its box outlined in yellow. */
+export const MEASURE_GROUND = '#1e3a5f'
+export const MEASURE_EDGE = 'yellow'

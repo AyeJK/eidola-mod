@@ -1,0 +1,9 @@
+{
+  "name": "eidola-fixtures",
+  "owner": { "name": "Jeremy Kaye" },
+  "description": "Test Engram plugins for Eidola, for checking the hand-off by hand. Not for sharing.",
+  "plugins": [
+    { "name": "eidola-engram-fixture", "source": "./engram-plugin", "description": "A small test creature drawn inside Eidola's pane and band." },
+    { "name": "exported-lich", "source": "./exported-lich", "description": "The bundled Lich, exported as an Engram plugin of its own (scripts/export-engram.mjs)." }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "spec": 2,
+  "id": "exported-wisp",
+  "name": "Exported Wisp",
+  "version": "0.1.0",
+  "author": "eidola",
+  "description": "A will-o'-the-wisp in a night fen. It flies where it likes, its ghost fire burning the colour of your work, and speaks in flickers.",
+  "rights": "licensed",
+  "remixOf": "wisp",
+  "vessel": {
+    "scene": "self",
+    "shows": [
+      "band"
+    ],
+    "thumbnails": {
+      "band": "thumb-band.svg"
+    },
+    "hud": {
+      "show": true,
+      "meter": "none",
+      "tag": "none",
+      "layout": "bottom",
+      "label": "pixel",
+      "bracket": "#6f62d8",
+      "colours": {
+        "idle": {
+          "label": "#eeeefa",
+          "detail": "#a0a0b8"
+        },
+        "waiting": {
+          "label": "#d4d4e6",
+          "detail": "#8a8aa2"
+        },
+        "sleeping": {
+          "label": "#7a7a94",
+          "detail": "#56566e"
+        },
+        "thinking": {
+          "label": "#5fe8c0",
+          "detail": "#3aa688"
+        },
+        "working": {
+          "label": "#6af0c8",
+          "detail": "#3fae8c"
+        },
+        "responding": {
+          "label": "#5fe8c0",
+          "detail": "#3aa688"
+        },
+        "success": {
+          "label": "#eeeefa",
+          "detail": "#a0a0b8"
+        },
+        "error": {
+          "label": "#ff5a6e",
+          "detail": "#c0465a"
+        },
+        "attention": {
+          "label": "#ffe066",
+          "detail": "#c8a83a"
+        }
+      }
+    }
+  },
+  "extensions": {}
+}

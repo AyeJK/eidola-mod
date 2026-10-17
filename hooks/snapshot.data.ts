@@ -18,7 +18,7 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "description": "Something vast in the deep water beside your work. It surfaces when there is work to do.",
     "button": {
       "key": "awaken:kraken",
-      "label": "Awaken"
+      "label": "AWAKEN"
     },
     "listedUnder": [
       "all",
@@ -33,7 +33,7 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "description": "A crowned skull of alchemical signs, soul-fire in its sockets. It burns brighter while you work.",
     "button": {
       "key": "awaken:lich",
-      "label": "Awaken"
+      "label": "AWAKEN"
     },
     "listedUnder": [
       "all",
@@ -48,7 +48,7 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "description": "A will-o'-the-wisp in a night fen. It flies where it likes, its ghost fire burning the colour of your work, and speaks in flickers.",
     "button": {
       "key": "awaken:wisp",
-      "label": "Awaken"
+      "label": "AWAKEN"
     },
     "listedUnder": [
       "all",
@@ -58,46 +58,46 @@ export const SNAPSHOTS: Record<string, unknown> = {
 
   // Task 2: the picker thumbnails, at the card sizes of a docked and a narrow pane.
   "thumbnail: kraken, docked pane, two cards a row": {
-    "rows": 10,
+    "rows": 5,
     "alt": "Kraken, pane view",
     "width": 176,
-    "height": 190,
-    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 722\" width=\"176\" height=\"190\" preserveAspectRatio=\"xMidYMid slice\"><title>kraken/thumb-pane.svg</title></svg>"
+    "height": 95,
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 722\" width=\"176\" height=\"95\" preserveAspectRatio=\"xMidYMid slice\"><title>kraken/thumb-pane.svg</title></svg>"
   },
   "thumbnail: lich, docked pane, two cards a row": {
-    "rows": 10,
+    "rows": 5,
     "alt": "Lich, pane view",
     "width": 176,
-    "height": 190,
-    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 480 361\" width=\"176\" height=\"190\" preserveAspectRatio=\"xMidYMid slice\"><title>lich/thumb-pane.svg</title></svg>"
+    "height": 95,
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 480 361\" width=\"176\" height=\"95\" preserveAspectRatio=\"xMidYMid slice\"><title>lich/thumb-pane.svg</title></svg>"
   },
   "thumbnail: wisp, docked pane, two cards a row": {
-    "rows": 4,
+    "rows": 5,
     "alt": "Wisp, band view",
     "width": 176,
-    "height": 76,
-    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 171\" width=\"176\" height=\"76\" preserveAspectRatio=\"xMidYMid slice\"><title>wisp/thumb-band.svg</title></svg>"
+    "height": 44,
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 171\" width=\"176\" height=\"44\" preserveAspectRatio=\"xMidYMid slice\"><title>wisp/thumb-band.svg</title></svg>"
   },
   "thumbnail: kraken, narrow pane, one card a row": {
-    "rows": 10,
+    "rows": 7,
     "alt": "Kraken, pane view",
     "width": 224,
-    "height": 190,
-    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 722\" width=\"224\" height=\"190\" preserveAspectRatio=\"xMidYMid slice\"><title>kraken/thumb-pane.svg</title></svg>"
+    "height": 133,
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 722\" width=\"224\" height=\"133\" preserveAspectRatio=\"xMidYMid slice\"><title>kraken/thumb-pane.svg</title></svg>"
   },
   "thumbnail: lich, narrow pane, one card a row": {
-    "rows": 10,
+    "rows": 7,
     "alt": "Lich, pane view",
     "width": 224,
-    "height": 190,
-    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 480 361\" width=\"224\" height=\"190\" preserveAspectRatio=\"xMidYMid slice\"><title>lich/thumb-pane.svg</title></svg>"
+    "height": 133,
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 480 361\" width=\"224\" height=\"133\" preserveAspectRatio=\"xMidYMid slice\"><title>lich/thumb-pane.svg</title></svg>"
   },
   "thumbnail: wisp, narrow pane, one card a row": {
-    "rows": 4,
+    "rows": 7,
     "alt": "Wisp, band view",
     "width": 224,
-    "height": 76,
-    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 171\" width=\"224\" height=\"76\" preserveAspectRatio=\"xMidYMid slice\"><title>wisp/thumb-band.svg</title></svg>"
+    "height": 56,
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 171\" width=\"224\" height=\"56\" preserveAspectRatio=\"xMidYMid slice\"><title>wisp/thumb-band.svg</title></svg>"
   },
 
   // Task 3: the pane and band in each mood, the clock fixed. Long SVG sources are their length and hash.
@@ -138,7 +138,9 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "Box {\"width\":100,\"height\":7}",
     "  Svg {\"source\":\"[15270 chars #b37bc58e]\",\"alt\":\"Kraken in deep water\",\"width\":796,\"height\":131,\"isInteractive\":true}",
     "  Box {\"position\":\"absolute\",\"top\":0,\"left\":0}",
-    "    Client#kraken-band {\"module\":\"hooks/kraken-live.tsx\",\"props\":{\"mood\":\"idle\",\"cols\":100,\"rows\":7,\"view\":\"band\",\"ink\":0},\"width\":100,\"height\":7}"
+    "    Client#kraken-band {\"module\":\"hooks/kraken-live.tsx\",\"props\":{\"mood\":\"idle\",\"cols\":100,\"rows\":7,\"view\":\"band\",\"ink\":0},\"width\":100,\"height\":7}",
+    "  Box#corner {\"position\":\"absolute\",\"top\":5,\"left\":97}",
+    "    Client#band-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#3c9aa6\",\"isOpen\":false},\"width\":3,\"height\":2}"
   ],
   "scene: kraken, idle, terminal pane": [
     "Text",
@@ -185,7 +187,9 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "Box {\"width\":100,\"height\":7}",
     "  Svg {\"source\":\"[15270 chars #b37bc58e]\",\"alt\":\"Kraken in deep water\",\"width\":796,\"height\":131,\"isInteractive\":true}",
     "  Box {\"position\":\"absolute\",\"top\":0,\"left\":0}",
-    "    Client#kraken-band {\"module\":\"hooks/kraken-live.tsx\",\"props\":{\"mood\":\"working\",\"cols\":100,\"rows\":7,\"view\":\"band\",\"ink\":0},\"width\":100,\"height\":7}"
+    "    Client#kraken-band {\"module\":\"hooks/kraken-live.tsx\",\"props\":{\"mood\":\"working\",\"cols\":100,\"rows\":7,\"view\":\"band\",\"ink\":0},\"width\":100,\"height\":7}",
+    "  Box#corner {\"position\":\"absolute\",\"top\":5,\"left\":97}",
+    "    Client#band-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#3c9aa6\",\"isOpen\":false},\"width\":3,\"height\":2}"
   ],
   "scene: kraken, working, terminal pane": [
     "Text",
@@ -232,7 +236,9 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "Box {\"width\":100,\"height\":7}",
     "  Svg {\"source\":\"[15270 chars #b37bc58e]\",\"alt\":\"Kraken in deep water\",\"width\":796,\"height\":131,\"isInteractive\":true}",
     "  Box {\"position\":\"absolute\",\"top\":0,\"left\":0}",
-    "    Client#kraken-band {\"module\":\"hooks/kraken-live.tsx\",\"props\":{\"mood\":\"attention\",\"cols\":100,\"rows\":7,\"view\":\"band\",\"ink\":0},\"width\":100,\"height\":7}"
+    "    Client#kraken-band {\"module\":\"hooks/kraken-live.tsx\",\"props\":{\"mood\":\"attention\",\"cols\":100,\"rows\":7,\"view\":\"band\",\"ink\":0},\"width\":100,\"height\":7}",
+    "  Box#corner {\"position\":\"absolute\",\"top\":5,\"left\":97}",
+    "    Client#band-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#3c9aa6\",\"isOpen\":false},\"width\":3,\"height\":2}"
   ],
   "scene: kraken, attention, terminal pane": [
     "Text",
@@ -284,7 +290,9 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "Box {\"width\":100,\"height\":12}",
     "  Svg {\"source\":\"[4202 chars #afc10364]\",\"alt\":\"Lich in the dark\",\"width\":796,\"height\":226,\"isInteractive\":true}",
     "  Box {\"position\":\"absolute\",\"top\":0,\"left\":0}",
-    "    Client#lich-band {\"module\":\"hooks/lich-live.tsx\",\"props\":{\"mood\":\"idle\",\"moodAt\":1760000000000,\"moodBefore\":\"idle\",\"ink\":0,\"inkAt\":0,\"epoch\":1760000000000,\"cols\":100,\"rows\":12,\"view\":\"band\"},\"width\":100,\"height\":12}"
+    "    Client#lich-band {\"module\":\"hooks/lich-live.tsx\",\"props\":{\"mood\":\"idle\",\"moodAt\":1760000000000,\"moodBefore\":\"idle\",\"ink\":0,\"inkAt\":0,\"epoch\":1760000000000,\"cols\":100,\"rows\":12,\"view\":\"band\"},\"width\":100,\"height\":12}",
+    "  Box#corner {\"position\":\"absolute\",\"top\":10,\"left\":97}",
+    "    Client#band-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#9a3c28\",\"isOpen\":false},\"width\":3,\"height\":2}"
   ],
   "scene: lich, idle, terminal pane": [
     "Text",
@@ -336,7 +344,9 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "Box {\"width\":100,\"height\":12}",
     "  Svg {\"source\":\"[4202 chars #afc10364]\",\"alt\":\"Lich in the dark\",\"width\":796,\"height\":226,\"isInteractive\":true}",
     "  Box {\"position\":\"absolute\",\"top\":0,\"left\":0}",
-    "    Client#lich-band {\"module\":\"hooks/lich-live.tsx\",\"props\":{\"mood\":\"working\",\"moodAt\":1760000000000,\"moodBefore\":\"idle\",\"ink\":0,\"inkAt\":0,\"epoch\":1760000000000,\"cols\":100,\"rows\":12,\"view\":\"band\"},\"width\":100,\"height\":12}"
+    "    Client#lich-band {\"module\":\"hooks/lich-live.tsx\",\"props\":{\"mood\":\"working\",\"moodAt\":1760000000000,\"moodBefore\":\"idle\",\"ink\":0,\"inkAt\":0,\"epoch\":1760000000000,\"cols\":100,\"rows\":12,\"view\":\"band\"},\"width\":100,\"height\":12}",
+    "  Box#corner {\"position\":\"absolute\",\"top\":10,\"left\":97}",
+    "    Client#band-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#9a3c28\",\"isOpen\":false},\"width\":3,\"height\":2}"
   ],
   "scene: lich, working, terminal pane": [
     "Text",
@@ -388,7 +398,9 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "Box {\"width\":100,\"height\":12}",
     "  Svg {\"source\":\"[4202 chars #afc10364]\",\"alt\":\"Lich in the dark\",\"width\":796,\"height\":226,\"isInteractive\":true}",
     "  Box {\"position\":\"absolute\",\"top\":0,\"left\":0}",
-    "    Client#lich-band {\"module\":\"hooks/lich-live.tsx\",\"props\":{\"mood\":\"attention\",\"moodAt\":1760000000000,\"moodBefore\":\"idle\",\"ink\":0,\"inkAt\":0,\"epoch\":1760000000000,\"cols\":100,\"rows\":12,\"view\":\"band\"},\"width\":100,\"height\":12}"
+    "    Client#lich-band {\"module\":\"hooks/lich-live.tsx\",\"props\":{\"mood\":\"attention\",\"moodAt\":1760000000000,\"moodBefore\":\"idle\",\"ink\":0,\"inkAt\":0,\"epoch\":1760000000000,\"cols\":100,\"rows\":12,\"view\":\"band\"},\"width\":100,\"height\":12}",
+    "  Box#corner {\"position\":\"absolute\",\"top\":10,\"left\":97}",
+    "    Client#band-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#9a3c28\",\"isOpen\":false},\"width\":3,\"height\":2}"
   ],
   "scene: lich, attention, terminal pane": [
     "Text",

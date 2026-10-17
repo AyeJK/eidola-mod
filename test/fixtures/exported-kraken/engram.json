@@ -1,0 +1,68 @@
+{
+  "spec": 2,
+  "id": "exported-kraken",
+  "name": "Exported Kraken",
+  "version": "0.1.0",
+  "author": "eidola",
+  "description": "Something vast in the deep water beside your work. It surfaces when there is work to do.",
+  "rights": "licensed",
+  "remixOf": "kraken",
+  "vessel": {
+    "scene": "self",
+    "shows": [
+      "pane",
+      "band",
+      "shrine"
+    ],
+    "thumbnails": {
+      "pane": "thumb-pane.svg",
+      "band": "thumb-band.svg"
+    },
+    "hud": {
+      "show": true,
+      "meter": "none",
+      "tag": "livecam",
+      "camera": "DEEPCAM 02",
+      "bracket": "#3c9aa6",
+      "colours": {
+        "idle": {
+          "label": "#5ff6ff",
+          "detail": "#3c9aa6"
+        },
+        "waiting": {
+          "label": "#4fd8e8",
+          "detail": "#3a8e98"
+        },
+        "success": {
+          "label": "#8ff0f6",
+          "detail": "#4fa8b0"
+        },
+        "sleeping": {
+          "label": "#2f7f8a",
+          "detail": "#255f68"
+        },
+        "thinking": {
+          "label": "#ff7466",
+          "detail": "#b8453c"
+        },
+        "working": {
+          "label": "#ff3a40",
+          "detail": "#b8282c"
+        },
+        "responding": {
+          "label": "#ff9a80",
+          "detail": "#c0604c"
+        },
+        "error": {
+          "label": "#ff1f2e",
+          "detail": "#a8141e"
+        },
+        "attention": {
+          "label": "#ffcf3a",
+          "detail": "#c49a2a"
+        }
+      }
+    }
+  },
+  "extensions": {}
+}

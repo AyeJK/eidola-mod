@@ -11,6 +11,12 @@ import type { VesselState } from '../types'
 export const PX_PER_COLUMN = 8
 export const PX_PER_ROW = 19
 
+/** The dark behind a band view drawn across the middle of the pane. */
+export const BACKDROP = '#07090c'
+
+/** The veil drawn over the resting scene while nothing is awake. */
+export const VEIL = '#000'
+
 /** The Svg element's limit on `source`. */
 export const SVG_LIMIT = 131072
 

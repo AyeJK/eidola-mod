@@ -222,8 +222,8 @@ describe('snapshot: picker cards', () => {
 
     for (const id of KEPT) {
       const card = await pane.find({ type: 'Box', key: `card:${id}` })
-      // Name, where it shows, what it is: the card's text in order.
-      const [name, shows, description] = texts(card?.children ?? [])
+      // Name, what it is, where it shows: the card's text in order.
+      const [name, description, shows] = texts(card?.children ?? [])
       const button = (await pane.findAll({ type: 'Button' })).find(one => String(one.key).endsWith(`:${id}`))
       snap(`card: ${id}`, { id, name, shows, description, button: { key: button?.key, label: button?.props.label }, listedUnder: under[id] })
     }
@@ -325,7 +325,8 @@ describe('snapshot: placement', () => {
     for (const [setting, options] of Object.entries(SETTINGS)) {
       test(`the ${id} with ${setting}`, { options }, async ($, on) => {
         const pane = engine(on, id)
-        on('session.surfaces', () => ({ value: ['desktop' as const] }))
+        // A terminal session, so /eidola place prints its switches: on the desktop it opens a screen in the pane instead.
+        on('session.surfaces', () => ({ value: ['terminal' as const] }))
         on('http.fetch', () => ({ value: { status: 200, ok: true, headers: {}, text: '' } }))
         await startSession($)
         const place = (await $.command.run({ command: 'eidola', args: 'place', ...TYPED })).text

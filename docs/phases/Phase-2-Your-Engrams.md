@@ -20,16 +20,16 @@ The picker matches the new design, and clicking a card opens that Engram's own p
 
 | Status | # | Task | Module | Reference |
 |--------|---|------|--------|-----------|
-| — | 1 | Add `hooks/theme.ts` with the pane colours from the design system, and use only those in every screen the picker draws | hooks/theme.ts | docs/design/design-system.md §Colours |
-| — | 2 | Bake the pixel "Eidola" wordmark as one `Svg` of paths (no web font), and the three surface icons (pane, band, Shrine) as small `Svg`s that take a colour | hooks/wordmark.ts, hooks/icons.ts | docs/design/design-system.md §What the pane can and can't do |
-| — | 3 | Rebuild the picker header: back button, wordmark, and a Surfaces button whose icons are amber when that surface is on. Then the "Engrams" title with its count label and the ember-to-gold rule | hooks/register.tsx | design-system §Header, §Title and rule |
-| — | 4 | Add the awake strip: thumbnail with the mood in amber, the "AWAKE" label, the name, "drawing in …" from `whereItDraws`, and Details and Sleep | hooks/register.tsx | design-system §Awake strip |
-| — | 5 | Restyle the filters as chips with counts (All, Pane, Band), amber when selected. Yours comes in 2.6 and Shrine in Phase 4 | hooks/register.tsx | design-system §Filter chips |
-| — | 6 | Restyle the cards: thumbnail, name, two-line description, and a footer with the surface icons, the short "pane + band" text and Awaken or Sleep. The awake card gets the amber border and badge | hooks/register.tsx | design-system §Engram card |
-| — | 7 | Make the card body open the Engram page; Awaken and Sleep still act straight away | hooks/register.tsx |
-| — | 8 | Add the Engram page: back to the picker; the HUD preview running the Engram's live scene in a `Client`; three mood chips and an Error button that change the preview only; the label, name, rule and description; Awaken or Sleep; the Where it draws panel from `whereItDraws` with a link to Surfaces; and the Draws, Source, Rights and On error cards. Remix comes in 2.6 | hooks/register.tsx, hooks/engram-page.tsx | design-system §HUD preview, §Panel |
-| — | 9 | Terminal and mobile: the same screens in plain text, with no `Svg` or `Client` | hooks/register.tsx |
-| — | 10 | Render tests on desktop and terminal: the picker with the awake strip, chips and cards; a card opening its page; the page in each mood and with the error preview; the preview buttons leaving the session's mood alone | hooks/picker.test.ts, hooks/engram-page.test.ts |
+| x | 1 | Add `hooks/theme.ts` with the pane colours from the design system, and use only those in every screen the picker draws | hooks/theme.ts | docs/design/design-system.md §Colours |
+| x | 2 | Bake the pixel "Eidola" wordmark as one `Svg` of paths (no web font), and the three surface icons (pane, band, Shrine) as small `Svg`s that take a colour | hooks/wordmark.ts, hooks/icons.ts | docs/design/design-system.md §What the pane can and can't do |
+| x | 3 | Rebuild the picker header: back button, wordmark, and a Surfaces button whose icons are amber when that surface is on. Then the "Engrams" title with its count label and the ember-to-gold rule | hooks/register.tsx | design-system §Header, §Title and rule |
+| x | 4 | Add the awake strip: thumbnail with the mood in amber, the "AWAKE" label, the name, "drawing in …" from `whereItDraws`, and Details and Sleep | hooks/register.tsx | design-system §Awake strip |
+| x | 5 | Restyle the filters as chips with counts (All, Pane, Band), amber when selected. Yours comes in 2.6 and Shrine in Phase 4 | hooks/register.tsx | design-system §Filter chips |
+| x | 6 | Restyle the cards: thumbnail, name, two-line description, and a footer with the surface icons, the short "pane + band" text and Awaken or Sleep. The awake card gets the amber border and badge | hooks/register.tsx | design-system §Engram card |
+| x | 7 | Make the card body open the Engram page; Awaken and Sleep still act straight away | hooks/register.tsx |
+| x | 8 | Add the Engram page: back to the picker; the HUD preview running the Engram's live scene in a `Client`; three mood chips and an Error button that change the preview only; the label, name, rule and description; Awaken or Sleep; the Where it draws panel from `whereItDraws` with a link to Surfaces; and the Draws, Source, Rights and On error cards. Remix comes in 2.6 | hooks/register.tsx, hooks/engram-page.tsx | design-system §HUD preview, §Panel |
+| x | 9 | Terminal and mobile: the same screens in plain text, with no `Svg` or `Client` | hooks/register.tsx |
+| x | 10 | Render tests on desktop and terminal: the picker with the awake strip, chips and cards; a card opening its page; the page in each mood and with the error preview; the preview buttons leaving the session's mood alone | hooks/picker.test.ts, hooks/engram-page.test.ts |
 | MANUAL | 11 | Open the picker and the Lich's page in the desktop app and compare them with the canvas |
 
 ### Acceptance Criteria
@@ -62,10 +62,10 @@ You can set the surfaces from a screen instead of a command, and reach the picke
 
 | Status | # | Task | Module | Reference |
 |--------|---|------|--------|-----------|
-| — | 1 | Add the Surfaces screen: a row each for Pane and Band with its switch; the "Hide the band while the pane is open" check under Band; a Status line row; and a warning when every surface is off. Each control writes the setting with `$.config.set`, as `/eidola place` does | hooks/register.tsx, hooks/surfaces-page.tsx | design-system §Surface row, §Switch |
-| — | 2 | `/eidola place` with no arguments opens the Surfaces screen on desktop and prints the switches elsewhere | hooks/register.tsx |
-| — | 3 | Ways in: `/engrams` opens the picker on desktop and still prints the list elsewhere. `/engrams <id>` opens that Engram's page. The corner triangle shows on every Engram's band, not only the Wisp's | hooks/register.tsx, hooks/frame-corner.tsx |
-| — | 4 | Tests: each switch and the check write the setting and the screen redraws; the all-off warning; `/engrams kraken` opens the Kraken's page; the band corner shows for each of the three | hooks/surfaces-page.test.ts, hooks/picker.test.ts |
+| x | 1 | Add the Surfaces screen: a row each for Pane and Band with its switch; the "Hide the band while the pane is open" check under Band; a Status line row; and a warning when every surface is off. Each control writes the setting with `$.config.set`, as `/eidola place` does | hooks/register.tsx, hooks/surfaces-page.tsx | design-system §Surface row, §Switch |
+| x | 2 | `/eidola place` with no arguments opens the Surfaces screen on desktop and prints the switches elsewhere | hooks/register.tsx |
+| x | 3 | Ways in: `/engrams` opens the picker on desktop and still prints the list elsewhere. `/engrams <id>` opens that Engram's page. The corner triangle shows on every Engram's band, not only the Wisp's | hooks/register.tsx, hooks/frame-corner.tsx |
+| x | 4 | Tests: each switch and the check write the setting and the screen redraws; the all-off warning; `/engrams kraken` opens the Kraken's page; the band corner shows for each of the three | hooks/surfaces-page.test.ts, hooks/picker.test.ts |
 | MANUAL | 5 | In the desktop app: switch the band off and on from the Surfaces screen, and open the picker from a band's corner |
 
 ### Acceptance Criteria
@@ -97,15 +97,15 @@ Another plugin can draw an Engram's creature inside Eidola's pane and band, Eido
 
 | Status | # | Task | Module | Reference |
 |--------|---|------|--------|-----------|
-| — | 1 | Hand-off in the pane: when the awake Engram belongs to another plugin, Eidola's `Pane` hook calls `next(e)` with the drawing area's size and places what comes back inside its own frame, HUD and corner. Otherwise it draws as today | hooks/register.tsx | .probe/SCENE-PROBE.md |
-| — | 2 | The same hand-off for the band | hooks/register.tsx |
-| — | 3 | If the plugin's drawing throws, returns nothing or runs over the frame budget, Eidola shows the Engram it was remixed from (or the resting sprite), marks the Engram "not loading" with the file and line, and keeps the session running | hooks/register.tsx |
-| — | 4 | Discovery: Eidola adds an `eidola` noun in `engine.create` with `announce({ root })`, which an Engram plugin calls at `session.start`. Eidola reads its `engram.json` from that root, validates it with `validate.ts` and adds it to the registry. A `plugin.register` hook catches plugins that load after Eidola, as a backup | hooks/register.tsx, hooks/loader.ts | Plan §Next: scene plugins |
-| — | 5 | Make Eidola's `PluginState` a public contract: document `engram`, `mood`, `moodBefore`, `moodAt`, `ink`, `inkAt` and `epoch`, add `contract: 1`, and ship the types so an Engram plugin listing Eidola under `dependencies` gets them | types/index.d.ts |
-| — | 6 | Write `docs/spec/engram-plugin.md`: the folder (plugin.json, engram.json with `scene: "self"` and an optional `remixOf`, the drawing module, an optional Shrine module, thumbnails), how it announces itself, which state it reads, what it must draw for each mood and for the error effect, the limits (700 drawing blocks, 10 ticks a second, thumbnails at 131,072 characters), and what it must never do (write Eidola's state, add prompt text) | docs/spec/engram-plugin.md |
-| — | 7 | Add a test Engram plugin under `test/fixtures/engram-plugin/` that follows the contract and draws a simple creature in all three moods | test/fixtures/engram-plugin/ |
-| — | 8 | Tests with the fixture: it announces and appears in the registry; awake, its drawing appears inside Eidola's frame in the pane and the band; a throwing fixture falls back and is marked not loading; both load orders are found | hooks/handoff.test.ts |
-| — | 9 | Find out how a pane button can start Claude on a task (for Create, Edit, Fix and Remix with Claude): `$.command.run` on the skill's slash command, or anything better the engine offers. Record the answer in the spec | docs/spec/engram-plugin.md |
+| x | 1 | Hand-off in the pane: when the awake Engram belongs to another plugin, Eidola's `Pane` hook calls `next(e)` with the drawing area's size and places what comes back inside its own frame, HUD and corner. Otherwise it draws as today | hooks/register.tsx | .probe/SCENE-PROBE.md |
+| x | 2 | The same hand-off for the band | hooks/register.tsx |
+| x | 3 | If the plugin's drawing throws, returns nothing or runs over the frame budget, Eidola shows the Engram it was remixed from (or the resting sprite), marks the Engram "not loading" with the file and line, and keeps the session running | hooks/register.tsx |
+| x | 4 | Discovery: Eidola adds an `eidola` noun in `engine.create` with `announce({ root })`, which an Engram plugin calls at `session.start`. Eidola reads its `engram.json` from that root, validates it with `validate.ts` and adds it to the registry. A `plugin.register` hook catches plugins that load after Eidola, as a backup | hooks/register.tsx, hooks/loader.ts | Plan §Next: scene plugins |
+| x | 5 | Make Eidola's `PluginState` a public contract: document `engram`, `mood`, `moodBefore`, `moodAt`, `ink`, `inkAt` and `epoch`, add `contract: 1`, and ship the types so an Engram plugin listing Eidola under `dependencies` gets them | types/index.d.ts |
+| x | 6 | Write `docs/spec/engram-plugin.md`: the folder (plugin.json, engram.json with `scene: "self"` and an optional `remixOf`, the drawing module, an optional Shrine module, thumbnails), how it announces itself, which state it reads, what it must draw for each mood and for the error effect, the limits (700 drawing blocks, 10 ticks a second, thumbnails at 131,072 characters), and what it must never do (write Eidola's state, add prompt text) | docs/spec/engram-plugin.md |
+| x | 7 | Add a test Engram plugin under `test/fixtures/engram-plugin/` that follows the contract and draws a simple creature in all three moods | test/fixtures/engram-plugin/ |
+| x | 8 | Tests with the fixture: it announces and appears in the registry; awake, its drawing appears inside Eidola's frame in the pane and the band; a throwing fixture falls back and is marked not loading; both load orders are found | hooks/handoff.test.ts |
+| x | 9 | Find out how a pane button can start Claude on a task (for Create, Edit, Fix and Remix with Claude): `$.command.run` on the skill's slash command, or anything better the engine offers. Record the answer in the spec | docs/spec/engram-plugin.md |
 | MANUAL | 10 | Install the fixture from a local marketplace, awaken it in a desktop session, and confirm it draws inside Eidola's pane and band |
 
 ### Acceptance Criteria
@@ -138,11 +138,11 @@ The Kraken, the Lich and the Wisp follow the same contract as any Engram plugin,
 
 | Status | # | Task | Module | Reference |
 |--------|---|------|--------|-----------|
-| — | 1 | Give each bundled Engram the Engram plugin layout inside `engrams/<id>/`: its `engram.json`, its drawing module and its thumbnails together, drawing through the same interface an Engram plugin uses | engrams/, hooks/register.tsx | docs/spec/engram-plugin.md |
-| — | 2 | Write `scripts/export-engram.mjs <id> <folder>`: turn a bundled Engram into a standalone, installable Engram plugin (plugin.json, the announce call, its scene, its thumbnails, `remixOf`) under a new id | scripts/export-engram.mjs |
-| — | 3 | Prove an exported Lich, installed locally, draws exactly as the bundled one: the fixed-seed run matches | hooks/export.test.ts |
-| — | 4 | Write `scripts/check-engram.mjs <folder>`: check an Engram plugin against the contract (engram.json through `validate.ts`, the announce call, the drawing module, thumbnails against their limit) and print ok, warnings and errors, each with the file and the fix | scripts/check-engram.mjs | Plan decision 8 |
-| — | 5 | Test the checker on the exported three, the fixture, and broken copies of each | hooks/check.test.ts |
+| x | 1 | Give each bundled Engram the Engram plugin layout inside `engrams/<id>/`: its `engram.json`, its drawing module and its thumbnails together, drawing through the same interface an Engram plugin uses | engrams/, hooks/register.tsx | docs/spec/engram-plugin.md |
+| x | 2 | Write `scripts/export-engram.mjs <id> <folder>`: turn a bundled Engram into a standalone, installable Engram plugin (plugin.json, the announce call, its scene, its thumbnails, `remixOf`) under a new id | scripts/export-engram.mjs |
+| x | 3 | Prove an exported Lich, installed locally, draws exactly as the bundled one: the fixed-seed run matches | hooks/export.test.ts |
+| x | 4 | Write `scripts/check-engram.mjs <folder>`: check an Engram plugin against the contract (engram.json through `validate.ts`, the announce call, the drawing module, thumbnails against their limit) and print ok, warnings and errors, each with the file and the fix | scripts/check-engram.mjs | Plan decision 8 |
+| x | 5 | Test the checker on the exported three, the fixture, and broken copies of each | hooks/check.test.ts |
 
 ### Acceptance Criteria
 
@@ -171,13 +171,13 @@ A skill shipped with the mod lets Claude create, remix, change, check and publis
 
 | Status | # | Task | Module | Reference |
 |--------|---|------|--------|-----------|
-| — | 1 | Write `skills/eidola-engram/SKILL.md`: what an Engram is, the contract, the limits and how each surface differs, and step-by-step guides for create, remix, change, fix, check and publish. Keep the contract in `docs/spec/engram-plugin.md` and point to it, so the two never drift | skills/eidola-engram/ | docs/spec/engram-plugin.md |
-| — | 2 | Add a starter Engram plugin for "create from nothing": a small, working creature in all three moods with the error effect, under `skills/eidola-engram/starter/` | skills/eidola-engram/starter/ |
-| — | 3 | Your Engrams live in `~/.claude/eidola/engrams/<id>/`, listed in a local marketplace (`eidola-local`) that the skill keeps up to date and installs from, so changes show up live | skills/eidola-engram/ |
-| — | 4 | Remix: from a bundled Engram through `export-engram.mjs`; from an installed Engram plugin by copying its folder under a new id with `remixOf` set. Never overwrite an existing id | skills/eidola-engram/ |
-| — | 5 | Publish: run the checker, then push the Engram to a GitHub repo of the creator's with a `marketplace.json`, and print the two commands others run to install it. Never publish without the creator's yes | skills/eidola-engram/ |
-| — | 6 | Add `/eidola new`, `/eidola remix <id>`, `/eidola edit <id>` and `/eidola publish <id>`, each starting the skill on that task | hooks/register.tsx |
-| — | 7 | Run the skill's evals with `claude plugin eval`: create a creature from a description, remix the Lich into a new colour and motion, fix a broken fixture, and publish to a test repo. Each result must pass the checker and draw | evals/eidola-engram/ |
+| x | 1 | Write `skills/eidola-engram/SKILL.md`: what an Engram is, the contract, the limits and how each surface differs, and step-by-step guides for create, remix, change, fix, check and publish. Keep the contract in `docs/spec/engram-plugin.md` and point to it, so the two never drift | skills/eidola-engram/ | docs/spec/engram-plugin.md |
+| x | 2 | Add a starter Engram plugin for "create from nothing": a small, working creature in all three moods with the error effect, under `skills/eidola-engram/starter/` | skills/eidola-engram/starter/ |
+| x | 3 | Your Engrams live in `~/.claude/eidola/engrams/<id>/`, listed in a local marketplace (`eidola-local`) that the skill keeps up to date and installs from, so changes show up live | skills/eidola-engram/ |
+| x | 4 | Remix: from a bundled Engram through `export-engram.mjs`; from an installed Engram plugin by copying its folder under a new id with `remixOf` set. Never overwrite an existing id | skills/eidola-engram/ |
+| x | 5 | Publish: run the checker, then push the Engram to a GitHub repo of the creator's with a `marketplace.json`, and print the two commands others run to install it. Never publish without the creator's yes | skills/eidola-engram/ |
+| x | 6 | Add `/eidola new`, `/eidola remix <id>`, `/eidola edit <id>` and `/eidola publish <id>`, each starting the skill on that task | hooks/register.tsx |
+| MANUAL | 7 | Run the skill's evals with `claude plugin eval`: create a creature from a description, remix the Lich into a new colour and motion, fix a broken fixture, and publish to a test repo. Each result must pass the checker and draw | evals/eidola-engram/ |
 | MANUAL | 8 | Create one Engram from nothing and remix one, start to finish, in a desktop session, and publish one to a real repo |
 
 ### Acceptance Criteria
@@ -208,13 +208,13 @@ Your Engrams sit beside the bundled ones, and every Engram page offers Remix.
 
 | Status | # | Task | Module | Reference |
 |--------|---|------|--------|-----------|
-| — | 1 | Add the Yours chip and its count. The Yours view starts with the New Engram tile (Create with Claude, and "or remix one" back to the picker), then your Engrams as cards with "Remix of …", an Edit with Claude icon button and Awaken | hooks/register.tsx | design-system §Engram card; canvas Yours artboard |
-| — | 2 | A not-loading Engram shows as a card with a dimmed thumbnail, the "Not loading" badge, the file and line, and Fix with Claude | hooks/register.tsx | canvas Yours artboard |
-| — | 3 | The Yours empty state: Make your own Engram, Create with Claude, "or remix one" | hooks/register.tsx | canvas Yours · empty artboard |
-| — | 4 | Add Remix with Claude to every Engram page, and Publish to the pages of your own | hooks/engram-page.tsx | canvas Engram page artboard |
-| — | 5 | Wire Create, Edit, Fix, Remix and Publish to the skill, as 2.3 #9 found | hooks/register.tsx |
-| — | 6 | Add an Engrams line to `/eidola`: bundled count, yours, and each not-loading Engram with its file and line | hooks/register.tsx |
-| — | 7 | Render tests on desktop and terminal: Yours with one working and one broken Engram, the empty state, and Remix on a bundled page | hooks/picker.test.ts, hooks/engram-page.test.ts |
+| x | 1 | Add the Yours chip and its count. The Yours view starts with the New Engram tile (Create with Claude, and "or remix one" back to the picker), then your Engrams as cards with "Remix of …", an Edit with Claude icon button and Awaken | hooks/register.tsx | design-system §Engram card; canvas Yours artboard |
+| x | 2 | A not-loading Engram shows as a card with a dimmed thumbnail, the "Not loading" badge, the file and line, and Fix with Claude | hooks/register.tsx | canvas Yours artboard |
+| x | 3 | The Yours empty state: Make your own Engram, Create with Claude, "or remix one" | hooks/register.tsx | canvas Yours · empty artboard |
+| x | 4 | Add Remix with Claude to every Engram page, and Publish to the pages of your own | hooks/engram-page.tsx | canvas Engram page artboard |
+| x | 5 | Wire Create, Edit, Fix, Remix and Publish to the skill, as 2.3 #9 found | hooks/register.tsx |
+| x | 6 | Add an Engrams line to `/eidola`: bundled count, yours, and each not-loading Engram with its file and line | hooks/register.tsx |
+| x | 7 | Render tests on desktop and terminal: Yours with one working and one broken Engram, the empty state, and Remix on a bundled page | hooks/picker.test.ts, hooks/engram-page.test.ts |
 | MANUAL | 8 | From the picker alone: create an Engram, remix the Kraken, fix a broken one, and publish one |
 
 ### Acceptance Criteria

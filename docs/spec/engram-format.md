@@ -67,14 +67,15 @@ Every field is in `engram.json`. A field left out takes its default.
 | Field | Required | Type | Default | Read by |
 |---|---|---|---|---|
 | `spec` | yes | the number `2` | | loader |
-| `id` | yes | slug: `a`-`z`, `0`-`9` and `-`, 2 to 32 characters, equal to the folder's name | | loader, `$.store`, `/awaken` |
+| `id` | yes | slug: `a`-`z`, `0`-`9` and `-`, 2 to 32 characters, equal to the folder's name (an Engram plugin's id stands alone: its folder is named by where it was installed) | | loader, `$.store`, `/awaken` |
 | `name` | yes | string, 1 to 32 characters | | picker, HUD, status line |
 | `version` | yes | semver, such as `1.0.0` | | `/eidola`, picker (yours) |
 | `author` | yes | non-empty string | | picker (yours), checker |
 | `description` | yes | string, 1 to 160 characters | | picker card, `/engrams` |
 | `rights` | yes | `original` or `licensed`: the creator's word that they made it or may share it | | checker |
+| `remixOf` | no | an Engram's id, not its own: the Engram this one was remixed from. Read for an Engram plugin's, whose drawing falls back to that Engram's scene | the resting sprite | fallback, picker still |
 | `vessel` | yes | object | | |
-| `vessel.scene` | yes | `kraken`, `lich` or `wisp`, a scene built into the mod (later, also a scene an Engram plugin provides) | | renderer, Shrine |
+| `vessel.scene` | yes | `kraken`, `lich` or `wisp`, a scene built into the mod; `self` in an Engram plugin, which draws its own creature ([engram-plugin.md](./engram-plugin.md)) | | renderer, hand-off, Shrine |
 | `vessel.shows` | no | list of `pane`, `band`, `shrine`: at least one, each once | all three | `whereItDraws`, picker, Shrine |
 | `vessel.thumbnails` | no | `{ pane?, band? }`, each a file name in `vessel/` ending `.svg` | the scene's bundled thumbnail | picker |
 | `vessel.hud` | no | object | | HUD frame |
@@ -100,7 +101,7 @@ Every field is in `engram.json`. A field left out takes its default.
 |---|---|---|
 | `manifest` | `engram.json` exists and parses, `spec` is `2`, the required fields are present, and every field present has the right type (slug, semver, lengths, enums, hex colours, file names) | error |
 | `id` | `id` equals the folder's name and, for a package that isn't bundled, isn't a bundled id | error |
-| `scene` | `vessel.scene` is set and names a scene the mod has | error |
+| `scene` | `vessel.scene` is set and names a scene the mod has; in an Engram plugin's `engram.json`, it is `self` | error |
 | `thumb-size` | Each thumbnail is at most 131,072 characters and starts with `<svg` (after any leading whitespace) | error |
 | `thumb-safe` | No `<script>`, no `on*=` attribute and no `href` to `http:` or `https:` in a thumbnail. The host strips scripts anyway; this rejects them so the creator knows | error |
 | `thumb-exists` | Each file named in `vessel.thumbnails` exists in `vessel/` | error |

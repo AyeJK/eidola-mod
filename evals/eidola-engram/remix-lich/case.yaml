@@ -1,0 +1,63 @@
+schema_version: "1.1"
+name: eidola-remix-lich
+description: Remix the bundled Lich into a new colour and motion. It must pass the checker and draw.
+tags: [eidola-engram, remix]
+plugins: ["../../.."]
+runs: 1
+expected_outcome: frost-lich in eidola-home/engrams/, exported from the Lich (remixOf lich), its fire colours changed to icy blues and its motion slowed; checker ok and draws; Eidola's own Lich untouched.
+execution:
+  max_turns: 80
+  timeout_seconds: 1500
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+  env:
+    EVAL_EIDOLA_HOME: eidola-home
+  prompt: |
+    /eidola:eidola-engram remix lich Make a remix of the Lich called frost-lich (name "Frost Lich", author "Eval Tester"): swap its fire colours for icy blues and pale cyan, and make its motion slower and calmer. Keep the three moods distinct. Check it passes the checker and draws. Don't install it.
+context:
+  # Marks the workspace as an eval's (.eidola-eval): see scaffold.sh.
+  scaffold_script: scaffold.sh
+graders:
+  - name: exported-from-the-lich
+    type: tool_used
+    tool: Bash
+    input_match: 'engram-home\.mjs[\s\S]{0,6}remix lich frost-lich'
+  - name: remix-of-lich
+    type: regex
+    target: { source: file, path: eidola-home/engrams/frost-lich/engram.json }
+    pattern: '"id": "frost-lich"[\s\S]*"remixOf": "lich"'
+  - name: files-changed
+    type: tool_used
+    tool: Edit
+    input_match: 'frost-lich'
+    min: 1
+  - name: checker-ok
+    type: regex
+    target: trace
+    pattern: 'frost-lich: ok'
+  - name: draws
+    type: regex
+    target: trace
+    pattern: 'frost-lich: draws'
+  - name: nothing-written-in-eidola
+    type: tool_used
+    tool: Write
+    input_match: 'eidola-mod'
+    min: 0
+    max: 0
+  - name: nothing-edited-in-eidola
+    type: tool_used
+    tool: Edit
+    input_match: 'eidola-mod'
+    min: 0
+    max: 0
+  - name: nothing-installed
+    type: tool_used
+    tool: Bash
+    input_match: 'claude\s+plugin\s+(install|i|marketplace\s+add)\b'
+    min: 0
+    max: 0
+  - name: colour-and-motion
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if the assistant changed the remix's colours from the Lich's fire reds and oranges to icy blues or cyans (in the copied files under eidola-home/engrams/frost-lich/, not in the Eidola mod's own folder) AND slowed its motion (for example lower speeds or amplitudes, longer periods, or a slower tick that stays at 100 ms or slower), and the final message reports that the checker passed and it draws. FAIL if only the colours or only the motion changed, if any file in the Eidola mod's own folder was edited, or if the checker or draw check did not pass.

@@ -162,7 +162,8 @@ describe('the loader in a session', () => {
     on('clock.now', () => ({ value: NOW }))
     on('command.register', ($2, e) => ({ value: { command: e.name } }))
     on('session.start', ($2, e) => ({ cwd: e.cwd }))
-    on('session.surfaces', () => ({ value: ['desktop' as const] }))
+    // A terminal session, so /engrams prints its list: on the desktop it opens a screen in the pane instead.
+    on('session.surfaces', () => ({ value: ['terminal' as const] }))
     on('http.fetch', () => ({ value: { status: 200, ok: true, headers: {}, text: '' } }))
 
     await $.session.start({ cwd: '/work', surface: 'desktop', isInteractive: true })

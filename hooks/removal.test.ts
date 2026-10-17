@@ -54,7 +54,8 @@ function engine(on: On, stored: string | null | undefined) {
   on('clock.now', () => ({ value: NOW }))
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
-  on('session.surfaces', () => ({ value: ['desktop' as const] }))
+  // A terminal session, so /engrams prints its list: on the desktop it opens a screen in the pane instead.
+  on('session.surfaces', () => ({ value: ['terminal' as const] }))
   on('http.fetch', () => ({ value: { status: 200, ok: true, headers: {}, text: '' } }))
   return { store, reads }
 }
@@ -73,7 +74,7 @@ describe('removal: the bundle', () => {
       .map(box => /^card:(.+)$/.exec(String(box.key))?.[1])
       .filter((id): id is string => id !== undefined)
     expect([...cards].sort()).toEqual(KEPT)
-    expect(await pane.find({ type: 'Text', text: '3 bundled' })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: '3 BUNDLED' })).toBeDefined()
     await pane.unmount()
 
     const listed = (await $.command.run({ command: 'engrams', args: '', ...TYPED })).text ?? ''

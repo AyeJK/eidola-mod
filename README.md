@@ -3,7 +3,8 @@
 An Engram's scene in a pane or the band above the prompt that reacts to what Claude is doing. Eidola adds nothing to the prompt.
 
 - States: idle, thinking, working, attention, success, responding, error, waiting (asleep when no Engram is awake: the pane and band show the Wisp's scene, dimmed)
-- Commands: `/eidola` (open the pane and print diagnostics), `/eidola place [pane|band|hide on|off]` (show the surfaces switches, or set one), `/eidola frame` (toggle the awake Engram's HUD), `/eidola mood idle|working|attention` (set the mood by hand until the next prompt), `/eidola ink` (show a failure), `/eidola media` (toggle the media test), `/awaken <engram>`, `/sleep`, `/engrams`
+- Commands: `/eidola` (open the pane and print diagnostics), `/eidola place [pane|band|hide|status on|off]` (open the Surfaces screen on the desktop, print the switches elsewhere, or set one), `/eidola frame` (toggle the awake Engram's HUD), `/eidola mood idle|working|attention` (set the mood by hand until the next prompt), `/eidola ink` (show a failure), `/eidola media` (toggle the media test), `/awaken <engram>`, `/sleep`, `/engrams [engram]` (open the picker, or one Engram's page, in the pane on the desktop; print the list elsewhere)
+- Make your own: `/eidola new`, `/eidola remix <engram>`, `/eidola edit <engram>`, `/eidola publish <engram>` start the Eidola skill (`skills/eidola-engram/`, also `/eidola:eidola-engram`) on that task: Claude makes the Engram plugin with you in `~/.claude/eidola/engrams/<id>/`, lists it in the local marketplace `eidola-local`, checks it, installs it with your yes, and publishes it to a GitHub repo of yours only with your yes. `edit` and `publish` take your own Engrams; a bundled one is remixed first.
 - The Engram picker: click the triangle in the bottom-right corner of the pane, or of the band for a band-only Engram, to list the bundled Engrams, filter them by where they draw, and awaken one
 
 ## Options
@@ -56,7 +57,12 @@ claude plugin validate .
 npx -p typescript tsc -p .
 claude plugin test .
 node scripts/bake-thumbs.mjs --check
+node scripts/export-engram.mjs --check
 ```
+
+Each bundled Engram draws through its own drawing module, `engrams/<id>/hooks/draw.tsx`, given the hand-off an Engram plugin is given ([docs/spec/engram-plugin.md](docs/spec/engram-plugin.md)). `node scripts/export-engram.mjs <id> <folder>` turns one into a standalone Engram plugin under a new id, and `node scripts/check-engram.mjs <folder>` checks any Engram plugin against the contract, printing each problem with its file and fix. The tests read a committed export (`test/fixtures/exported-lich/`) and the checker's view of the exported three (`hooks/exports.data.ts`); after changing how a bundled Engram draws, write both again: `node scripts/export-engram.mjs lich test/fixtures/exported-lich --fixture --force && node scripts/export-engram.mjs --data` (`--fixture` is the only way an export lands inside the mod, and only under `test/`). `--check` fails when either has drifted.
+
+The Eidola skill (`skills/eidola-engram/SKILL.md`) runs from wherever the mod is installed and never writes inside it. It works through `scripts/engram-home.mjs` (`where`, `list`, `new`, `remix`, `check`, `draws`, `sync`, `publish-prep`), which keeps your Engrams in `~/.claude/eidola/` (`EIDOLA_HOME` moves it) and refuses an id that is taken. "Create from nothing" copies the starter, `skills/eidola-engram/starter/` (tested by `hooks/starter.test.ts`; keep tests out of the starter's folder). The skill's evals are in `evals/eidola-engram/`: `claude plugin eval . --case "eidola-*" --runs 1 --ablation none --no-publish --scaffold --allow-tools Write Edit "Bash(node:*)" "Bash(git:*)" "Bash(ls:*)" "Bash(cat:*)" "Bash(mkdir:*)" "Bash(cd:*)" "Bash(pwd:*)" "Bash(find:*)"` (from a terminal where `claude auth status` says logged in; `--scaffold` runs the cases' own setup scripts, which stage a broken Engram and a local bare git repo standing in for GitHub).
 
 The Kraken's and the Lich's picker thumbnails are stills of their live drawings, baked into `engrams/<id>/vessel/thumb-*.svg`, the files each `engram.json` names. After changing how one of them draws, bake them again with `node scripts/bake-thumbs.mjs`: it runs each drawing in the test runner, keeps its best-composed frame, and writes the stills. `--check` only checks that every thumbnail an Engram names exists and fits a desktop Svg, that no per-state frame is left in a package's `vessel/`, and that the tests' copy of each manifest (`hooks/packages.data.ts`) matches it.
 

@@ -1,0 +1,7 @@
+{
+  "name": "eidola-engram-fixture",
+  "version": "0.1.0",
+  "description": "A test Engram plugin for Eidola: a small creature drawn in Eidola's pane and band. Follows docs/spec/engram-plugin.md.",
+  "author": { "name": "Jeremy Kaye" },
+  "dependencies": ["eidola"]
+}

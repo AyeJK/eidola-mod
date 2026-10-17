@@ -1,0 +1,72 @@
+schema_version: "1.1"
+name: eidola-create
+description: Create an Engram from a description, from nothing (the starter). It must pass the checker and draw.
+tags: [eidola-engram, create]
+plugins: ["../../.."]
+runs: 1
+expected_outcome: A new Engram plugin jelly-glow in eidola-home/engrams/, listed in eidola-local, its creature a jellyfish in three moods with an error effect; the checker prints "jelly-glow ok" and the draw check "jelly-glow draws"; nothing installed, nothing written inside Eidola's folder.
+execution:
+  max_turns: 60
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+  env:
+    EVAL_EIDOLA_HOME: eidola-home
+  prompt: |
+    I want my own Engram for Eidola. Make me a small jellyfish called jelly-glow (name "Jelly Glow", author "Eval Tester"). At rest it drifts and glows soft teal; while Claude works it pulses orange; when it needs me it flashes pink with its tentacles raised. When something goes wrong its tentacles tangle for a moment. Make it, check that it passes the checker and draws, and tell me how it went. Don't install it yet.
+context:
+  # Marks the workspace as an eval's (.eidola-eval): with it, the Engram home
+  # script refuses the real ~/.claude/eidola if EVAL_EIDOLA_HOME is missing,
+  # and reads the relative eidola-home from the workspace's top.
+  scaffold_script: scaffold.sh
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: eidola-engram
+  - name: made-from-the-starter
+    type: tool_used
+    tool: Bash
+    input_match: 'engram-home\.mjs[\s\S]{0,6}new jelly-glow'
+  - name: checker-ok
+    type: regex
+    target: trace
+    pattern: 'jelly-glow: ok'
+  - name: draws
+    type: regex
+    target: trace
+    pattern: 'jelly-glow: draws'
+  - name: engram-json
+    type: regex
+    target: { source: file, path: eidola-home/engrams/jelly-glow/engram.json }
+    pattern: '"id": "jelly-glow"[\s\S]*"scene": "self"'
+  - name: a-jellyfish
+    type: regex
+    target: { source: file, path: eidola-home/engrams/jelly-glow/hooks/register.tsx }
+    pattern: "const ID = 'jelly-glow'"
+  - name: listed-in-eidola-local
+    type: regex
+    target: { source: file, path: eidola-home/.claude-plugin/marketplace.json }
+    pattern: '"name": "eidola-local"[\s\S]*"source": "./engrams/jelly-glow"'
+  - name: nothing-installed
+    type: tool_used
+    tool: Bash
+    input_match: 'claude\s+plugin\s+(install|i|marketplace\s+add)\b'
+    min: 0
+    max: 0
+  - name: nothing-written-in-eidola
+    type: tool_used
+    tool: Write
+    input_match: 'eidola-mod'
+    min: 0
+    max: 0
+  - name: nothing-edited-in-eidola
+    type: tool_used
+    tool: Edit
+    input_match: 'eidola-mod'
+    min: 0
+    max: 0
+  - name: the-creature-described
+    type: llm
+    focus: trace
+    criteria: |
+      PASS if the Engram's drawing code (the LOOKS table or equivalent the assistant wrote in eidola-home/engrams/jelly-glow/hooks/register.tsx) depicts a jellyfish with a teal look at idle, an orange look while working, a pink look with raised tentacles for attention, and a distinct tangled-tentacles error look; the final message reports that the checker passed and the Engram draws, and says it was not installed (or offers to install it). FAIL if the creature is still the starter's mote, a mood is missing, colours do not match the description, or the assistant installed the plugin.

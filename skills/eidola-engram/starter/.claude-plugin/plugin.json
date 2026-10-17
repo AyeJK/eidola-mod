@@ -1,0 +1,6 @@
+{
+  "name": "starter",
+  "version": "0.1.0",
+  "description": "Starter, an Engram for Eidola: a small creature drawn in Eidola's pane and band.",
+  "dependencies": ["eidola"]
+}

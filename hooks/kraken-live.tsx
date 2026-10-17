@@ -103,20 +103,21 @@ type ArmLife = ArmPose & {
 }
 
 /** -1 or 1, evenly. */
-const either = () => (Math.random() < 0.5 ? -1 : 1)
+const either = (rnd: () => number) => (rnd() < 0.5 ? -1 : 1)
 
 /**
  * What an arm may set out to do, and how. Curls go both ways: out and up,
- * or inward, back toward the body; and to either side.
+ * or inward, back toward the body; and to either side. Each draws from
+ * `rnd`, the Kraken's own fixed sequence, so a run from one seed repeats.
  */
 const INTENTS = {
-  drift: () => ({ curl: -0.6 + Math.random() * 2, sweep: (Math.random() - 0.5) * 1.2, reach: 0.9 + Math.random() * 0.15, splay: (Math.random() - 0.5) * 0.5, wave: 0.6 + Math.random() * 0.7, toward: 0, tuck: 0 }),
-  coil: () => ({ curl: either() * (2 + Math.random() * 1), sweep: (Math.random() - 0.5) * 1.6, reach: 0.75, splay: -0.1, wave: 0.3, toward: 0, tuck: 0 }),
-  hook: () => ({ curl: -(1.8 + Math.random() * 1), sweep: (Math.random() - 0.5) * 0.8, reach: 0.95, splay: 0.15, wave: 0.35, toward: 0, tuck: 0 }),
-  reach: () => ({ curl: (Math.random() - 0.5) * 0.6, sweep: (Math.random() - 0.5) * 0.6, reach: 1.25 + Math.random() * 0.15, splay: -0.35, wave: 0.4, toward: Math.random() < 0.5 ? 0.55 : 0, tuck: 0 }),
-  creep: () => ({ curl: (Math.random() - 0.5) * 1.2, sweep: (Math.random() - 0.5) * 1, reach: 1.1, splay: -0.2, wave: 0.25, toward: 0.6 + Math.random() * 0.2, tuck: 0 }),
+  drift: (rnd: () => number) => ({ curl: -0.6 + rnd() * 2, sweep: (rnd() - 0.5) * 1.2, reach: 0.9 + rnd() * 0.15, splay: (rnd() - 0.5) * 0.5, wave: 0.6 + rnd() * 0.7, toward: 0, tuck: 0 }),
+  coil: (rnd: () => number) => ({ curl: either(rnd) * (2 + rnd() * 1), sweep: (rnd() - 0.5) * 1.6, reach: 0.75, splay: -0.1, wave: 0.3, toward: 0, tuck: 0 }),
+  hook: (rnd: () => number) => ({ curl: -(1.8 + rnd() * 1), sweep: (rnd() - 0.5) * 0.8, reach: 0.95, splay: 0.15, wave: 0.35, toward: 0, tuck: 0 }),
+  reach: (rnd: () => number) => ({ curl: (rnd() - 0.5) * 0.6, sweep: (rnd() - 0.5) * 0.6, reach: 1.25 + rnd() * 0.15, splay: -0.35, wave: 0.4, toward: rnd() < 0.5 ? 0.55 : 0, tuck: 0 }),
+  creep: (rnd: () => number) => ({ curl: (rnd() - 0.5) * 1.2, sweep: (rnd() - 0.5) * 1, reach: 1.1, splay: -0.2, wave: 0.25, toward: 0.6 + rnd() * 0.2, tuck: 0 }),
   // Drawn in under the head, hanging, the tip curling a little as it trails.
-  tuck: () => ({ curl: -0.5 + Math.random() * 0.9, sweep: (Math.random() - 0.5) * 0.6, reach: 0.85 + Math.random() * 0.1, splay: 0.25, wave: 0.5, toward: 0, tuck: 0.7 + Math.random() * 0.25 }),
+  tuck: (rnd: () => number) => ({ curl: -0.5 + rnd() * 0.9, sweep: (rnd() - 0.5) * 0.6, reach: 0.85 + rnd() * 0.1, splay: 0.25, wave: 0.5, toward: 0, tuck: 0.7 + rnd() * 0.25 }),
 } as const
 
 type Intent = keyof typeof INTENTS | 'twitch'
@@ -638,7 +639,7 @@ function step(live: Live, W: number, H: number, s: number): void {
       if (pick === 'twitch') {
         arm.twitch = 0.5 + random(live) * 0.4
       } else {
-        arm.intent = INTENTS[pick]()
+        arm.intent = INTENTS[pick](() => random(live))
       }
       arm.ease = 0.015 + random(live) * 0.045
       arm.next = live.tick + between(live, pick === 'twitch' ? [15, 40] : [50, 160])

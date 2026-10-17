@@ -1,0 +1,15 @@
+{
+  "spec": 2,
+  "id": "starter",
+  "name": "Starter",
+  "version": "0.1.0",
+  "author": "eidola",
+  "description": "A small mote of light that drifts at rest, works in amber and calls in yellow.",
+  "rights": "original",
+  "vessel": {
+    "scene": "self",
+    "shows": ["pane", "band"],
+    "thumbnails": { "pane": "thumb-pane.svg" },
+    "hud": { "show": true, "meter": "none", "tag": "name", "bracket": "#7fd4ff" }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "spec": 2,
+  "id": "broken-moth",
+  "name": "Broken Moth",
+  "version": "0.1.0",
+  "author": "Eval Tester",
+  "description": "A dusty moth that circles a lamp.",
+  "rights": "original",
+  "vessel": {
+    "scene": "kraken",
+    "shows": [
+      "pane",
+      "band"
+    ],
+    "thumbnails": {
+      "pane": "thumb-pane.svg"
+    },
+    "hud": {
+      "show": true,
+      "meter": "none",
+      "tag": "name",
+      "bracket": "#7fd4ff"
+    }
+  }
+}

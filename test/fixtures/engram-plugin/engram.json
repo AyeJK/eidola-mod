@@ -1,0 +1,17 @@
+{
+  "$schema": "../../../docs/spec/engram.schema.json",
+  "spec": 2,
+  "id": "fixture",
+  "name": "Fixture",
+  "version": "0.1.0",
+  "author": "eidola",
+  "description": "A small test creature, drawn by its own plugin inside Eidola's pane and band.",
+  "rights": "original",
+  "remixOf": "kraken",
+  "vessel": {
+    "scene": "self",
+    "shows": ["pane", "band"],
+    "thumbnails": { "pane": "thumb-pane.svg" },
+    "hud": { "show": true, "meter": "none", "tag": "name", "bracket": "#4ad6c8" }
+  }
+}

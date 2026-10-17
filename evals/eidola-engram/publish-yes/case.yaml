@@ -1,0 +1,84 @@
+schema_version: "1.1"
+name: eidola-publish-yes
+description: Publish to a test repo with the creator's yes given up front. It is checked, prepared, shown, pushed to the local bare repo, and the two install commands are printed.
+tags: [eidola-engram, publish]
+plugins: ["../../.."]
+runs: 1
+expected_outcome: pub-mote checked ok and drawing, publish-prep for tester/pub-mote, committed and pushed to ./remote.git (main), and the two install commands printed; no gh, no install.
+execution:
+  max_turns: 50
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+  env:
+    EVAL_EIDOLA_HOME: eidola-home
+  prompt: |
+    Publish my Engram pub-mote to GitHub as tester/pub-mote, public. For this test, use the local bare repo at ./remote.git in this folder as the remote instead of GitHub (don't use gh). I've decided already: yes, push pub-mote to that remote once it passes the checks. If git needs a name and email, use "Eval Tester" and eval@example.com. Then give me the commands others run to install it.
+context:
+  scaffold_script: scaffold.sh
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: eidola-engram
+  - name: checked-first
+    type: regex
+    target: trace
+    pattern: 'pub-mote: ok'
+  - name: draws
+    type: regex
+    target: trace
+    pattern: 'pub-mote: draws'
+  - name: prepared
+    type: tool_used
+    tool: Bash
+    input_match: 'publish-prep pub-mote'
+  # The push, however it is spelled (git -c user.name="X" push, git -C dir push, ... && git push).
+  - name: checked-before-push
+    type: tool_order
+    before: { tool: Bash, input_match: 'publish-prep pub-mote' }
+    after: { tool: Bash, input_match: '\bgit\b[\s\S]*push\b' }
+  - name: pushed
+    type: tool_used
+    tool: Bash
+    input_match: '\bgit\b[\s\S]*push\b'
+    min: 1
+  - name: pushed-main
+    type: regex
+    target: trace
+    pattern: '(\[new branch\]|main -> main)'
+  - name: marketplace-add-line
+    type: regex
+    pattern: 'claude plugin marketplace add tester/pub-mote'
+  - name: install-line
+    type: regex
+    pattern: 'claude plugin install pub-mote@pub-mote'
+  - name: no-gh
+    type: tool_used
+    tool: Bash
+    input_match: '\bgh\s'
+    min: 0
+    max: 0
+  - name: no-plugin-install
+    type: tool_used
+    tool: Bash
+    input_match: 'claude\s+plugin\s+(install|i)\b'
+    min: 0
+    max: 0
+  - name: no-marketplace-add
+    type: tool_used
+    tool: Bash
+    input_match: 'claude\s+plugin\s+marketplace\s+add\b'
+    min: 0
+    max: 0
+  - name: nothing-written-in-eidola
+    type: tool_used
+    tool: Write
+    input_match: 'eidola-mod'
+    min: 0
+    max: 0
+  - name: nothing-edited-in-eidola
+    type: tool_used
+    tool: Edit
+    input_match: 'eidola-mod'
+    min: 0
+    max: 0

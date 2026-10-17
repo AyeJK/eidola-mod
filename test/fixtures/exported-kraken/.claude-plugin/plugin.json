@@ -1,0 +1,11 @@
+{
+  "name": "exported-kraken",
+  "version": "0.1.0",
+  "description": "Exported Kraken, an Engram for Eidola, made from the bundled Kraken.",
+  "author": {
+    "name": "eidola"
+  },
+  "dependencies": [
+    "eidola"
+  ]
+}

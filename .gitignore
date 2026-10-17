@@ -6,3 +6,5 @@ Thumbs.db
 .claude-plugin/types/
 .probe/
 docs/phases/.runs/
+evals/results/
+evals/*/results/

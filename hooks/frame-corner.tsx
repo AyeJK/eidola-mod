@@ -1,6 +1,7 @@
-// The pane's bottom-right corner: a small brass triangle in place of the
-// bracket. A click on it opens the Engram picker, and closes it again. It
-// lights under the pointer, so it reads as something to press.
+// The bottom-right corner of the pane and of every band: a small brass
+// triangle in place of the bracket. A click on it opens the Engram picker,
+// and closes it (or any screen the pane shows) again. It lights under the
+// pointer, so it reads as something to press.
 
 import type { ClientModule } from 'claude-code'
 

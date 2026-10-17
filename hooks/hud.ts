@@ -1,5 +1,7 @@
 // Pictures for the HUD frame: the state's name, drawn large.
 
+import type { VesselState } from '../types'
+
 /** The state's label, drawn large: its height in pixels (two cell rows). */
 export const LABEL_PX = 34
 
@@ -87,3 +89,19 @@ export function labelSvg(
       : `<text x="1" y="${y}" font-family="Inter,'Segoe UI',system-ui,sans-serif" font-weight="800" font-size="${Math.round(24 * k)}" letter-spacing="${1.2 * k}" fill="${colour}">${name}</text>`
   return wrap(text, width)
 }
+
+/** The frame's look for each state: its colour, its name, and the line under it when there is no detail. */
+export const FRAME_STATES: Record<VesselState, { colour: string; name: string; line: string }> = {
+  idle: { colour: '#8a93a6', name: 'IDLE', line: 'at rest' },
+  thinking: { colour: '#4f7cff', name: 'THINKING', line: 'processing depth' },
+  working: { colour: '#ff9d3a', name: 'WORKING', line: 'executing' },
+  attention: { colour: '#ff3b3b', name: 'ATTENTION', line: 'priority interrupt' },
+  success: { colour: '#46d27a', name: 'DONE', line: 'complete' },
+  responding: { colour: '#ffd23a', name: 'RESPONDING', line: 'transmitting' },
+  error: { colour: '#ff3b3b', name: 'ERROR', line: 'fault' },
+  waiting: { colour: '#b48cff', name: 'WAITING', line: 'standing by' },
+  sleeping: { colour: '#5a6070', name: 'ASLEEP', line: 'dormant' },
+}
+
+/** The detail under the state: what it is doing, in grey. */
+export const FRAME_GREY = '#9aa3b2'

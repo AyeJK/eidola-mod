@@ -1,0 +1,84 @@
+// Does this Engram draw? Written by the Eidola skill
+// (node <eidola>/scripts/engram-home.mjs draws <id>) and run with
+// `claude plugin test <this Engram's folder>`. It hands the drawing module
+// what Eidola hands it (docs/spec/engram-plugin.md, Beneath Eidola: the
+// hand-off on e.props.eidola) in the pane and the band, on the terminal and
+// the desktop, in each mood and with the error effect, and checks what comes
+// back: one Box keyed eidola:<id>, within 700 blocks, each mood drawn
+// differently, and the error effect different from the mood under it.
+// Written again each time the skill checks; keep your own tests in another file.
+
+import { describe, expect, test } from 'claude-code/testing'
+import type { RenderElement } from 'claude-code'
+
+const ID = '__ID__'
+const PLUGIN = '__PLUGIN__'
+const NOW = 1_760_000_000_000
+const MOODS = ['idle', 'working', 'attention'] as const
+const SURFACES = ['terminal', 'desktop'] as const
+const BLOCKS = 700
+const SCROLL = { offset: 0, bodyRows: 40 }
+/** Where it draws, as engram.json's vessel.shows says, and how much room each place gives. */
+const PLACES = __PLACES__ as readonly ('pane' | 'band')[]
+const ROOM = { pane: { columns: 48, rows: 30 }, band: { columns: 80, rows: __BAND_ROWS__ } } as const
+
+type Mood = (typeof MOODS)[number]
+
+function handoff(where: 'pane' | 'band', mood: Mood, isError: boolean) {
+  return { contract: 1, engram: ID, where, ...ROOM[where], mood, moodBefore: 'idle', moodAt: NOW - 5_000, ink: isError ? 1 : 0, inkAt: isError ? NOW - 100 : 0, epoch: NOW - 60_000 }
+}
+
+function mountOf(surface: (typeof SURFACES)[number], where: 'pane' | 'band', mood: Mood, isError: boolean) {
+  const eidola = handoff(where, mood, isError)
+  return where === 'pane'
+    ? { plugin: PLUGIN, surface, component: 'Pane', requestId: 'eidola', props: { title: 'Eidola', isFocused: false, bodyColumns: 48, placement: 'dock', scroll: SCROLL, view: {}, eidola } }
+    : { plugin: PLUGIN, surface, component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 12, bodyColumns: 80, scroll: SCROLL, view: {}, eidola } }
+}
+
+/** The element keyed eidola:<id> in a drawn tree. */
+function sceneOf(node: unknown): RenderElement | undefined {
+  if (node === null || typeof node !== 'object') {
+    return undefined
+  }
+  const element = node as { props?: { key?: unknown }; children?: unknown }
+  if (element.props?.key === `eidola:${ID}`) {
+    return node as RenderElement
+  }
+  return Array.isArray(element.children) ? element.children.map(sceneOf).find(Boolean) : undefined
+}
+
+/** How many elements a tree holds. */
+function blocks(node: unknown): number {
+  if (node === null || typeof node !== 'object' || !('type' in (node as object))) {
+    return 0
+  }
+  const children = (node as { children?: unknown }).children
+  return 1 + (Array.isArray(children) ? children.reduce((sum: number, child) => sum + blocks(child), 0) : 0)
+}
+
+describe(`${ID} draws`, () => {
+  for (const surface of SURFACES) {
+    for (const where of PLACES) {
+      test(`in the ${where} on ${surface}: each mood, distinct, and the error effect`, async ($, on) => {
+        on('clock.now', () => ({ value: NOW }))
+        on('ui.render', ($, e) => $.ui.resolve(e).Box({}))
+        const seen = new Map<string, string>()
+        for (const mood of MOODS) {
+          for (const isError of [false, true]) {
+            const ui = await $.ui.mount(mountOf(surface, where, mood, isError) as never)
+            const scene = sceneOf(await ui.drawn())
+            const at = `${mood}${isError ? ' with the error effect' : ''}`
+            expect(scene, `${at}: no Box keyed eidola:${ID} came back`).toBeDefined()
+            expect(blocks(scene), `${at}: over ${BLOCKS} blocks`).toBeLessThanOrEqual(BLOCKS)
+            seen.set(at, JSON.stringify(scene))
+            await ui.unmount()
+          }
+        }
+        expect(new Set(MOODS.map(mood => seen.get(mood))).size, 'the three moods must each draw differently').toBe(3)
+        for (const mood of MOODS) {
+          expect(seen.get(`${mood} with the error effect`), `the error effect must change ${mood}`).not.toBe(seen.get(mood))
+        }
+      })
+    }
+  }
+})

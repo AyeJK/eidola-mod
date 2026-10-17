@@ -39,11 +39,20 @@ export const ENGRAM_SCHEMA = {
     author: { type: 'string', minLength: 1 },
     description: { type: 'string', description: 'The picker card and /engrams.', minLength: 1, maxLength: 160 },
     rights: { description: 'Your word that you made it, or may share it.', enum: ['original', 'licensed'] },
+    remixOf: {
+      type: 'string',
+      description: "An Engram plugin's: the id of the Engram it was remixed from, drawn while its own drawing can't be.",
+      pattern: '^[a-z0-9-]{2,32}$',
+    },
     vessel: {
       type: 'object',
       required: ['scene'],
       properties: {
-        scene: { type: 'string', description: 'The scene it draws, built into the mod.', enum: ['kraken', 'lich', 'wisp'] },
+        scene: {
+          type: 'string',
+          description: 'The scene it draws, built into the mod; self in an Engram plugin, which draws its own (docs/spec/engram-plugin.md).',
+          enum: ['kraken', 'lich', 'wisp', 'self'],
+        },
         shows: {
           type: 'array',
           description: 'Where it draws; all three when left out.',

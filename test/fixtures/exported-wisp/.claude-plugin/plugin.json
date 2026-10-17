@@ -1,0 +1,11 @@
+{
+  "name": "exported-wisp",
+  "version": "0.1.0",
+  "description": "Exported Wisp, an Engram for Eidola, made from the bundled Wisp.",
+  "author": {
+    "name": "eidola"
+  },
+  "dependencies": [
+    "eidola"
+  ]
+}

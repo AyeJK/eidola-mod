@@ -11,6 +11,7 @@ import {
   HUD_TAGS,
   RIGHTS,
   SCENE_IDS,
+  SCENE_NAMES,
   SHOW_PLACES,
   SPEC_VERSION,
   THUMB_VIEWS,
@@ -67,7 +68,10 @@ export type PackageFiles = { folder: string; files: Readonly<Record<string, stri
 export type ValidateOptions = {
   /** Ids the package may not take: the bundled ids, for a package that isn't bundled. */
   reserved?: readonly string[]
-  /** The scenes `vessel.scene` may name; the mod's built-in scenes by default. */
+  /**
+   * The scenes `vessel.scene` may name; the mod's built-in scenes by default,
+   * and `["self"]` for an Engram plugin's engram.json.
+   */
   scenes?: readonly string[]
   /**
    * Whether to check the thumbnails' files (default true). The loader reads
@@ -92,7 +96,7 @@ export const REQUIRED = {
 
 /** Every key the format has, at each level; any other draws an unknown-key warning. */
 export const KEYS = {
-  engram: [...REQUIRED.engram, 'extensions', '$schema'],
+  engram: [...REQUIRED.engram, 'remixOf', 'extensions', '$schema'],
   vessel: ['scene', 'shows', 'thumbnails', 'hud'],
   thumbnails: THUMB_VIEWS,
   hud: ['show', 'meter', 'tag', 'camera', 'layout', 'label', 'bracket', 'colours'],
@@ -104,7 +108,7 @@ export const KEYS = {
 export const ENUMS = {
   spec: [SPEC_VERSION],
   rights: RIGHTS,
-  scene: SCENE_IDS,
+  scene: SCENE_NAMES,
   shows: SHOW_PLACES,
   meter: HUD_METERS,
   tag: HUD_TAGS,
@@ -398,6 +402,15 @@ function top(out: Collector, json: Json, folder: string | undefined, options: Va
     out.add('manifest', MANIFEST, 'The required field rights is missing.', 'Add "rights": "original" if you made it, or "licensed" if you may share it.')
   } else if (!(RIGHTS as readonly unknown[]).includes(rights)) {
     out.add('manifest', MANIFEST, `rights is ${quote(rights)}.`, `Set rights to one of ${oneOf(RIGHTS)}.`)
+  }
+
+  const remixOf = json['remixOf']
+  if (remixOf !== undefined) {
+    if (typeof remixOf !== 'string' || !RE.id.test(remixOf)) {
+      out.add('manifest', MANIFEST, `remixOf is ${quote(remixOf)}, not an Engram's id.`, 'Set remixOf to the id of the Engram it was remixed from, such as "kraken", or leave it out.')
+    } else if (remixOf === json['id']) {
+      out.add('manifest', MANIFEST, 'remixOf names this Engram itself.', 'Set remixOf to the id of the Engram it was remixed from, or leave it out.')
+    }
   }
 }
 

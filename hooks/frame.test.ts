@@ -19,7 +19,8 @@ const PANE = {
 } as const
 
 describe('the frame', () => {
-  test("each Engram's HUD: the Kraken's on as it ships, with no meter; toggled per Engram", async ($, on) => {
+  // Some 5 s alone; given room for a full run, where every test file runs at once.
+  test("each Engram's HUD: the Kraken's on as it ships, with no meter; toggled per Engram", { timeoutMs: 15_000 }, async ($, on) => {
     servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))

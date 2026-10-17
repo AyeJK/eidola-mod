@@ -35,9 +35,10 @@ export type Hud = {
   show?: boolean
   /**
    * `bars`, a level meter in the corner (the default); `wave`, a recording
-   * scrolling along the bottom; `sparks`, arcane sparks rising from it.
+   * scrolling along the bottom; `sparks`, arcane sparks rising from it;
+   * `none`, no meter.
    */
-  meter?: 'bars' | 'wave' | 'sparks'
+  meter?: 'bars' | 'wave' | 'sparks' | 'none'
   /**
    * The corner tag: `name` (the default); `livecam`, a camera feed's stamp,
    * a blinking recording dot, LIVE and `camera`, the name and the time; or
@@ -140,7 +141,7 @@ export const ENGRAMS: Record<string, Engram> = {
       scene: 'kraken',
       hud: {
         show: true,
-        meter: 'wave',
+        meter: 'none',
         tag: 'livecam',
         camera: 'DEEPCAM 02',
         bracket: '#3c9aa6',

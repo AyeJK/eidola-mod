@@ -17,7 +17,7 @@ const PANE = {
 } as const
 
 describe('the frame', () => {
-  test("each Engram's HUD: the Kraken's on as it ships, with its recording; toggled per Engram", async ($, on) => {
+  test("each Engram's HUD: the Kraken's on as it ships, with no meter; toggled per Engram", async ($, on) => {
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))
@@ -25,16 +25,16 @@ describe('the frame', () => {
     on('clock.now', () => ({ value: NOW }))
     await $.command.run({ command: 'awaken', args: 'kraken', ...TYPED })
 
-    // The Kraken ships with its HUD on: its state, its live-cam stamp, its recording.
+    // The Kraken ships with its HUD on: its state and its live-cam stamp.
     let pane = await $.ui.mount(PANE)
     expect(await pane.find({ type: 'Client', key: 'frame-cam' })).toBeDefined()
     await pane.advance(600)
     expect(await pane.find({ type: 'Text', text: ' LIVE', in: 'frame-cam' })).toBeDefined()
     expect(await pane.find({ type: 'Text', text: /^KRAKEN {2}\d\d:\d\d:\d\d$/, in: 'frame-cam' })).toBeDefined()
     expect(svgsOf(await pane.findAll({ type: 'Svg' })).some(source => source.includes('>IDLE<'))).toBe(true)
-    expect(await pane.find({ type: 'Client', key: 'frame-wave' })).toBeDefined()
-    await pane.advance(1000)
-    expect((await pane.findAll({ type: 'Box', in: 'frame-wave' })).length).toBeGreaterThan(40)
+    // No meter: no recording along the bottom, no level bars in the corner.
+    expect(await pane.find({ type: 'Client', key: 'frame-wave' })).toBeUndefined()
+    expect(await pane.find({ type: 'Client', key: 'frame-meter' })).toBeUndefined()
     expect(await pane.find({ type: 'Client', key: 'kraken-live' })).toBeDefined()
     await pane.unmount()
 

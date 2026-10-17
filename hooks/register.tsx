@@ -297,6 +297,7 @@ function framed(
               )
             : at('frame-tag', 1, cols - tag.length - 3, <Text color={FRAME_GOLD}>{tag}</Text>))}
       {rows >= 6 &&
+        awake?.vessel.hud?.meter !== 'none' &&
         (awake?.vessel.hud?.meter === 'wave'
           ? at(
               'frame-wave',

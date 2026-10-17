@@ -1,6 +1,6 @@
-// Event -> Vessel state resolver. Pure: no `$`, no timers. A port of the
-// rules in eidola-runtime/docs/spec/vessel-reactivity.md, driven by engine
-// events instead of editor shell hooks.
+// Event -> Vessel state resolver. Pure: no `$`, no timers. The rules are in
+// docs/spec/vessel-states.md: the nine states, the three moods, and the
+// error effect, driven by engine events.
 
 import type { Mood, VesselView } from '../types'
 

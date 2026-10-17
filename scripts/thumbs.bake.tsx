@@ -25,7 +25,8 @@ import { SVG_LIMIT, cellsFor, glyphsSvg, pixelsSvg, stillSvg } from '../../hooks
 const NOW = 1_760_000_000_000
 
 type Shot = {
-  file: string
+  /** Which still it is: `<engram id>/<view>`; the Engram's engram.json names its file. */
+  shot: string
   module: ClientModule<any, any>
   props: Record<string, unknown>
   /** The ticks to look through, every `every`: the frame chosen is the best composed of them. */
@@ -155,7 +156,7 @@ function backdropAt(draw: (w: number, h: number) => string, shown: number): (W: 
 const SHOTS: Shot[] = [
   {
     // At work, its ghost fire teal, out over the water.
-    file: 'vessels/wisp/thumb-band.svg',
+    shot: 'wisp/band',
     module: WispLive,
     props: { mood: 'working', ink: 0 },
     from: 40,
@@ -167,7 +168,7 @@ const SHOTS: Shot[] = [
     backdrop: (W, H) => renderScene(fenScene(W, H, Math.round(W / 8), Math.round(H / 19)), NOW),
   },
   {
-    file: 'vessels/kraken/thumb-pane.svg',
+    shot: 'kraken/pane',
     module: KrakenLive,
     props: { mood: 'idle', view: 'pane', ink: 0 },
     from: 20,
@@ -178,7 +179,7 @@ const SHOTS: Shot[] = [
     backdrop: backdropAt((w, h) => renderScene(krakenWaterScene(w, h), NOW), 320),
   },
   {
-    file: 'vessels/kraken/thumb-band.svg',
+    shot: 'kraken/band',
     module: KrakenLive,
     props: { mood: 'idle', view: 'band', ink: 0 },
     from: 20,
@@ -189,7 +190,7 @@ const SHOTS: Shot[] = [
     backdrop: backdropAt((w, h) => renderScene(krakenWaterScene(w, h), NOW), 400),
   },
   {
-    file: 'vessels/lich/thumb-pane.svg',
+    shot: 'lich/pane',
     module: LichLive,
     props: { mood: 'idle', view: 'pane', ink: 0 },
     from: 20,
@@ -204,7 +205,7 @@ const SHOTS: Shot[] = [
     backdrop: backdropAt((w, h) => renderScene(voidScene(w, h, 'pane'), NOW), 320),
   },
   {
-    file: 'vessels/lich/thumb-band.svg',
+    shot: 'lich/band',
     module: LichLive,
     props: { mood: 'idle', view: 'band', ink: 0 },
     from: 20,
@@ -222,13 +223,13 @@ const PART = 4000
 
 describe('bake', () => {
   for (const shot of SHOTS) {
-    test(shot.file, { timeoutMs: 120_000 }, () => {
+    test(shot.shot, { timeoutMs: 120_000 }, () => {
       const { svg, tick } = capture(shot)
       expect(svg.length).toBeLessThan(SVG_LIMIT)
-      console.log(`THUMB-TICK ${shot.file} ${tick}`)
+      console.log(`THUMB-TICK ${shot.shot} ${tick}`)
       const n = Math.ceil(svg.length / PART)
       for (let i = 0; i < n; i += 1) {
-        console.log('THUMB ' + JSON.stringify({ file: shot.file, i, n, part: svg.slice(i * PART, (i + 1) * PART) }))
+        console.log('THUMB ' + JSON.stringify({ shot: shot.shot, i, n, part: svg.slice(i * PART, (i + 1) * PART) }))
       }
     })
   }

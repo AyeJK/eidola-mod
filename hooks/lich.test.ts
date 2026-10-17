@@ -9,6 +9,7 @@ import { advance, born, replay } from './lich-live'
 import type { Live } from './lich-live'
 import { GLYPH_BUDGET, drawGlyphs } from './live-glyphs'
 import { SVG_LIMIT } from './stage'
+import { servePackages } from './packages.data'
 
 const STATES: VesselState[] = ['idle', 'thinking', 'working', 'attention', 'success', 'responding', 'error', 'waiting', 'sleeping']
 const NOW = 1_760_000_000_000
@@ -51,6 +52,7 @@ describe('the Lich as a field scene', () => {
 
 describe('the Lich Engram', () => {
   test('draws it live in glyphs, in four slices that tile the pane, and in the band', async ($, on) => {
+    servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))
@@ -109,6 +111,7 @@ describe('the Lich Engram', () => {
   })
 
   test('where nothing draws live it is a field scene', async ($, on) => {
+    servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))
@@ -137,6 +140,7 @@ function bookText(book: Parameters<typeof grimoireGlyphs>[0], cols = 120, rows =
 
 describe('the grimoire in the band', () => {
   test('lies open and still at idle', async ($, on) => {
+    servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))
@@ -161,6 +165,7 @@ describe('the grimoire in the band', () => {
   })
 
   test('turns its pages while it works', async ($, on) => {
+    servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))

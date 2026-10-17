@@ -1,29 +1,34 @@
 {
   "name": "eidola",
   "version": "0.6.0",
-  "description": "A pixel Vessel that reacts to what Claude is doing, plus an Engram Soul injected into every session.",
+  "description": "An Engram's scene that reacts to what Claude is doing, in a pane or the band above the prompt.",
   "types": "./types/index.d.ts",
   "author": {
     "name": "Jeremy Kaye"
   },
   "userConfig": {
-    "placement": {
-      "type": "string",
-      "title": "Where the Vessel appears",
-      "description": "default follows the awake Engram's suggestion (auto if it has none). both: pane and band. pane: pane only. band: band only, and the pane opens only when you ask. auto: band only while no pane is placed.",
-      "options": [
-        "default",
-        "both",
-        "pane",
-        "band",
-        "auto"
-      ],
-      "default": "default"
+    "pane": {
+      "type": "boolean",
+      "title": "Pane",
+      "description": "The awake Engram draws in the pane, when it shows there, and the pane opens by itself. Off: the pane opens only when you ask (/eidola).",
+      "default": true
+    },
+    "band": {
+      "type": "boolean",
+      "title": "Band",
+      "description": "The awake Engram draws in the band above the prompt, when it shows there.",
+      "default": true
+    },
+    "hideBandWhilePaneOpen": {
+      "type": "boolean",
+      "title": "Hide the band while the pane is open",
+      "description": "The band steps aside while the Eidola pane is open, so an Engram that shows in the pane draws once. A band-only Engram, like the Wisp, keeps its band.",
+      "default": true
     },
     "statusLine": {
       "type": "boolean",
       "title": "Show the Vessel's state in the status line",
-      "description": "The Engram's name and state, such as \"Wisp \u00b7 idle\", under the prompt.",
+      "description": "The Engram's name and state, such as \"Wisp · idle\", under the prompt.",
       "default": true
     }
   }

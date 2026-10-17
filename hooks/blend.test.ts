@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'claude-code/testing'
 import type { UiPane } from 'claude-code'
 
+import { servePackages } from './packages.data'
+
 const PLACED: UiPane[] = [{ id: 'eidola', title: 'Eidola', isShown: true, isFocused: false, isPlaced: true }]
 const TYPED = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
 const PANE = {
@@ -13,6 +15,7 @@ const PANE = {
 
 describe('blend test', () => {
   test('each run shortens the drawing a pixel more and keeps its source', async ($, on) => {
+    servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: PLACED }))
     on('ui.invalidate', () => ({ value: undefined }))

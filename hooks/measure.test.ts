@@ -2,6 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import type { On, UiPane } from 'claude-code'
 
 import { REFERENCE_PX, referenceSvg } from './measure'
+import { servePackages } from './packages.data'
 
 const SCROLL = { offset: 0, bodyRows: 60 }
 const PLACED: UiPane[] = [{ id: 'eidola', title: 'Eidola', isShown: true, isFocused: false, isPlaced: true }]
@@ -31,6 +32,7 @@ describe('measure', () => {
   })
 
   test('/eidola measure swaps pane and band to their reports, and back', async ($, on) => {
+    servePackages(on)
     desktopWithPane(on)
     const turnedOn = await $.command.run({ command: 'eidola', args: 'measure', ...TYPED })
     expect(turnedOn.text).toContain('Measure on')

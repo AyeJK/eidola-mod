@@ -1,0 +1,33 @@
+{
+  "spec": 2,
+  "id": "lich",
+  "name": "Lich",
+  "version": "1.0.0",
+  "author": "eidola",
+  "description": "A crowned skull of alchemical signs, soul-fire in its sockets. It burns brighter while you work.",
+  "rights": "original",
+  "vessel": {
+    "scene": "lich",
+    "shows": ["pane", "band", "shrine"],
+    "thumbnails": { "pane": "thumb-pane.svg", "band": "thumb-band.svg" },
+    "hud": {
+      "show": true,
+      "meter": "sparks",
+      "tag": "sigil",
+      "label": "serif",
+      "bracket": "#9a3c28",
+      "colours": {
+        "idle": { "label": "#e0603e", "detail": "#9a3c28" },
+        "waiting": { "label": "#d0583a", "detail": "#8a3424" },
+        "success": { "label": "#f08a5a", "detail": "#a85a38" },
+        "sleeping": { "label": "#8a3424", "detail": "#5e2418" },
+        "thinking": { "label": "#c08aff", "detail": "#7a4ab8" },
+        "working": { "label": "#a860f0", "detail": "#6c34a8" },
+        "responding": { "label": "#d4a8ff", "detail": "#8a5cc0" },
+        "error": { "label": "#e0603e", "detail": "#9a3c28" },
+        "attention": { "label": "#3ccf8a", "detail": "#22905e" }
+      }
+    }
+  },
+  "extensions": {}
+}

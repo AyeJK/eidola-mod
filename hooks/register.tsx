@@ -2,24 +2,33 @@ import { atom, read, update } from 'claude-code'
 import type { Elements, EngineInterface, Register, RenderElement } from 'claude-code'
 
 import type { Mood, VesselState, VesselView } from '../types'
-import { DEFAULT_ENGRAM, ENGRAMS, RESTING, SHOWS_LABELS, showsOf, soulSection } from './engrams'
-import type { Engram } from './engrams'
+import { RESTING_ID } from './engrams'
+import { withDefaults } from './engram-types'
+import type { Engram } from './engram-types'
+import { ENGRAMS_DIR, loadEngrams } from './loader'
+import type { Skipped } from './loader'
+import { checkThumbnail } from './validate'
 import { BLEND_STEPS, blendTestSvg } from './blend-test'
 import { MEASURE_HELP, REFERENCE_PX, bandReport, paneReport, referenceSvg } from './measure'
 import { mediaCases } from './media-test'
 import { NET_PROBES, PROBE_TIMEOUT_MS, describeOutcome } from './net-probe'
 import type { NetProbe, Outcome } from './net-probe'
 import {
-  PLACEMENT_HELP,
-  PLACEMENT_SETTINGS,
-  bandShows,
-  effectivePlacement,
-  isPlacementSetting,
-  opensPane,
-  readPlacement,
+  DEFAULT_SURFACES,
+  OPTION_KEYS,
+  SWITCHES,
+  SWITCH_HELP,
+  drawsIn,
+  isSwitch,
+  readOnOff,
   readStatusLine,
+  readSurfaces,
+  showsLabel,
+  surfacesLine,
+  switchOf,
+  whereItDraws,
 } from './placement'
-import type { Placement, PlacementSetting } from './placement'
+import type { Drawing, Surfaces } from './placement'
 import { EMPTY, step } from './resolver'
 import type { Model, Signal, TurnEndReason } from './resolver'
 import { FACES, SPRITE_PALETTE, vesselSvg } from './sprite'
@@ -29,10 +38,12 @@ import { voidScene } from './lich'
 import { fenScene } from './wisp'
 import { LABEL_PX, labelSvg } from './hud'
 import { SCENES } from './scenes'
-import { BAND_SCENE_PX, BAND_STAGE_PX, PX_PER_COLUMN, PX_PER_ROW, sceneSize, stageSize, stageSvg } from './stage'
+import { BAND_SCENE_PX, BAND_STAGE_PX, PX_PER_COLUMN, PX_PER_ROW, sceneSize, stageSize } from './stage'
 
 const PANE = 'eidola'
 const STORE_KEY = 'engram'
+/** The name of a removed Engram that was awake, kept until `/eidola` has said so once. */
+const REMOVED_KEY = 'removed'
 /** Where the frame's toggles are kept between sessions: by Engram id. */
 const FRAME_KEY = 'frames'
 
@@ -42,7 +53,7 @@ const viewAtom = atom({ plugin: 'eidola', key: 'view' } as const, {
 } as VesselView)
 // The drawings read the mood alone, so a tool's detail never redraws them.
 const moodAtom = atom({ plugin: 'eidola', key: 'mood' } as const, 'idle' as Mood)
-const engramAtom = atom({ plugin: 'eidola', key: 'engram' } as const, DEFAULT_ENGRAM as string | null)
+const engramAtom = atom({ plugin: 'eidola', key: 'engram' } as const, RESTING_ID as string | null)
 const mediaAtom = atom({ plugin: 'eidola', key: 'media' } as const, false)
 const measureAtom = atom({ plugin: 'eidola', key: 'measure' } as const, false)
 const blendAtom = atom({ plugin: 'eidola', key: 'blend' } as const, null as number | null)
@@ -54,7 +65,7 @@ const pickerFilterAtom = atom({ plugin: 'eidola', key: 'pickerFilter' } as const
 
 /** Whether an Engram's HUD frame shows: as the person toggled it, else as it ships. */
 function isFramed(frames: Record<string, boolean>, engram: Engram | undefined): boolean {
-  return engram ? (frames[engram.engram.id] ?? engram.vessel.hud?.show ?? false) : false
+  return engram ? (frames[engram.id] ?? engram.vessel.hud.show) : false
 }
 const moodAtAtom = atom({ plugin: 'eidola', key: 'moodAt' } as const, 0)
 const moodBeforeAtom = atom({ plugin: 'eidola', key: 'moodBefore' } as const, 'idle' as Mood)
@@ -84,7 +95,7 @@ let model: Model = EMPTY
 let generation = 0
 let pending: Timer | undefined
 const svgCache = new Map<string, string>()
-// Baked Vessel files, read once each. null: the file couldn't be read.
+// Thumbnail files, read once each. null: the file couldn't be read.
 const fileCache = new Map<string, string | null>()
 /** Cell rows the live band takes: it fills the band's own minimum height. */
 const BAND_ROWS = 7
@@ -114,19 +125,84 @@ function sceneFor(where: 'pane' | 'band', key: string, build: () => string): str
   return svg
 }
 
-// Built stages by Engram, state and size. null: this Vessel gets no stage.
-const stageCache = new Map<string, string | null>()
-
 // The person's options. A change in /config reloads the module, so these
 // are set once per load in register().
-let placementSetting: PlacementSetting = 'default'
+let surfaces: Surfaces = DEFAULT_SURFACES
 let isStatusLineOn = true
 
-function engramOf(id: string | null): Engram | undefined {
-  return id === null ? undefined : ENGRAMS[id]
+// ── The registry ───────────────────────────────────────────────────────
+
+/**
+ * The frames Engrams removed in 0.7.0, by id: v2 draws scenes only. A session
+ * whose stored awake id is one of these starts with nothing awake, and
+ * `/eidola` says once that it was removed. Migration data, not Engrams.
+ */
+const REMOVED: Record<string, string> = {
+  spirit: 'Spirit',
+  skull: 'Skull',
+  moon: 'Moon',
+  sigil: 'Sigil',
+  starfield: 'Starfield',
 }
 
-/** The built-in sprite for a state, at a size. */
+// The Engrams loaded from engrams/<id>/ (hooks/loader.ts), by id, and the
+// packages skipped with why. Loaded at session start and on /engrams, and on
+// first need by anything that runs before session start; a reload of the
+// module loads again, so module variables are fine.
+let registry = new Map<string, Engram>()
+let skipped: Skipped[] = []
+let loading: Promise<void> | undefined
+
+/** Loads the bundled packages afresh. Never rejects: a failure leaves the registry empty. */
+function loadRegistry($: EngineInterface): Promise<void> {
+  loading = (async () => {
+    const out = await loadEngrams({ list: path => $.fs.list(path), read: path => $.fs.read(path) }, `${$.plugin.root}/${ENGRAMS_DIR}`)
+    registry = out.registry
+    skipped = out.skipped
+    // A package's thumbnails may have changed with it.
+    fileCache.clear()
+  })().catch(() => undefined)
+  return loading
+}
+
+/** The registry, loaded once if nothing has loaded it yet. */
+async function engramsOf($: EngineInterface): Promise<Map<string, Engram>> {
+  await (loading ?? loadRegistry($))
+  return registry
+}
+
+async function engramOf($: EngineInterface, id: string | null): Promise<Engram | undefined> {
+  const engrams = await engramsOf($)
+  return id === null ? undefined : engrams.get(id)
+}
+
+/** The Engrams in the order they are listed: the resting one first, then by id. */
+async function listed($: EngineInterface): Promise<Engram[]> {
+  const all = [...(await engramsOf($)).values()]
+  return [...all.filter(one => one.id === RESTING_ID), ...all.filter(one => one.id !== RESTING_ID)]
+}
+
+/**
+ * Drawn, dimmed, while nothing is awake, should the resting Engram's
+ * package not load: its scene under the mod's own name.
+ */
+const UNNAMED_REST: Engram = withDefaults({
+  spec: 2,
+  id: RESTING_ID,
+  name: 'Eidola',
+  version: '0.0.0',
+  author: 'eidola',
+  description: '',
+  rights: 'original',
+  vessel: { scene: 'wisp' },
+})
+
+/** The resting Engram: its scene, dimmed, is what shows while nothing is awake. */
+async function restingOf($: EngineInterface): Promise<Engram> {
+  return (await engramsOf($)).get(RESTING_ID) ?? UNNAMED_REST
+}
+
+/** The built-in sprite for a state, at a size: the media test's control. */
 function spriteSvg(state: VesselState, size: number): string {
   const key = `sprite:${state}:${size}`
   let svg = svgCache.get(key)
@@ -137,21 +213,12 @@ function spriteSvg(state: VesselState, size: number): string {
   return svg
 }
 
-/**
- * The Engram's baked SVG for a state, from vessels/<pack>/<state>.svg in
- * the mod. A file that can't be read falls back to the built-in sprite, so
- * a Vessel always shows.
- */
-async function vesselFor($: EngineInterface, engram: Engram, state: VesselState, size: number): Promise<string> {
-  const key = `${engram.vessel.pack}/${state}`
-  if (!fileCache.has(key)) {
-    try {
-      fileCache.set(key, await $.fs.read(`${$.plugin.root}/vessels/${key}.svg`))
-    } catch {
-      fileCache.set(key, null)
-    }
-  }
-  return fileCache.get(key) ?? spriteSvg(state, size)
+/** How much of the resting scene the veil hides while nothing is awake. */
+const RESTING_DIM = 0.55
+
+/** A scene dimmed under a veil of the dark: the resting Wisp's, while nothing is awake. */
+function dimmed(svg: string): string {
+  return svg.replace(/<\/svg>$/, `<rect width="100%" height="100%" fill="#000" opacity="${RESTING_DIM}"/></svg>`)
 }
 
 /**
@@ -164,14 +231,6 @@ function filling(svg: string, width: number, height: number): string {
       .replace(/\s(width|height|preserveAspectRatio)="[^"]*"/g, '')
       .replace(/>$/, ` width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice">`),
   )
-}
-
-/** The width that fits a drawing inside a size-by-size box, read from its viewBox. */
-function fitWidth(svg: string, size: number): number {
-  const box = /viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"/.exec(svg)
-  const w = Number(box?.[1])
-  const h = Number(box?.[2])
-  return w > 0 && h > w ? Math.round((size * w) / h) : size
 }
 
 /** One probe, never rejecting: the line says what happened. */
@@ -196,10 +255,18 @@ function setStatus($: EngineInterface, text: string | undefined): void {
   $.ui.status(isStatusLineOn ? text : undefined)
 }
 
-/** Where the Vessel appears now: the person's option, else the Engram's suggestion. */
-async function currentPlacement($: EngineInterface): Promise<Placement> {
-  const engram = engramOf(await read($, engramAtom)) ?? RESTING
-  return effectivePlacement(placementSetting, engram.vessel.placement)
+/**
+ * Where the awake Engram draws now (the resting one while nothing is awake),
+ * from the surfaces setting and whether the pane is open.
+ */
+async function drawingNow($: EngineInterface, isPaneOpen: boolean): Promise<Drawing> {
+  const engram = (await engramOf($, await read($, engramAtom))) ?? (await restingOf($))
+  return whereItDraws(surfaces, engram, isPaneOpen)
+}
+
+/** An Engram that doesn't show in the pane: opened by hand, the pane draws its band view. */
+function drawsBandViewInPane(engram: Engram | undefined): boolean {
+  return engram !== undefined && whereItDraws(surfaces, engram, true).paneView === 'band'
 }
 
 async function show($: EngineInterface, view: VesselView): Promise<void> {
@@ -208,8 +275,8 @@ async function show($: EngineInterface, view: VesselView): Promise<void> {
     return
   }
   await update($, viewAtom, () => view)
-  const engram = engramOf(await read($, engramAtom))
-  setStatus($, engram ? `${engram.engram.name} · ${LABELS[view.state].toLowerCase()}` : undefined)
+  const engram = await engramOf($, await read($, engramAtom))
+  setStatus($, engram ? `${engram.name} · ${LABELS[view.state].toLowerCase()}` : undefined)
 }
 
 /** The frame's look for each state: its colour, its name, and the line under it when there is no detail. */
@@ -269,15 +336,16 @@ function framed(
   awake: Engram | undefined,
 ): RenderElement {
   const { Box, Text, Client, Svg } = els
-  const own = awake?.vessel.hud?.colours?.[view.state]
+  const own = awake?.vessel.hud.colours[view.state]
   const look = { ...FRAME_STATES[view.state], colour: own?.label ?? FRAME_STATES[view.state].colour }
   const detailColour = own?.detail ?? FRAME_GREY
   const width = Math.max(4, cols - 6)
   const clip = (text: string) => (text.length > width ? text.slice(0, width - 1) + '…' : text)
   const detail = clip((view.detail || look.line).toLowerCase())
-  const tag = (awake?.engram.name ?? 'Eidola').toUpperCase()
-  const isBottom = awake?.vessel.hud?.layout === 'bottom'
-  const label = labelSvg(look.name, look.colour, awake?.vessel.hud?.label, isBottom ? 'small' : 'large')
+  const hud = awake?.vessel.hud
+  const tag = (awake?.name ?? 'Eidola').toUpperCase()
+  const isBottom = hud?.layout === 'bottom'
+  const label = labelSvg(look.name, look.colour, hud?.label, isBottom ? 'small' : 'large')
   const at = (key: string, top: number, left: number, child: RenderElement) => (
     <Box key={key} position="absolute" top={top} left={left}>
       {child}
@@ -393,6 +461,48 @@ function lichSlices(rows: number): Array<[number, number]> {
   return [0, 1, 2, 3].map(i => [cuts[i]!, cuts[i + 1]! - cuts[i]!] as [number, number])
 }
 
+/**
+ * The Wisp in its fen, `cols` wide and its band's rows tall: the fen drawn
+ * once, the spirit and its lanterns live over it, in its HUD when that is on.
+ * A row taller than its rows, clipped to them, so the HUD meets its edges.
+ * Drawn in the band, and in the pane when the pane is opened by hand.
+ */
+async function fenView($: EngineInterface, els: Elements['desktop'], awake: Engram, cols: number, where: 'pane' | 'band'): Promise<RenderElement> {
+  const { Box, Svg, Client } = els
+  const rows = WISP_BAND_ROWS
+  const width = cols * PX_PER_COLUMN
+  const height = overdrawn(rows)
+  const mood = await read($, moodAtom)
+  const now = await $.clock.now()
+  const fen = sceneFor(where, `wisp-fen:${cols}x${rows}`, () => renderScene(fenScene(width, height, cols, rows), now))
+  const tree = (
+    <Box width={cols} height={rows} overflow="hidden" alignItems="flex-start">
+      <Svg key="scene:band-fen" source={fen} alt={`${awake.name} in the fen`} width={width} height={height} isInteractive />
+      <Box position="absolute" top={0} left={0}>
+        <Client key="wisp-band" module="./wisp-live.tsx" props={{ mood, cols, rows, ink: await read($, inkAtom) }} width={cols} height={rows} />
+      </Box>
+    </Box>
+  )
+  return isFramed(await read($, frameAtom), awake) ? framed(els, tree, cols, rows, await read($, viewAtom), awake) : tree
+}
+
+/**
+ * An Engram's band view, drawn in the pane for one that doesn't show there:
+ * the Wisp's fen, or any other scene's band view as a still strip.
+ */
+async function bandView($: EngineInterface, els: Elements['desktop'], awake: Engram, cols: number, where: 'pane' | 'band'): Promise<RenderElement> {
+  if (awake.vessel.scene === 'wisp') {
+    return fenView($, els, awake, cols, where)
+  }
+  const { Svg } = els
+  const state = MOOD_STATE[await read($, moodAtom)]
+  const width = Math.max(96, cols * PX_PER_COLUMN - 4)
+  const height = BAND_SCENE_PX
+  const now = await $.clock.now()
+  const scene = sceneFor(where, `band-view:${state}:${width}x${height}`, () => renderScene(SCENES[awake.vessel.scene].band(state, width, height), now))
+  return <Svg key="scene:band-view" source={scene} alt={`${awake.name}: ${LABELS[state]}`} width={width} height={height} isInteractive />
+}
+
 // Every hook goes through here, and nothing here may break a tool call or
 // a turn: failures are swallowed and the Vessel just misses a beat.
 async function signal($: EngineInterface, s: Signal): Promise<void> {
@@ -432,14 +542,14 @@ async function signal($: EngineInterface, s: Signal): Promise<void> {
 async function setEngram($: EngineInterface, id: string | null): Promise<void> {
   await $.store.set(STORE_KEY, id)
   await update($, engramAtom, () => id)
-  const engram = engramOf(id)
-  setStatus($, engram ? `${engram.engram.name} · awake` : undefined)
+  const engram = await engramOf($, id)
+  setStatus($, engram ? `${engram.name} · awake` : undefined)
   // An open pane is retitled with the new name; a closed one stays closed.
-  // One that draws only in the band has no Vessel to show there: the pane closes.
+  // One that doesn't show in the pane never keeps it open by itself: it closes.
   try {
     const panes = await $.ui.panes()
     if (panes.some(one => one.id === PANE)) {
-      if (engram && isBandOnly(engram)) {
+      if (drawsBandViewInPane(engram)) {
         await update($, pickerAtom, () => false)
         await $.ui.close({ id: PANE })
       } else {
@@ -449,22 +559,17 @@ async function setEngram($: EngineInterface, id: string | null): Promise<void> {
   } catch {
     // The old title is only cosmetic.
   }
-  // A different Engram may suggest a different placement.
+  // A different Engram may draw on different surfaces.
   $.ui.invalidate('ui.render')
-}
-
-/** An Engram that draws only in the band: the pane, opened, only lists Engrams. */
-function isBandOnly(engram: Engram | undefined): boolean {
-  return engram !== undefined && showsOf(engram) === 'band'
 }
 
 /** The pane's title: the awake Engram's name, else Eidola. */
 function paneTitle(engram: Engram | undefined): string {
-  return engram ? engram.engram.name : 'Eidola'
+  return engram ? engram.name : 'Eidola'
 }
 
-// Under the `auto` placement the band steps aside while the pane is placed.
-// Every open and close redraws it to keep that true.
+// With "hide the band while the pane is open" on, the band steps aside while
+// the pane is placed. Every open and close redraws it to keep that true.
 async function isPanePlaced($: EngineInterface): Promise<boolean> {
   try {
     const panes = await $.ui.panes()
@@ -476,35 +581,35 @@ async function isPanePlaced($: EngineInterface): Promise<boolean> {
 }
 
 async function openPane($: EngineInterface) {
-  const opened = await $.ui.open({ id: PANE, title: paneTitle(engramOf(await read($, engramAtom))) })
+  const opened = await $.ui.open({ id: PANE, title: paneTitle(await engramOf($, await read($, engramAtom))) })
   $.ui.invalidate('ui.render')
   return opened
 }
 
-function listText(active: string | null): string {
-  return Object.values(ENGRAMS)
+function listText(engrams: Engram[], active: string | null): string {
+  return engrams
     .map(one => {
-      const mark = one.engram.id === active ? ' (awake)' : ''
-      return `${one.engram.id}${mark}: ${one.engram.meta.description}`
+      const mark = one.id === active ? ' (awake)' : ''
+      return `${one.id}${mark}: ${one.description}`
     })
     .join('\n')
 }
 
-async function placeText($: EngineInterface): Promise<string> {
-  const now = await currentPlacement($)
-  const options = PLACEMENT_SETTINGS.map(one => `  ${one}: ${PLACEMENT_HELP[one]}`).join('\n')
-  return `Placement: ${now} (setting: ${placementSetting}).\nChange it with /eidola place <setting>:\n${options}`
+/** `/eidola place`: the switches, and how to set one. */
+function placeText(): string {
+  const switches = SWITCHES.map(one => `  ${one} ${switchOf(surfaces, one) ? 'on' : 'off'}: ${SWITCH_HELP[one]}`).join('\n')
+  return `Surfaces: ${surfacesLine(surfaces)}.\n${switches}\nSet one with /eidola place <switch> on|off, e.g. /eidola place band off.`
 }
 
 // ── The picker ─────────────────────────────────────────────────────────
 
 /**
  * Back from the picker to the awake Engram: in the pane, or, for one that
- * draws only in the band, back to the band, the pane closed.
+ * doesn't show in the pane, back to the band, the pane closed.
  */
 async function closePicker($: EngineInterface, awake: Engram | undefined): Promise<void> {
   await update($, pickerAtom, () => false)
-  if (isBandOnly(awake)) {
+  if (drawsBandViewInPane(awake)) {
     await $.ui.close({ id: PANE }).catch(() => undefined)
   }
 }
@@ -516,27 +621,29 @@ const FILTER_LABELS: Record<PickerFilter, string> = { all: 'All', pane: 'Pane', 
 
 /** Whether an Engram is listed under a filter: one that shows in both is listed under each. */
 function isListed(engram: Engram, filter: PickerFilter): boolean {
-  const shows = showsOf(engram)
-  return filter === 'all' || shows === 'both' || shows === filter
+  return filter === 'all' || drawsIn(engram)[filter]
 }
 
 /** Thumbnails by Engram, view and size: a scene is costly to draw, so once each. */
-const thumbCache = new Map<string, string | null>()
+const thumbCache = new Map<string, string>()
 
 /**
  * A still of an Engram at rest, `width` × `height` px, as it looks where it
  * draws: its pane view for one that shows in a pane (or both), its band view
- * for one that shows only in the band. A scene draws that view; a Vessel is
- * set on its stage, or drawn alone where it gets none.
+ * for one that shows only in the band: its own still for the view where it
+ * ships one, else its scene drawing that view.
  */
 async function thumbFor($: EngineInterface, engram: Engram, view: 'pane' | 'band', width: number, height: number): Promise<{ svg: string; width: number }> {
-  // Its own still for the view, where it ships one, fitted to the box by its viewBox.
-  const file = engram.vessel.thumbnails?.[view]
+  // Its own still for the view, where it ships one, fitted to the box by its
+  // viewBox: read from its package the first time it is shown, checked by the
+  // thumbnail rules then, and its scene drawn in place of one that fails.
+  const file = engram.vessel.thumbnails[view]
   if (file) {
-    const at = `${engram.vessel.pack}/${file}`
+    const at = `${engram.id}/${file}`
     if (!fileCache.has(at)) {
       try {
-        fileCache.set(at, await $.fs.read(`${$.plugin.root}/vessels/${at}`))
+        const text = await $.fs.read(`${$.plugin.root}/${ENGRAMS_DIR}/${engram.id}/vessel/${file}`)
+        fileCache.set(at, checkThumbnail(file, text).length ? null : text)
       } catch {
         fileCache.set(at, null)
       }
@@ -546,24 +653,13 @@ async function thumbFor($: EngineInterface, engram: Engram, view: 'pane' | 'band
       return { svg: filling(still, width, height), width }
     }
   }
-  const key = `${engram.engram.id}:${view}:${width}x${height}`
-  const scene = engram.vessel.scene
-  if (scene) {
-    let svg = thumbCache.get(key)
-    if (!svg) {
-      svg = renderScene(SCENES[scene][view]('idle', width, height), await $.clock.now())
-      thumbCache.set(key, svg)
-    }
-    return { svg, width }
+  const key = `${engram.id}:${view}:${width}x${height}`
+  let svg = thumbCache.get(key)
+  if (!svg) {
+    svg = renderScene(SCENES[engram.vessel.scene][view]('idle', width, height), await $.clock.now())
+    thumbCache.set(key, svg)
   }
-  const vessel = await vesselFor($, engram, 'idle', height)
-  // The band's strip sets the Vessel on a small square stage; the pane on one that fills it.
-  const stage = view === 'band' ? { width: height, height } : { width, height }
-  if (!thumbCache.has(key)) {
-    thumbCache.set(key, stageSvg(vessel, 'idle', stage) ?? null)
-  }
-  const staged = thumbCache.get(key)
-  return staged ? { svg: staged, width: stage.width } : { svg: vessel, width: fitWidth(vessel, height) }
+  return { svg, width }
 }
 
 /** A card's still, in rows: a pane view is tall, a band view short and wide. */
@@ -588,28 +684,27 @@ async function picker(
   const gap = 2
   const cardCols = Math.floor((cols - 2 - gap * (perRow - 1)) / perRow)
   const thumbW = (cardCols - 2) * PX_PER_COLUMN
-  const all = Object.values(ENGRAMS)
+  const all = await listed($)
   const engrams = all.filter(engram => isListed(engram, filter))
   const cards = await Promise.all(
     engrams.map(async engram => {
-      const id = engram.engram.id
-      const isAwake = awake?.engram.id === id
-      const shows = showsOf(engram)
-      const view = shows === 'band' ? 'band' : 'pane'
+      const id = engram.id
+      const isAwake = awake?.id === id
+      const view = drawsIn(engram).pane ? 'pane' : 'band'
       const thumbRows = THUMB_ROWS[view]
       const thumbH = thumbRows * PX_PER_ROW
       const thumb = await thumbFor($, engram, view, thumbW, thumbH)
       return (
         <Box key={`card:${id}`} flexDirection="column" width={cardCols} borderStyle="single" borderColor={isAwake ? brass : '#2c323c'}>
           <Box key="thumb" width={cardCols - 2} height={thumbRows} alignItems="center" justifyContent="center" backgroundColor="#07090c">
-            <Svg key={`thumb:${id}:${view}:${thumbW}x${thumbH}`} source={thumb.svg} alt={`${engram.engram.name}, ${view} view`} width={Math.min(thumb.width, thumbW)} height={thumbH} />
+            <Svg key={`thumb:${id}:${view}:${thumbW}x${thumbH}`} source={thumb.svg} alt={`${engram.name}, ${view} view`} width={Math.min(thumb.width, thumbW)} height={thumbH} />
           </Box>
           <Box key="name" flexDirection="row" justifyContent="space-between">
-            <Text bold>{engram.engram.name}</Text>
-            {isAwake ? <Text color={brass}>awake</Text> : <Text dimColor>{SHOWS_LABELS[shows]}</Text>}
+            <Text bold>{engram.name}</Text>
+            {isAwake ? <Text color={brass}>awake</Text> : <Text dimColor>{showsLabel(engram)}</Text>}
           </Box>
           <Text key="about" dimColor>
-            {engram.engram.meta.description}
+            {engram.description}
           </Text>
           {isAwake ? (
             <Button key={`sleep:${id}`} label="Sleep" onPress={() => void setEngram($, null)} />
@@ -641,7 +736,7 @@ async function picker(
       <Box key="head" flexDirection="row" justifyContent="space-between" alignItems="center">
         {/* A breadcrumb back to the Vessel the picker opened over. */}
         <Box key="crumbs" flexDirection="row" alignItems="center" gap={1}>
-          <Button key="picker-back" label={`‹ ${awake?.engram.name ?? 'Eidola'}`} dimColor onPress={() => void closePicker($, awake)} />
+          <Button key="picker-back" label={`‹ ${awake?.name ?? 'Eidola'}`} dimColor onPress={() => void closePicker($, awake)} />
           <Text dimColor>/</Text>
           <Text bold color={brass}>
             ENGRAMS
@@ -665,7 +760,7 @@ async function picker(
 }
 
 export const register: Register = (on, options) => {
-  placementSetting = readPlacement(options)
+  surfaces = readSurfaces(options)
   isStatusLineOn = readStatusLine(options)
 
   // ── Session ────────────────────────────────────────────────────────────
@@ -674,10 +769,10 @@ export const register: Register = (on, options) => {
     await $.command.register({ name: 'eidola', description: 'Open the Eidola Vessel pane' })
     await $.command.register({
       name: 'awaken',
-      description: 'Awaken an Engram: its Vessel reacts and its Soul joins the system prompt',
+      description: 'Awaken an Engram: its scene reacts to what Claude is doing',
       argumentHint: '<engram>',
     })
-    await $.command.register({ name: 'sleep', description: 'Put the awake Engram to sleep and remove its Soul' })
+    await $.command.register({ name: 'sleep', description: 'Put the awake Engram to sleep' })
     await $.command.register({ name: 'engrams', description: 'List the bundled Engrams' })
 
     if (!(await read($, epochAtom))) {
@@ -692,13 +787,23 @@ export const register: Register = (on, options) => {
     }
 
     const stored = await $.store.get(STORE_KEY)
-    const id = stored === undefined ? DEFAULT_ENGRAM : typeof stored === 'string' && ENGRAMS[stored] ? stored : null
+    // A removed Engram was awake: nothing is, from now on, and /eidola says why once.
+    const removed = typeof stored === 'string' && Object.hasOwn(REMOVED, stored) ? REMOVED[stored] : undefined
+    if (removed !== undefined) {
+      await $.store.set(STORE_KEY, null)
+      await $.store.set(REMOVED_KEY, removed)
+    }
+    // The bundled packages, read afresh: a package that fails is skipped, and
+    // an awake id whose package didn't load wakes nothing this session.
+    await loadRegistry($)
+    const wanted = stored === undefined ? RESTING_ID : stored
+    const id = typeof wanted === 'string' && registry.has(wanted) ? wanted : null
     await update($, engramAtom, () => id)
 
     if (!isStatusLineOn) {
       $.ui.status(undefined)
     }
-    if (opensPane(await currentPlacement($))) {
+    if ((await drawingNow($, false)).opensPane) {
       void openPane($).catch(() => undefined)
     }
     await signal($, { kind: 'session' })
@@ -708,7 +813,7 @@ export const register: Register = (on, options) => {
 
   on('session.attach', async ($, e, next) => {
     const result = await next(e)
-    if (opensPane(await currentPlacement($))) {
+    if ((await drawingNow($, false)).opensPane) {
       void openPane($).catch(() => undefined)
     }
     return result
@@ -716,17 +821,11 @@ export const register: Register = (on, options) => {
 
   // ── Engine events → Vessel state ──────────────────────────────────────
 
-  // The Soul also rides each typed prompt as hidden context. prompt.compose
-  // alone didn't reach the model in the Claude app's cloud sessions, which
-  // bring their own system prompt; this path works on every surface.
+  // A typed prompt moves the Vessel; the prompt itself passes on untouched.
+  // Eidola adds nothing to the prompt or the system prompt.
   on('prompt.submit', async ($, e, next) => {
     await signal($, { kind: 'prompt' })
-    const engram = engramOf(await read($, engramAtom))
-    if (!engram) {
-      return next(e)
-    }
-    const soul = `<eidola-soul engram="${engram.engram.id}">\n${soulSection(engram)}\n</eidola-soul>`
-    return next({ ...e, context: [...(e.context ?? []), soul] })
+    return next(e)
   }).catch(($, e, next) => next(e))
 
   // turn.start carries no agentId: it fires for the main loop only.
@@ -770,63 +869,50 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  // ── Soul ───────────────────────────────────────────────────────────────
-
-  on('prompt.compose', async ($, e, next) => {
-    const composed = await next(e)
-    const engram = engramOf(await read($, engramAtom))
-    if (!engram) {
-      return composed
-    }
-    return {
-      ...composed,
-      sections: [
-        ...composed.sections.filter(one => one.id !== 'eidola:soul'),
-        { id: 'eidola:soul', text: soulSection(engram), scope: 'session' as const },
-      ],
-    }
-  })
-
   // ── Commands ───────────────────────────────────────────────────────────
 
   // /eidola        diagnostics: surfaces, pane, band, network reach
   // /eidola media  toggles the media test in the pane
-  // /eidola place  shows or sets where the Vessel appears
+  // /eidola place  shows the surfaces switches, or sets one: /eidola place band off
   // /eidola mood   sets the mood by hand, until the next prompt
   on('command.run', { command: 'eidola' }, async ($, e) => {
-    const [sub = '', value = ''] = e.args.trim().toLowerCase().split(/\s+/)
+    const [sub = '', value = '', onOff = ''] = e.args.trim().toLowerCase().split(/\s+/)
 
     if (sub === 'place') {
       if (!value) {
-        return { text: await placeText($) }
+        return { text: placeText() }
       }
-      if (!isPlacementSetting(value)) {
-        return { text: `"${value}" isn't a placement.\n${await placeText($)}` }
+      if (!isSwitch(value)) {
+        return { text: `"${value}" isn't a switch.\n${placeText()}` }
+      }
+      const isOn = readOnOff(onOff)
+      if (isOn === undefined) {
+        return { text: `Say on or off: /eidola place ${value} on, or /eidola place ${value} off.\n${placeText()}` }
       }
       // Written as the person's own /config choice; the module reloads with it.
-      const written = await $.config.set({ key: 'eidola.placement', value })
+      const written = await $.config.set({ key: `eidola.${OPTION_KEYS[value]}`, value: isOn })
       if ('deny' in written && written.deny !== undefined) {
-        return { text: `Couldn't change the placement here (${written.deny}). Set it in /config instead.` }
+        return { text: `Couldn't change the ${value} switch here (${written.deny}). Set it in /config instead.` }
       }
-      return { text: `Placement set to ${value}: ${PLACEMENT_HELP[value]}.` }
+      return { text: `${value} ${isOn ? 'on' : 'off'}: ${SWITCH_HELP[value]}.` }
     }
 
     if (sub === 'frame') {
-      const awake = engramOf(await read($, engramAtom))
+      const awake = await engramOf($, await read($, engramAtom))
       if (!awake) {
         return { text: 'Nothing is awake to frame. /awaken an Engram first.' }
       }
       const frames = await read($, frameAtom)
       const isOn = !isFramed(frames, awake)
-      const next = { ...frames, [awake.engram.id]: isOn }
+      const next = { ...frames, [awake.id]: isOn }
       await update($, frameAtom, () => next)
       await $.store.set(FRAME_KEY, next)
-      return { text: isOn ? `Frame on for ${awake.engram.name}.` : `Frame off for ${awake.engram.name}.` }
+      return { text: isOn ? `Frame on for ${awake.name}.` : `Frame off for ${awake.name}.` }
     }
 
     if (sub === 'ink') {
       await bumpInk($)
-      const awake = engramOf(await read($, engramAtom))
+      const awake = await engramOf($, await read($, engramAtom))
       const scene = awake?.vessel.scene
       return { text: scene === 'lich' ? 'The Lich is scorched.' : scene === 'wisp' ? 'The Wisp gutters, and a lantern goes out.' : 'The Kraken inks.' }
     }
@@ -919,19 +1005,26 @@ export const register: Register = (on, options) => {
       }
     }
 
-    const surfaces = await $.session.surfaces()
+    const attached = await $.session.surfaces()
     const opened = await openPane($)
-    const placement = await currentPlacement($)
+    const drawing = await drawingNow($, opened.isPlaced)
     const panes = await $.ui.panes()
     const mine = panes.find(one => one.id === PANE)
     const probes = await Promise.all(NET_PROBES.map(probe => probeLine($, probe)))
+    // A removed Engram was awake when the session started: said once, then forgotten.
+    // The store out of reach costs only the notice, never the diagnostics.
+    const removed = await $.store.get(REMOVED_KEY).catch(() => undefined)
+    if (typeof removed === 'string') {
+      await $.store.delete(REMOVED_KEY).catch(() => undefined)
+    }
     const lines = [
-      `Surfaces: ${surfaces.length ? surfaces.join(', ') : 'none attached'}`,
+      ...(typeof removed === 'string' ? [`${removed} was removed in 0.7.0. Pick another with /awaken.`] : []),
+      // A package that didn't load: its folder, and each error's file, problem and fix.
+      ...skipped.flatMap(one => [`Skipped Engram ${one.folder}:`, ...one.issues.map(issue => `  ${issue.file}: ${issue.problem} ${issue.fix}`)]),
+      `Surfaces: ${attached.length ? attached.join(', ') : 'none attached'}`,
       opened.isPlaced ? 'Pane: placed.' : `Pane: not placed (${opened.reason})`,
       mine ? `Pane state: shown=${mine.isShown} placed=${mine.isPlaced}` : 'Pane state: not in the pane list',
-      `Placement: ${placement} (setting: ${placementSetting}). Band: ${
-        bandShows(placement, opened.isPlaced) ? 'showing' : 'hidden'
-      }. Status line: ${isStatusLineOn ? 'on' : 'off'}.`,
+      `Switches: ${surfacesLine(surfaces)}. Band: ${drawing.band ? 'showing' : 'hidden'}. Status line: ${isStatusLineOn ? 'on' : 'off'}.`,
       lastBand
         ? `Band hook last saw: ${lastBand.surface}, survey=${lastBand.hasSurvey}, working=${lastBand.isWorking}; drew ${lastBand.drew}.`
         : 'Band hook: not asked to draw since the mod loaded.',
@@ -955,8 +1048,8 @@ export const register: Register = (on, options) => {
     // The corner triangle, clicked: the picker opens, or closes. In the band it
     // opens the pane on the picker, or closes the pane if it is open on it.
     if ((e.element === 'frame-corner' || e.element === 'band-corner') && data && typeof data === 'object' && (data as { corner?: unknown }).corner === 'toggle') {
-      const awake = engramOf(await read($, engramAtom))
-      const isOpen = (await read($, pickerAtom)) || (isBandOnly(awake) && (await isPanePlaced($)))
+      const awake = await engramOf($, await read($, engramAtom))
+      const isOpen = await read($, pickerAtom)
       if (e.component === 'AbovePrompt' && !isOpen) {
         await update($, pickerAtom, () => true)
         await openPane($)
@@ -979,25 +1072,31 @@ export const register: Register = (on, options) => {
   }).catch(($, e, next) => next(e))
 
   on('command.run', { command: 'awaken' }, async ($, e) => {
-    const id = e.args.trim().toLowerCase() || DEFAULT_ENGRAM
-    const engram = ENGRAMS[id]
+    const id = e.args.trim().toLowerCase() || RESTING_ID
+    const engram = await engramOf($, id)
     if (!engram) {
-      return { text: `No Engram called "${id}". Bundled Engrams:\n${listText(await read($, engramAtom))}` }
+      return { text: `No Engram called "${id}". Bundled Engrams:\n${listText(await listed($), await read($, engramAtom))}` }
     }
     await setEngram($, id)
-    if (!isBandOnly(engram)) {
+    if (whereItDraws(surfaces, engram, false).opensPane) {
       void openPane($).catch(() => undefined)
     }
-    return { text: `${engram.engram.name} is awake. Their Soul applies from your next message.` }
+    return { text: `${engram.name} is awake.` }
   })
 
   on('command.run', { command: 'sleep' }, async $ => {
-    const engram = engramOf(await read($, engramAtom))
+    const engram = await engramOf($, await read($, engramAtom))
     await setEngram($, null)
-    return { text: engram ? `${engram.engram.name} is asleep. Their Soul is gone from your next message.` : 'Nothing was awake.' }
+    return { text: engram ? `${engram.name} is asleep.` : 'Nothing was awake.' }
   })
 
-  on('command.run', { command: 'engrams' }, async $ => ({ text: listText(await read($, engramAtom)) }))
+  // The packages are read again, so a fixed or changed one shows without a restart.
+  on('command.run', { command: 'engrams' }, async $ => {
+    await loadRegistry($)
+    $.ui.invalidate('ui.render')
+    const engrams = await listed($)
+    return { text: engrams.length ? listText(engrams, await read($, engramAtom)) : 'No Engrams loaded. /eidola says why.' }
+  })
 
   // ── The pane ───────────────────────────────────────────────────────────
 
@@ -1005,8 +1104,8 @@ export const register: Register = (on, options) => {
     const vessel = async () => {
     const id = await read($, engramAtom)
     const mood = await read($, moodAtom)
-    const awake = engramOf(id)
-    const engram = awake ?? RESTING
+    const awake = await engramOf($, id)
+    const engram = awake ?? (await restingOf($))
     const state: VesselState = awake ? MOOD_STATE[mood] : 'sleeping'
 
     if (await read($, measureAtom)) {
@@ -1030,8 +1129,8 @@ export const register: Register = (on, options) => {
       )
     }
 
-    // The Vessel on its stage, no text: the pane's title names the Engram and
-    // the status line carries the state, so the body repeats neither.
+    // No text: the pane's title names the Engram and the status line carries
+    // the state, so the body repeats neither. The terminal draws the face.
     if (e.surface === 'terminal') {
       const { Text } = $.ui.resolve(e)
       return <Text>{FACES[state]}</Text>
@@ -1070,7 +1169,7 @@ export const register: Register = (on, options) => {
       return (
         <Box width={cols} height={rows} overflow="hidden" alignItems="flex-start">
           {/* Nothing here may change with the mood, alt included: a changed prop reloads the drawing. */}
-          <Svg key="scene:water" source={water} alt={`${awake.engram.name} in deep water`} width={width} height={height} isInteractive />
+          <Svg key="scene:water" source={water} alt={`${awake.name} in deep water`} width={width} height={height} isInteractive />
           <Box position="absolute" top={0} left={0}>
             <Client key="kraken-live" module="./kraken-live.tsx" props={{ mood, cols, rows, ink: await read($, inkAtom) }} width={cols} height={rows} />
           </Box>
@@ -1094,7 +1193,7 @@ export const register: Register = (on, options) => {
       return (
         <Box width={cols} height={rows} overflow="hidden" alignItems="flex-start">
           {/* Nothing here may change with the mood, alt included: a changed prop reloads the drawing. */}
-          <Svg key="scene:void" source={backdrop} alt={`${awake.engram.name} in the dark`} width={width} height={height} isInteractive />
+          <Svg key="scene:void" source={backdrop} alt={`${awake.name} in the dark`} width={width} height={height} isInteractive />
           <Box position="absolute" top={0} left={0} flexDirection="column">
             <Client key="lich-0" module="./lich-live.tsx" props={{ ...shared, slice: a! }} width={cols} height={a![1]} />
             <Client key="lich-1" module="./lich-live.tsx" props={{ ...shared, slice: b! }} width={cols} height={b![1]} />
@@ -1104,23 +1203,6 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-
-    // A scene Engram fills the whole body: its pane view in a tall dock, its
-    // band view in a short or inline one.
-    if (awake?.vessel.scene && !(await read($, mediaAtom))) {
-      const views = SCENES[awake.vessel.scene]
-      const { width, height } = sceneSize(e.props.bodyColumns, e.props.scroll.bodyRows, e.props.placement)
-      const isDeep = e.props.placement === 'dock' && height > width * 1.1
-      const now = await $.clock.now()
-      const scene = sceneFor('pane', `${isDeep ? 'deep' : 'surface'}:${state}:${width}x${height}`, () =>
-        renderScene(isDeep ? views.pane(state, width, height) : views.band(state, width, height), now),
-      )
-      return <Svg key="scene:pane" source={scene} alt={`${awake.engram.name}: ${LABELS[state]}`} width={width} height={height} isInteractive />
-    }
-
-    // The Vessel alone, when it gets no stage.
-    const size = Math.max(112, Math.min(208, e.props.bodyColumns * PX_PER_COLUMN))
-    const cacheKey = `${engram.engram.id}:${state}:${size}`
 
     if (await read($, mediaAtom)) {
       return (
@@ -1140,31 +1222,22 @@ export const register: Register = (on, options) => {
       )
     }
 
-    const svg = await vesselFor($, engram, state, size)
-    const alt = `${engram.engram.name}: ${LABELS[state]}`
-    const stage = stageSize(e.props.bodyColumns, e.props.scroll.bodyRows, e.props.placement)
-    const stageKey = `stage:${cacheKey}:${stage.width}x${stage.height}`
-    let scene = stageCache.get(stageKey)
-    if (scene === undefined) {
-      scene = stageSvg(svg, state, stage) ?? null
-      if (stageCache.size >= 64) {
-        stageCache.clear()
-      }
-      stageCache.set(stageKey, scene)
-    }
-    if (scene !== null) {
-      return <Svg key={stageKey} source={scene} alt={alt} width={stage.width} height={stage.height} isInteractive />
-    }
-    // No stage for this Vessel (no viewBox, or too large): the Vessel alone.
-    return (
-      <Box flexDirection="column" alignItems="center">
-        <Svg key={cacheKey} source={svg} alt={alt} width={fitWidth(svg, size)} isInteractive />
-      </Box>
-    )
+    // A scene fills the whole body: its pane view in a tall dock, its band
+    // view in a short or inline one. With nothing awake, the resting Wisp's
+    // scene, dimmed, a cell short each way, where its sleeping frame drew.
+    const views = SCENES[engram.vessel.scene]
+    const { width, height } = (awake ? sceneSize : stageSize)(e.props.bodyColumns, e.props.scroll.bodyRows, e.props.placement)
+    const isDeep = e.props.placement === 'dock' && height > width * 1.1
+    const now = await $.clock.now()
+    const scene = sceneFor('pane', `${awake ? '' : 'resting:'}${isDeep ? 'deep' : 'surface'}:${state}:${width}x${height}`, () => {
+      const svg = renderScene(isDeep ? views.pane(state, width, height) : views.band(state, width, height), now)
+      return awake ? svg : dimmed(svg)
+    })
+    return <Svg key="scene:pane" source={scene} alt={`${engram.name}: ${LABELS[state]}`} width={width} height={height} isInteractive />
     }
     // Never a frame, a corner or the picker over a test.
     const isTest = (await read($, measureAtom)) || (await read($, blendAtom)) !== null || (await read($, liveAtom)) !== null || (await read($, mediaAtom))
-    const awake = engramOf(await read($, engramAtom))
+    const awake = await engramOf($, await read($, engramAtom))
     if (e.surface !== 'desktop' || isTest) {
       return vessel()
     }
@@ -1172,11 +1245,19 @@ export const register: Register = (on, options) => {
     const cols = e.props.bodyColumns
     const rows = Math.max(4, e.props.scroll.bodyRows - 1)
     const brass = awake?.vessel.hud?.bracket ?? FRAME_GOLD
-    // An Engram that draws only in the band has nothing to show here but the picker.
-    const isPicking = (await read($, pickerAtom)) || isBandOnly(awake)
+    const isPicking = await read($, pickerAtom)
     let body: RenderElement
     if (isPicking) {
       body = await picker($, els, cols, rows, awake, brass)
+    } else if (awake && drawsBandViewInPane(awake)) {
+      // One that doesn't show in the pane, the pane opened by hand: its band
+      // view, across the middle of the pane.
+      const { Box } = els
+      body = (
+        <Box width={cols} height={rows} flexDirection="column" justifyContent="center" backgroundColor="#07090c">
+          {await bandView($, els, awake, cols, 'pane')}
+        </Box>
+      )
     } else {
       // The HUD frame over whatever the Vessel is, when it is on.
       const tree = await vessel()
@@ -1198,7 +1279,7 @@ export const register: Register = (on, options) => {
     )
   })
 
-  // ── The band above the prompt: shown only while no pane is placed ────
+  // ── The band above the prompt: where the surfaces setting says ───────
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     lastBand = { surface: e.surface, hasSurvey: e.props.hasSurvey, isWorking: e.props.isWorking, drew: 'engine' }
@@ -1224,17 +1305,16 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-    const placement = await currentPlacement($)
-    if (!bandShows(placement, placement === 'auto' && (await isPanePlaced($)))) {
+    if (!(await drawingNow($, surfaces.hideBand && (await isPanePlaced($)))).band) {
       return next(e)
     }
-    const awake = engramOf(await read($, engramAtom))
+    const awake = await engramOf($, await read($, engramAtom))
     const mood = await read($, moodAtom)
-    const engram = awake ?? RESTING
+    const engram = awake ?? (await restingOf($))
     const state: VesselState = awake ? MOOD_STATE[mood] : 'sleeping'
     // The tool's detail lives in the status line; the band redraws only on a mood change.
     const detail = awake ? '' : 'No Engram awake'
-    const line = `${engram.engram.name} · ${LABELS[state]}${detail ? ` · ${detail}` : ''}`
+    const line = `${engram.name} · ${LABELS[state]}${detail ? ` · ${detail}` : ''}`
 
     // A survey (a question the engine or the app asks here) keeps the slot
     // too: the strip stays and the survey draws under it, rather than the
@@ -1274,7 +1354,7 @@ export const register: Register = (on, options) => {
       const water = sceneFor('band', `kraken-water:${width}x${height}`, () => renderScene(krakenWaterScene(width, height), now))
       return withSurvey(
         <Box width={cols} height={rows}>
-          <Svg key="scene:band-water" source={water} alt={`${engram.engram.name} in deep water`} width={width} height={height} isInteractive />
+          <Svg key="scene:band-water" source={water} alt={`${engram.name} in deep water`} width={width} height={height} isInteractive />
           <Box position="absolute" top={0} left={0}>
             <Client key="kraken-band" module="./kraken-live.tsx" props={{ mood, cols, rows, view: 'band', ink: await read($, inkAtom) }} width={cols} height={rows} />
           </Box>
@@ -1287,22 +1367,10 @@ export const register: Register = (on, options) => {
     // A row taller than its rows, clipped to them, so the HUD meets its edges.
     if (awake?.vessel.scene === 'wisp' && e.surface === 'desktop') {
       const els = $.ui.resolve(e) as Elements['desktop']
-      const { Box, Svg, Client } = els
+      const { Box, Client } = els
       const cols = e.props.bodyColumns
       const rows = WISP_BAND_ROWS
-      const width = cols * PX_PER_COLUMN
-      const height = overdrawn(rows)
-      const now = await $.clock.now()
-      const fen = sceneFor('band', `wisp-fen:${cols}x${rows}`, () => renderScene(fenScene(width, height, cols, rows), now))
-      const tree = (
-        <Box width={cols} height={rows} overflow="hidden" alignItems="flex-start">
-          <Svg key="scene:band-fen" source={fen} alt={`${engram.engram.name} in the fen`} width={width} height={height} isInteractive />
-          <Box position="absolute" top={0} left={0}>
-            <Client key="wisp-band" module="./wisp-live.tsx" props={{ mood, cols, rows, ink: await read($, inkAtom) }} width={cols} height={rows} />
-          </Box>
-        </Box>
-      )
-      const body = isFramed(await read($, frameAtom), awake) ? framed(els, tree, cols, rows, await read($, viewAtom), awake) : tree
+      const body = await fenView($, els, awake, cols, 'band')
       const brass = awake.vessel.hud?.bracket ?? FRAME_GOLD
       return withSurvey(
         <Box width={cols} height={rows}>
@@ -1326,7 +1394,7 @@ export const register: Register = (on, options) => {
       const backdrop = sceneFor('band', `lich-void:${width}x${height}`, () => renderScene(voidScene(width, height, 'band'), now))
       return withSurvey(
         <Box width={cols} height={rows}>
-          <Svg key="scene:band-void" source={backdrop} alt={`${engram.engram.name} in the dark`} width={width} height={height} isInteractive />
+          <Svg key="scene:band-void" source={backdrop} alt={`${engram.name} in the dark`} width={width} height={height} isInteractive />
           <Box position="absolute" top={0} left={0}>
             <Client key="lich-band" module="./lich-live.tsx" props={{ ...(await liveProps($)), cols, rows, view: 'band' }} width={cols} height={rows} />
           </Box>
@@ -1336,7 +1404,7 @@ export const register: Register = (on, options) => {
 
     // A scene Engram fills the band edge to edge, no text: the status line
     // under the prompt names the state.
-    if (awake?.vessel.scene) {
+    if (awake) {
       const views = SCENES[awake.vessel.scene]
       const { Svg } = $.ui.resolve(e)
       const width = Math.max(96, e.props.bodyColumns * PX_PER_COLUMN - 4)
@@ -1346,27 +1414,17 @@ export const register: Register = (on, options) => {
       return withSurvey(<Svg key="scene:band" source={scene} alt={line} width={width} height={height} isInteractive />)
     }
 
-    // A status strip: the Vessel on a small square stage, its name and state
-    // beside it.
+    // Nothing awake: a status strip, the resting Wisp's scene dimmed on a
+    // small square, and its name and state beside it.
     const { Box, Svg, Text } = $.ui.resolve(e)
     const size = BAND_STAGE_PX
-    const cacheKey = `${engram.engram.id}:${state}:${size}`
-    const svg = await vesselFor($, engram, state, size)
-    const stageKey = `band-stage:${cacheKey}`
-    let scene = stageCache.get(stageKey)
-    if (scene === undefined) {
-      scene = stageSvg(svg, state, { width: size, height: size }) ?? null
-      stageCache.set(stageKey, scene)
-    }
+    const now = await $.clock.now()
+    const resting = sceneFor('band', `resting:${state}:${size}x${size}`, () => dimmed(renderScene(SCENES[engram.vessel.scene].band(state, size, size), now)))
     return withSurvey(
       <Box flexDirection="row" alignItems="center" gap={1}>
-        {scene !== null ? (
-          <Svg key={stageKey} source={scene} alt={line} width={size} height={size} isInteractive />
-        ) : (
-          <Svg key={`band:${cacheKey}`} source={svg} alt={line} width={fitWidth(svg, 2 * PX_PER_ROW + 10)} isInteractive />
-        )}
+        <Svg key="scene:band-resting" source={resting} alt={line} width={size} height={size} isInteractive />
         <Box flexDirection="column">
-          <Text bold>{`${engram.engram.name} · ${LABELS[state]}`}</Text>
+          <Text bold>{`${engram.name} · ${LABELS[state]}`}</Text>
           {detail ? (
             <Text dimColor wrap="truncate-end">
               {detail}

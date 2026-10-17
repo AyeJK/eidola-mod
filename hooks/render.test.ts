@@ -2,6 +2,8 @@ import { describe, expect, test } from 'claude-code/testing'
 import type { On, UiPane } from 'claude-code'
 import type { Engine, Mounted } from 'claude-code/testing'
 
+import { servePackages } from './packages.data'
+
 // A mount rejects when the surface refuses the tree (an element it lacks, a
 // prop it does not take), so each mount here is the check the desktop pane
 // failed: Text weight/size drew nothing there.
@@ -19,15 +21,17 @@ function findVessel(ui: Pick<Mounted, 'find'>, surface: (typeof SURFACES)[number
 const TYPED = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
 
 /**
- * The Skull awake: a baked-sprite Engram that draws in the pane and the band,
- * suggesting no placement. The default Wisp draws only in the band, in a
- * scene of its own, so these tests of the plain Vessel use the Skull.
+ * The Kraken awake: an Engram that shows in the pane and the band. The default
+ * Wisp shows only in the band, so these tests of where the Engram draws use
+ * the Kraken.
  */
-async function skull($: Engine, on: On): Promise<void> {
+async function kraken($: Engine, on: On): Promise<void> {
+  servePackages(on)
   on('store.set', () => ({ value: undefined }))
   on('ui.open', () => ({ value: { isPlaced: true as const } }))
   on('ui.invalidate', () => ({ value: undefined }))
-  await $.command.run({ command: 'awaken', args: 'skull', ...TYPED })
+  on('clock.now', () => ({ value: 1_760_000_000_000 }))
+  await $.command.run({ command: 'awaken', args: 'kraken', ...TYPED })
 }
 
 const BAND = {
@@ -39,7 +43,7 @@ const BAND = {
 describe('pane', () => {
   for (const surface of SURFACES) {
     test(`draws the awake Engram on ${surface}`, async ($, on) => {
-      await skull($, on)
+      await kraken($, on)
       const ui = await $.ui.mount({
         plugin: 'eidola',
         surface,
@@ -50,124 +54,51 @@ describe('pane', () => {
       expect(await findVessel(ui, surface)).toBeDefined()
       // No name, state line or buttons: the title and status line carry those.
       expect(await ui.find({ type: 'Button' })).toBeUndefined()
-      expect(await ui.find({ type: 'Text', text: 'Skull' })).toBeUndefined()
+      expect(await ui.find({ type: 'Text', text: 'Kraken' })).toBeUndefined()
       await ui.unmount()
     })
   }
 })
 
-describe('baked Vessels', () => {
-  const BAKED = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 60"><rect width="30" height="60"/></svg>'
-
-  test('the pane draws the Engram\'s own SVG for the state, fitted by its viewBox', async ($, on) => {
-
-    const asked: string[] = []
-    on('fs.read', ($2, e) => {
-      asked.push(e.path)
-      return { value: BAKED }
-    })
-    await skull($, on)
-    const ui = await $.ui.mount({
-      plugin: 'eidola',
-      surface: 'desktop',
-      component: 'Pane',
-      requestId: 'eidola',
-      props: { title: 'Eidola', isFocused: false, bodyColumns: 32, placement: 'dock', scroll: SCROLL, view: {} },
-    })
-    const svg = await ui.find({ type: 'Svg' })
-    // Set on a stage the size of the body: 31 columns × 8px, 39 rows × 19px.
-    expect(svg?.props?.width).toBe(248)
-    expect(svg?.props?.height).toBe(741)
-    const source = String(svg?.props?.source)
-    expect(source).toContain('viewBox="0 0 248 741"')
-    expect(source).toContain('viewBox="0 0 30 60"><rect width="30" height="60"/></svg>')
-    expect(asked.some(path => path.replace(/\\/g, '/').endsWith('vessels/skull/idle.svg'))).toBe(true)
-    await ui.unmount()
-  })
-
-  test('a Vessel with no viewBox is drawn alone, without a stage', async ($, on) => {
-
-    const BARE = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40"/></svg>'
-    on('fs.read', () => ({ value: BARE }))
-    await skull($, on)
-    const ui = await $.ui.mount({
-      plugin: 'eidola',
-      surface: 'desktop',
-      component: 'Pane',
-      requestId: 'eidola',
-      props: { title: 'Eidola', isFocused: false, bodyColumns: 32, placement: 'dock', scroll: SCROLL, view: {} },
-    })
-    expect((await ui.find({ type: 'Svg' }))?.props?.source).toBe(BARE)
-    await ui.unmount()
-  })
-
-  test('a Vessel file that can\'t be read falls back to the built-in sprite', async ($, on) => {
-
-    on('fs.read', () => {
-      throw new Error('missing')
-    })
-    on('ui.panes', () => ({ value: UNPLACED }))
-    await skull($, on)
-    const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
-    const svg = await ui.find({ type: 'Svg' })
-    expect(String(svg?.props?.source)).toContain('shape-rendering="crispEdges"')
-    await ui.unmount()
-  })
-})
-
 describe('band', () => {
   for (const surface of SURFACES) {
-    test(`under both, draws on ${surface} beside a placed pane`, { options: { placement: 'both' } }, async ($, on) => {
+    test(`with hide off, draws on ${surface} beside a placed pane`, { options: { hideBandWhilePaneOpen: false } }, async ($, on) => {
       on('ui.panes', () => ({ value: PLACED }))
-      await skull($, on)
+      await kraken($, on)
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await findVessel(ui, surface)).toBeDefined()
       await ui.unmount()
     })
 
-    test(`under the default placement, steps aside on ${surface} while the pane is placed`, async ($, on) => {
+    test(`by default, steps aside on ${surface} while the pane is placed`, async ($, on) => {
 
       on('ui.panes', () => ({ value: PLACED }))
       on('ui.render', { component: 'AbovePrompt' }, ($2, e) => $2.ui.resolve(e).Box({}))
-      await skull($, on)
+      await kraken($, on)
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await findVessel(ui, surface)).toBeUndefined()
       await ui.unmount()
     })
 
-    test(`under auto, draws on ${surface} when no pane is placed`, { options: { placement: 'auto' } }, async ($, on) => {
+    test(`by default, draws on ${surface} when no pane is placed`, async ($, on) => {
 
       on('ui.panes', () => ({ value: UNPLACED }))
-      await skull($, on)
+      await kraken($, on)
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await findVessel(ui, surface)).toBeDefined()
       await ui.unmount()
     })
 
-    test(`under auto, steps aside on ${surface} while the pane is placed`, { options: { placement: 'auto' } }, async ($, on) => {
+    test(`with Pane off, still steps aside on ${surface} for a pane opened by hand`, { options: { pane: false } }, async ($, on) => {
 
       on('ui.panes', () => ({ value: PLACED }))
       // Beneath the plugin, the engine's own band: empty here.
       on('ui.render', { component: 'AbovePrompt' }, ($2, e) => $2.ui.resolve(e).Box({}))
-      await skull($, on)
+      await kraken($, on)
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await findVessel(ui, surface)).toBeUndefined()
       await ui.unmount()
     })
-
-    if (surface === 'desktop') {
-      test('on desktop the band is a status strip: the Vessel, then name and state', async ($, on) => {
-        on('ui.panes', () => ({ value: UNPLACED }))
-        await skull($, on)
-        const ui = await $.ui.mount({ ...BAND, surface })
-        const svg = await ui.find({ type: 'Svg' })
-        // A square stage that fills the band's height.
-        expect(svg?.props?.width).toBe(140)
-        expect(svg?.props?.height).toBe(140)
-        expect(await ui.find({ type: 'Text', text: /^Skull · / })).toBeDefined()
-        await ui.unmount()
-      })
-    }
 
     test(`a survey draws under the Vessel on ${surface}, not instead of it`, async ($, on) => {
 
@@ -176,18 +107,18 @@ describe('band', () => {
         const { Text } = $2.ui.resolve(e)
         return Text({ children: 'How is Claude doing?' })
       })
-      await skull($, on)
+      await kraken($, on)
       const ui = await $.ui.mount({ ...BAND, surface, props: { ...BAND.props, hasSurvey: true } })
       expect(await findVessel(ui, surface)).toBeDefined()
       expect(await ui.find({ type: 'Text', text: 'How is Claude doing?' })).toBeDefined()
       await ui.unmount()
     })
 
-    test(`under pane, never draws on ${surface}`, { options: { placement: 'pane' } }, async ($, on) => {
+    test(`with Band off, never draws on ${surface}`, { options: { band: false } }, async ($, on) => {
 
       on('ui.panes', () => ({ value: UNPLACED }))
       on('ui.render', { component: 'AbovePrompt' }, ($2, e) => $2.ui.resolve(e).Box({}))
-      await skull($, on)
+      await kraken($, on)
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await findVessel(ui, surface)).toBeUndefined()
       await ui.unmount()

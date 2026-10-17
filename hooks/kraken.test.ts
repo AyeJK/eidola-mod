@@ -6,6 +6,7 @@ import { EMPTY, INKS, renderScene } from './field'
 import type { FieldScene } from './field'
 import { krakenBandScene, krakenPaneScene } from './kraken'
 import { SVG_LIMIT } from './stage'
+import { servePackages } from './packages.data'
 
 const STATES: VesselState[] = ['idle', 'thinking', 'working', 'attention', 'success', 'responding', 'error', 'waiting', 'sleeping']
 const NOW = 1_760_000_000_000
@@ -94,6 +95,7 @@ describe('the Kraken Engram', () => {
   const TYPED = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
 
   test('fills the pane and the band with its scene, no text', async ($, on) => {
+    servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))

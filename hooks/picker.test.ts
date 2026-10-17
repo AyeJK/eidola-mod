@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'claude-code/testing'
 import type { UiPane } from 'claude-code'
 
+import { servePackages } from './packages.data'
+
 const NOW = 1_760_000_000_000
 
 const UNPLACED: UiPane[] = [{ id: 'eidola', title: 'Kraken', isShown: false, isFocused: false, isPlaced: false }]
@@ -15,6 +17,7 @@ const PANE = {
 
 describe('the picker', () => {
   test('the corner triangle opens the picker; a card awakens its Engram and closes it', async ($, on) => {
+    servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))
@@ -33,28 +36,28 @@ describe('the picker', () => {
     // A click on it: every bundled Engram as a card, the awake one to put to sleep.
     await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
     expect(await pane.find({ type: 'Client', key: 'kraken-live' })).toBeUndefined()
-    for (const id of ['wisp', 'spirit', 'skull', 'moon', 'sigil', 'lich']) {
+    for (const id of ['wisp', 'lich']) {
       expect(await pane.find({ type: 'Button', key: `awaken:${id}` })).toBeDefined()
     }
     expect(await pane.find({ type: 'Button', key: 'sleep:kraken' })).toBeDefined()
-    expect((await pane.findAll({ type: 'Svg' })).length).toBeGreaterThanOrEqual(7)
+    expect((await pane.findAll({ type: 'Svg' })).length).toBeGreaterThanOrEqual(3)
     // A card shows the view its Engram draws in: the Wisp's the band, the rest their pane.
     expect(await pane.find({ type: 'Text', text: 'pane + band' })).toBeDefined()
     expect(await pane.find({ type: 'Text', text: 'band only' })).toBeDefined()
     const alts = (await pane.findAll({ type: 'Svg' })).map(svg => String(svg.props?.alt))
     expect(alts.filter(alt => alt.endsWith(', band view'))).toEqual(['Wisp, band view'])
-    expect(alts.filter(alt => alt.endsWith(', pane view')).length).toBe(7)
+    expect(alts.filter(alt => alt.endsWith(', pane view')).length).toBe(2)
 
     // The filter: an Engram that draws in both is listed under Pane and under Band.
-    expect(await pane.find({ type: 'Text', text: '8 bundled' })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: '3 bundled' })).toBeDefined()
     await pane.press({ key: 'filter:band' })
     expect(await pane.find({ type: 'Button', key: 'filter:band' })).toMatchObject({ props: { variant: 'primary' } })
     expect(await pane.find({ type: 'Button', key: 'awaken:wisp' })).toBeDefined()
-    expect(await pane.find({ type: 'Text', text: '8 of 8' })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: '3 of 3' })).toBeDefined()
     await pane.press({ key: 'filter:pane' })
     expect(await pane.find({ type: 'Button', key: 'awaken:lich' })).toBeDefined()
     await pane.press({ key: 'filter:all' })
-    expect(await pane.find({ type: 'Text', text: '8 bundled' })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: '3 bundled' })).toBeDefined()
     expect(await pane.find({ type: 'Client', key: 'frame-corner' })).toBeDefined()
 
     // Awakening the Lich from its card: the picker closes on the Lich.
@@ -79,6 +82,7 @@ describe('the picker', () => {
   })
 
   test('Sleep on the awake card puts it to sleep and keeps the picker open', async ($, on) => {
+    servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))
@@ -94,16 +98,16 @@ describe('the picker', () => {
     await pane.unmount()
   })
 
-  test("a card shows the Engram's own still where it ships one, its Vessel where it does not", async ($, on) => {
+  test("a card shows the Engram's own still where it ships one, its scene where that can't be read", async ($, on) => {
     const STILL = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 722"><rect width="960" height="722"/></svg>'
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))
     on('store.set', () => ({ value: undefined }))
     on('clock.now', () => ({ value: NOW }))
-    on('fs.read', ($2, e) => {
-      if (/vessels[\\/]kraken[\\/]thumb-pane\.svg$/.test(String(e.path))) {
-        return { value: STILL }
+    servePackages(on, path => {
+      if (/engrams[\\/]kraken[\\/]vessel[\\/]thumb-pane\.svg$/.test(path)) {
+        return STILL
       }
       throw new Error('no such file')
     })

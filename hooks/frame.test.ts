@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'claude-code/testing'
 import type { UiPane } from 'claude-code'
 
+import { servePackages } from './packages.data'
+
 
 const NOW = 1_760_000_000_000
 
@@ -18,6 +20,7 @@ const PANE = {
 
 describe('the frame', () => {
   test("each Engram's HUD: the Kraken's on as it ships, with no meter; toggled per Engram", async ($, on) => {
+    servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))

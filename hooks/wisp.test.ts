@@ -6,6 +6,7 @@ import { capturePixels } from './live-pixels'
 import type { Colour } from './live-pixels'
 import { fenLayout, fenScene } from './wisp'
 import WispLive from './wisp-live'
+import { servePackages } from './packages.data'
 
 const NOW = 1_760_000_000_000
 const TYPED = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
@@ -169,6 +170,7 @@ describe('the Wisp', () => {
   })
 
   test('awake, it draws only in the band: its fen, itself live, its HUD and the corner', async ($, on) => {
+    servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))
@@ -190,6 +192,7 @@ describe('the Wisp', () => {
   })
 
   test("the band's corner opens the pane on the picker; its breadcrumb goes back to the band", async ($, on) => {
+    servePackages(on)
     const opened: string[] = []
     const closed: string[] = []
     on('ui.open', ($2, e) => {
@@ -224,6 +227,7 @@ describe('the Wisp', () => {
   })
 
   test('/eidola mood sets the mood by hand, and the band draws it', async ($, on) => {
+    servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: [] }))
     on('ui.invalidate', () => ({ value: undefined }))

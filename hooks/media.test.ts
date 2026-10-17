@@ -3,6 +3,7 @@ import type { On, UiPane } from 'claude-code'
 
 import { mediaCases } from './media-test'
 import { describeOutcome } from './net-probe'
+import { servePackages } from './packages.data'
 
 const SCROLL = { offset: 0, bodyRows: 60 }
 const PLACED: UiPane[] = [{ id: 'eidola', title: 'Eidola', isShown: true, isFocused: false, isPlaced: true }]
@@ -34,6 +35,7 @@ describe('media test', () => {
   })
 
   test('/eidola media swaps the pane to the three clips on desktop, and back', async ($, on) => {
+    servePackages(on)
     desktopWithPane(on)
 
     const turnedOn = await $.command.run({ command: 'eidola', args: 'media', ...TYPED })
@@ -71,6 +73,7 @@ describe('network probes', () => {
   })
 
   test('/eidola reports each probe, and a refused fetch does not break it', async ($, on) => {
+    servePackages(on)
     desktopWithPane(on)
     on('http.fetch', ($2, e) => {
       if (e.url.startsWith('https://eidola.app')) {
@@ -81,8 +84,8 @@ describe('network probes', () => {
 
     const out = await $.command.run({ command: 'eidola', args: '', ...TYPED })
     expect(out.text).toContain('Surfaces: desktop')
-    // The default Wisp draws only in the band, and says so.
-    expect(out.text).toContain('Placement: band (setting: default). Band: showing.')
+    // The default switches; the resting Wisp is band-only, so its band stays beside the pane /eidola opened.
+    expect(out.text).toContain('Switches: pane on · band on (hidden while the pane is open). Band: showing.')
     expect(out.text).toContain('eidola.app (hosted relay): reached, HTTP 200')
     expect(out.text).toContain('example.com (control): failed (')
     expect(out.text).toContain('Shrine on this host (127.0.0.1:9743): failed (')
@@ -91,6 +94,7 @@ describe('network probes', () => {
 
 describe('pane title', () => {
   test('names the awake Engram, and follows it when another awakens', async ($, on) => {
+    servePackages(on)
     const titles: (string | undefined)[] = []
     on('ui.open', ($2, e) => {
       titles.push(e.title)
@@ -101,8 +105,8 @@ describe('pane title', () => {
   on('clock.now', () => ({ value: 1_760_000_000_000 }))
     on('store.set', () => ({ value: undefined }))
 
-    await $.command.run({ command: 'awaken', args: 'skull', ...TYPED })
-    expect(titles).toContain('Skull')
+    await $.command.run({ command: 'awaken', args: 'kraken', ...TYPED })
+    expect(titles).toContain('Kraken')
     expect(titles).not.toContain('Eidola')
 
     await $.command.run({ command: 'sleep', args: '', ...TYPED })

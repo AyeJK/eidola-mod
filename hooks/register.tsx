@@ -8,7 +8,7 @@ import type { Engram, EngramJson, SceneName } from './engram-types'
 import { ENGRAMS_DIR, loadEngrams } from './loader'
 import type { Skipped } from './loader'
 import { MANIFEST, checkThumbnail, validate } from './validate'
-import { CONTRACT, fallbackKey, faultLine, judge, lineOf, sceneKey, slotKey, splitAt } from './handoff'
+import { CONTRACT, fallbackKey, faultLine, judge, lineOf, slotKey } from './handoff'
 import type { Fault, Verdict } from './handoff'
 import { BLEND_STEPS, blendTestSvg } from './blend-test'
 import { MEASURE_EDGE, MEASURE_GROUND, MEASURE_HELP, REFERENCE_PX, bandReport, paneReport, referenceSvg } from './measure'
@@ -138,27 +138,8 @@ const WISP_BAND_ROWS = 9
 const LICH_BAND_ROWS = 12
 
 // What the band hook saw and drew last, for /eidola. Not drawn from.
-type BandSeen = { surface: string; hasSurvey: boolean; isWorking: boolean; drew: 'engine' | 'strip' | 'strip+survey' | 'beneath+strip' }
+type BandSeen = { surface: string; hasSurvey: boolean; isWorking: boolean; drew: 'engine' | 'strip' | 'strip+survey' }
 let lastBand: BandSeen | undefined
-
-/**
- * Whether what the hooks beneath drew in the band shows nothing: no text, no
- * Svg, no Client, only empty Boxes and Texts (the engine's own answer when
- * no plugin beneath draws). The strip then draws alone, where it always has.
- */
-function isBlank(node: unknown): boolean {
-  if (node === null || node === undefined || node === false || node === '') {
-    return true
-  }
-  if (Array.isArray(node)) {
-    return node.every(isBlank)
-  }
-  if (typeof node === 'object') {
-    const { type, children } = node as { type?: unknown; children?: unknown }
-    return (type === 'Box' || type === 'Text') && isBlank(children)
-  }
-  return false
-}
 /** Which clock each live drawing keeps, as it reported on starting: for /eidola. */
 const liveClocks = new Map<string, string>()
 // The scene last built for the pane and the band. A scene's loops are locked
@@ -2401,36 +2382,21 @@ export const register: Register = (on, options) => {
     const detail = awake ? '' : 'No Engram awake'
     const line = `${engram.name} · ${LABELS[state]}${detail ? ` · ${detail}` : ''}`
 
-    // What the hooks beneath draw in the band goes with the strip. A survey
-    // (a question the engine or the app asks here) keeps the slot too: the
-    // strip stays and the survey draws under it, rather than the Vessel
-    // vanishing whenever a turn ends on a question. Anything else beneath
-    // (a plugin's row of its own, such as a job's progress bar) draws above
-    // the strip; with nothing there, the strip draws alone, unmoved.
-    // `beneath` is what `next` already gave, where it was asked (the hand-off).
-    const withSurvey = async (strip: RenderElement, beneath?: { tree: unknown }): Promise<RenderElement> => {
-      const { Box } = $.ui.resolve(e)
-      if (e.props.hasSurvey) {
-        const below = beneath ? beneath.tree : await next(e)
-        lastBand = { ...lastBand!, drew: 'strip+survey' }
-        return (
-          <Box flexDirection="column" gap={1}>
-            {strip}
-            {below as RenderElement}
-          </Box>
-        )
-      }
-      // Nothing beneath that answers, or a failure there: the strip alone.
-      const below = beneath ? beneath.tree : await next(e).catch(() => undefined)
-      if (isBlank(below)) {
+    // A survey (a question the engine or the app asks here) keeps the slot
+    // too: the strip stays and the survey draws under it, rather than the
+    // Vessel vanishing whenever a turn ends on a question.
+    const withSurvey = async (strip: RenderElement): Promise<RenderElement> => {
+      if (!e.props.hasSurvey) {
         lastBand = { ...lastBand!, drew: 'strip' }
         return strip
       }
-      lastBand = { ...lastBand!, drew: 'beneath+strip' }
+      const survey = await next(e)
+      lastBand = { ...lastBand!, drew: 'strip+survey' }
+      const { Box } = $.ui.resolve(e)
       return (
         <Box flexDirection="column" gap={1}>
-          {below as RenderElement}
           {strip}
+          {survey}
         </Box>
       )
     }
@@ -2441,8 +2407,6 @@ export const register: Register = (on, options) => {
       const cols = e.props.bodyColumns
       const rows = e.surface === 'desktop' ? bandRows(builtInScene(awake), e.props.hasSurvey, e.props.maxRows) : Math.max(1, Math.min(BAND_ROWS, e.props.maxRows))
       let verdict: Verdict
-      // What the hooks beneath drew besides the creature: drawn with the frame, as with any strip.
-      let beneath: { tree: unknown } | undefined
       const known = faults.get(awake.id)
       if (known) {
         verdict = { fault: known }
@@ -2456,17 +2420,11 @@ export const register: Register = (on, options) => {
         } catch {
           got = undefined
         }
-        // A plugin between may have wrapped the drawing in a row of its own: the drawing is judged, the rest drawn above the frame.
-        const { found, rest } = splitAt(got, sceneKey(awake.id))
-        verdict = verdictOf(awake, found ?? got, next.trace, (await $.clock.now()) - started)
-        // The band is asked again, plainly, where what came back can't be what is beneath: marked not
-        // loading just now (it may be the plugin's own), under a survey (the plugin may have answered in its
-        // place), or the drawing alone (the plugin answered without passing on, so a plugin under it wasn't asked).
-        beneath = 'fault' in verdict || e.props.hasSurvey || rest === undefined ? undefined : { tree: rest }
+        verdict = verdictOf(awake, got, next.trace, (await $.clock.now()) - started)
       }
       const slot = await slotFor($, $.ui.resolve(e) as unknown as Pick<Elements['desktop'], 'Box' | 'Text' | 'Svg'>, e.surface === 'desktop', awake, cols, rows, 'band', verdict)
       if (e.surface !== 'desktop') {
-        return withSurvey(slot, beneath)
+        return withSurvey(slot)
       }
       const els = $.ui.resolve(e) as Elements['desktop']
       const { Box } = els
@@ -2476,7 +2434,6 @@ export const register: Register = (on, options) => {
           {body}
           {await bandCorner($, els, cols, rows, awake)}
         </Box>,
-        beneath,
       )
     }
 

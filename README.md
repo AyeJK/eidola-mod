@@ -5,7 +5,7 @@ An Engram's scene in a pane or the band above the prompt that reacts to what Cla
 - States: idle, thinking, working, attention, success, responding, error, waiting (asleep when no Engram is awake: the pane and band show the Wisp's scene, dimmed)
 - Commands: `/eidola` (open the pane and print diagnostics), `/eidola place [pane|band|hide|status on|off]` (open the Surfaces screen on the desktop, print the switches elsewhere, or set one), `/eidola frame` (toggle the awake Engram's HUD), `/eidola mood idle|working|attention` (set the mood by hand until the next prompt), `/eidola ink` (show a failure), `/eidola media` (toggle the media test), `/awaken <engram>`, `/sleep`, `/engrams [engram]` (open the picker, or one Engram's page, in the pane on the desktop; print the list elsewhere)
 - Make your own: `/eidola new`, `/eidola remix <engram>`, `/eidola edit <engram>`, `/eidola publish <engram>` start the Eidola skill (`skills/eidola-engram/`, also `/eidola:eidola-engram`) on that task: Claude makes the Engram plugin with you in `~/.claude/eidola/engrams/<id>/`, lists it in the local marketplace `eidola-local`, checks it, installs it with your yes, and publishes it to a GitHub repo of yours only with your yes. `edit` and `publish` take your own Engrams; a bundled one is remixed first.
-- The Engram picker: click the triangle in the bottom-right corner of the pane, or of the band for a band-only Engram, to list the bundled Engrams, filter them by where they draw, and awaken one
+- The Engram picker: click the triangle in the bottom-right corner of the pane, or of the band for a band-only Engram, to list the Engrams, filter them by where they draw and where they come from, and awaken one
 
 ## Options
 

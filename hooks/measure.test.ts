@@ -22,6 +22,7 @@ function desktopWithPane(on: On): void {
   on('ui.open', () => ({ value: { isPlaced: true as const } }))
   on('ui.panes', () => ({ value: PLACED }))
   on('ui.invalidate', () => ({ value: undefined }))
+  on('clock.now', () => ({ value: 1_760_000_000_000 }))
 }
 
 describe('measure', () => {

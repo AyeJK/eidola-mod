@@ -20,11 +20,18 @@ export type GlyphAt = (x: number, y: number, levels: number) => readonly [string
 type Elements = Pick<ClientElements, 'Box' | 'Text'>
 
 /**
+ * Set only by the thumbnail bake (scripts/bake-thumbs.mjs): handed every
+ * frame's glyphs before they are drawn, at full detail, budget or no.
+ */
+export const captureGlyphs: { to?: (cols: number, rows: number, glyphAt: GlyphAt) => void } = {}
+
+/**
  * The glyphs as one column of rows, within the budget: fewer shades if need
  * be, and past that, short runs merged into their neighbours' colour until
  * it fits. Whatever a frame holds, it is never drawn past the bound.
  */
 export function drawGlyphs({ Box, Text }: Elements, cols: number, rows: number, glyphAt: GlyphAt) {
+  captureGlyphs.to?.(cols, rows, glyphAt)
   const draw = (levels: number, minRun: number) => {
     const out: RenderElement[] = []
     let size = 0

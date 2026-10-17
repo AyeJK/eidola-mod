@@ -1,6 +1,6 @@
 {
   "name": "eidola",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "A pixel Vessel that reacts to what Claude is doing, plus an Engram Soul injected into every session.",
   "types": "./types/index.d.ts",
   "author": {

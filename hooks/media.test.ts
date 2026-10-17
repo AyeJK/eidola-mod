@@ -19,6 +19,7 @@ function desktopWithPane(on: On): void {
   on('ui.open', () => ({ value: { isPlaced: true as const } }))
   on('ui.panes', () => ({ value: PLACED }))
   on('ui.invalidate', () => ({ value: undefined }))
+  on('clock.now', () => ({ value: 1_760_000_000_000 }))
   on('session.surfaces', () => ({ value: ['desktop' as const] }))
 }
 
@@ -80,7 +81,8 @@ describe('network probes', () => {
 
     const out = await $.command.run({ command: 'eidola', args: '', ...TYPED })
     expect(out.text).toContain('Surfaces: desktop')
-    expect(out.text).toContain('Placement: auto (setting: default). Band: hidden.')
+    // The default Wisp draws only in the band, and says so.
+    expect(out.text).toContain('Placement: band (setting: default). Band: showing.')
     expect(out.text).toContain('eidola.app (hosted relay): reached, HTTP 200')
     expect(out.text).toContain('example.com (control): failed (')
     expect(out.text).toContain('Shrine on this host (127.0.0.1:9743): failed (')
@@ -96,6 +98,7 @@ describe('pane title', () => {
     })
     on('ui.panes', () => ({ value: PLACED }))
     on('ui.invalidate', () => ({ value: undefined }))
+  on('clock.now', () => ({ value: 1_760_000_000_000 }))
     on('store.set', () => ({ value: undefined }))
 
     await $.command.run({ command: 'awaken', args: 'skull', ...TYPED })

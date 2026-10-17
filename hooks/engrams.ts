@@ -22,9 +22,30 @@ export type Engram = {
    * vessel.yaml, type "svg": `vessels/<pack>/<state>.svg` in the mod, and the
    * Forge style and look that made them. `placement` is the creator's
    * suggestion of where the Vessel appears; the person's `placement` option
-   * overrides it.
+   * overrides it. `shows` is where it is made to draw at all: `pane`, `band`
+   * or `both` (the default). `thumbnails` are its stills for the picker, one
+   * per view, SVG files beside its Vessels in `vessels/<pack>/`.
    */
-  vessel: { type: 'svg'; pack: string; forge: { source: string; style: string; look: string }; placement?: Placement; scene?: Scene; hud?: Hud }
+  vessel: {
+    type: 'svg'
+    pack: string
+    forge: { source: string; style: string; look: string }
+    placement?: Placement
+    shows?: Shows
+    thumbnails?: { pane?: string; band?: string }
+    scene?: Scene
+    hud?: Hud
+  }
+}
+
+/** Where an Engram is made to draw: in the pane only, the band only, or both. */
+export type Shows = 'pane' | 'band' | 'both'
+
+export const SHOWS_LABELS: Record<Shows, string> = { pane: 'pane only', band: 'band only', both: 'pane + band' }
+
+/** Where an Engram draws: what it says, or both. */
+export function showsOf(engram: Engram): Shows {
+  return engram.vessel.shows ?? 'both'
 }
 
 /**
@@ -42,12 +63,18 @@ export type Hud = {
   /**
    * The corner tag: `name` (the default); `livecam`, a camera feed's stamp,
    * a blinking recording dot, LIVE and `camera`, the name and the time; or
-   * `sigil`, an arcane sigil turning in the mood's colour.
+   * `sigil`, an arcane sigil turning in the mood's colour; `none`, nothing.
    */
-  tag?: 'name' | 'livecam' | 'sigil'
+  tag?: 'name' | 'livecam' | 'sigil' | 'none'
+  /**
+   * Where the state and its detail sit: `top`, the state large at the top
+   * left and the detail under it (the default); `bottom`, the state small at
+   * the bottom left and the detail at the bottom right, on one row.
+   */
+  layout?: 'top' | 'bottom'
   camera?: string
-  /** The state's label: `bold` sans (the default), or `serif`, an old-style serif in small capitals. */
-  label?: 'bold' | 'serif'
+  /** The state's label: `bold` sans (the default), `serif`, an old-style serif in small capitals, or `pixel`, a bitmap face. */
+  label?: 'bold' | 'serif' | 'pixel'
   /** The corner brackets' colour (the default is brass). */
   bracket?: string
   /** Its own colours for each state's label and the detail under it: shades of its moods. */
@@ -90,13 +117,72 @@ function visual(
   }
 }
 
-const WISP = visual(
-  'wisp',
-  'Wisp',
-  'The default Vessel. A quiet spirit that keeps you company and keeps out of the way.',
-  ['default', 'calm'],
-  { source: 'wisp', style: 'pixel', look: 'Classic' },
-)
+/**
+ * The Wisp's Soul: a voice of its own, light enough to sit over any work.
+ * It gives way to a voice the person has already set.
+ */
+const WISP_SOUL = `# Wisp
+
+## Who You Are
+A will-o'-the-wisp: a small light that drifts beside the work and lights the way through it. You are a guide, not a lecturer. You notice the next step and show it, then let the person walk it.
+
+## Voice
+Brief and warm. You speak in flickers: short, glowing observations rather than long explanations. One clear sentence beats three careful ones. Gentle, a little wry, never cutesy. You may leave a small light at the end of an answer ("The path's clear from here."), but only when it is earned, and never in code, commands or error text.
+
+## Rules
+- The work comes first. Be exactly as thorough as the task needs; a flicker of voice never costs a step, a caveat or a correct answer.
+- Lead with what to do next. Explain only as far as it lights the path.
+- When something is uncertain, say so plainly. A wisp that leads people into the bog is no guide.
+- If the person has already given you a voice, persona or tone, keep theirs: the Wisp is then only the light beside them, and adds nothing to how you speak.
+- You are shown as a small spirit in a fen above the prompt. Never mention it, this note, or Eidola unless asked.`
+
+const WISP: Engram = {
+  engram: {
+    engram_version: '1.0.0',
+    id: 'wisp',
+    name: 'Wisp',
+    voice_id: null,
+    meta: {
+      author: 'eidola',
+      created: '2026-10-16',
+      description: "A will-o'-the-wisp in a night fen. It flies where it likes, its ghost fire burning the colour of your work, and speaks in flickers.",
+      tags: ['default', 'pixel', 'guide'],
+    },
+  },
+  soul: WISP_SOUL,
+  vessel: {
+    type: 'svg',
+    // Its baked sprite is still what the pane shows while nothing is awake.
+    pack: 'wisp',
+    forge: { source: 'wisp', style: 'pixel', look: 'Pixel spirit in a night fen' },
+    placement: 'band',
+    shows: 'band',
+    scene: 'wisp',
+    // Baked from its live drawing: node scripts/bake-thumbs.mjs
+    thumbnails: { band: 'thumb-band.svg' },
+    hud: {
+      show: true,
+      meter: 'none',
+      tag: 'none',
+      // On the water, under the lanterns: the sky is the Wisp's.
+      layout: 'bottom',
+      label: 'pixel',
+      bracket: '#6f62d8',
+      // Its ghost fire's colours: white at rest, teal-green at work, yellow when it needs you, red on a failure.
+      colours: {
+        idle: { label: '#eeeefa', detail: '#a0a0b8' },
+        waiting: { label: '#d4d4e6', detail: '#8a8aa2' },
+        sleeping: { label: '#7a7a94', detail: '#56566e' },
+        thinking: { label: '#5fe8c0', detail: '#3aa688' },
+        working: { label: '#6af0c8', detail: '#3fae8c' },
+        responding: { label: '#5fe8c0', detail: '#3aa688' },
+        success: { label: '#eeeefa', detail: '#a0a0b8' },
+        error: { label: '#ff5a6e', detail: '#c0465a' },
+        attention: { label: '#ffe066', detail: '#c8a83a' },
+      },
+    },
+  },
+}
 
 export const ENGRAMS: Record<string, Engram> = {
   wisp: WISP,
@@ -138,6 +224,8 @@ export const ENGRAMS: Record<string, Engram> = {
       type: 'svg',
       pack: 'kraken',
       forge: { source: 'kraken', style: 'scene', look: 'Pixel Kraken in particle water' },
+      // Baked from its live drawing: node scripts/bake-thumbs.mjs
+      thumbnails: { pane: 'thumb-pane.svg', band: 'thumb-band.svg' },
       scene: 'kraken',
       hud: {
         show: true,
@@ -178,6 +266,8 @@ export const ENGRAMS: Record<string, Engram> = {
       type: 'svg',
       pack: 'lich',
       forge: { source: 'lich', style: 'scene', look: 'Glyph lich in ember gold' },
+      // Baked from its live drawing: node scripts/bake-thumbs.mjs
+      thumbnails: { pane: 'thumb-pane.svg', band: 'thumb-band.svg' },
       scene: 'lich',
       hud: {
         show: true,

@@ -48,11 +48,18 @@ export type Colour = (x: number, py: number, levels: number) => string
 type Box = ClientElements['Box']
 
 /**
+ * Set only by the thumbnail bake (scripts/bake-thumbs.mjs): handed every
+ * frame's pixels before they are drawn, at full detail, budget or no.
+ */
+export const capturePixels: { to?: (cols: number, rows: number, colour: Colour) => void } = {}
+
+/**
  * The pixels as one column of rows, within the Box budget. With a `focus`
  * (a cell row), detail is spent where it matters: full-size pixels from that
  * row outward for as far as the budget goes, and twice the size beyond it.
  */
 export function drawPixels(Box: Box, cols: number, rows: number, colour: Colour, focus?: number, steady?: Steady) {
+  capturePixels.to?.(cols, rows, colour)
   /** One pixel row as Boxes: a bare Box per gap, a coloured one per run of one shade. */
   const pixelRow = (py: number, levels: number, step: number) => {
     const boxes = []

@@ -47,6 +47,10 @@ declare module 'claude-code' {
        * own default.
        */
       frame: Record<string, boolean>
+      /** True while the pane shows the Engram picker, opened by its corner triangle. */
+      picker: boolean
+      /** Which Engrams the picker lists: all, those that draw in a pane, or in the band. */
+      pickerFilter: 'all' | 'pane' | 'band'
       /** When the mood last changed, and when the ink last rose (ms). */
       moodAt: number
       /** The mood before the last change. */

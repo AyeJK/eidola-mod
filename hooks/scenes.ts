@@ -5,6 +5,7 @@ import type { VesselState } from '../types'
 import type { FieldScene } from './field'
 import { lichBandScene, lichPaneScene } from './lich'
 import { krakenBandScene, krakenPaneScene } from './kraken'
+import { fenStateScene } from './wisp'
 
 export type SceneViews = {
   /** The pane, docked tall beside the transcript. */
@@ -16,6 +17,8 @@ export type SceneViews = {
 export const SCENES = {
   kraken: { pane: krakenPaneScene, band: krakenBandScene },
   lich: { pane: lichPaneScene, band: lichBandScene },
+  // The Wisp draws only in the band; its fen stands in wherever a scene is asked for.
+  wisp: { pane: fenStateScene, band: fenStateScene },
 } satisfies Record<string, SceneViews>
 
 export type SceneId = keyof typeof SCENES

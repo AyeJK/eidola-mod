@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { Elements, EngineInterface, Register, RenderElement } from 'claude-code'
 
 import type { Mood, VesselState, VesselView } from '../types'
-import { DEFAULT_ENGRAM, ENGRAMS, RESTING, soulSection } from './engrams'
+import { DEFAULT_ENGRAM, ENGRAMS, RESTING, SHOWS_LABELS, showsOf, soulSection } from './engrams'
 import type { Engram } from './engrams'
 import { BLEND_STEPS, blendTestSvg } from './blend-test'
 import { MEASURE_HELP, REFERENCE_PX, bandReport, paneReport, referenceSvg } from './measure'
@@ -26,6 +26,7 @@ import { FACES, SPRITE_PALETTE, vesselSvg } from './sprite'
 import { renderScene } from './field'
 import { krakenWaterScene } from './kraken'
 import { voidScene } from './lich'
+import { fenScene } from './wisp'
 import { LABEL_PX, labelSvg } from './hud'
 import { SCENES } from './scenes'
 import { BAND_SCENE_PX, BAND_STAGE_PX, PX_PER_COLUMN, PX_PER_ROW, sceneSize, stageSize, stageSvg } from './stage'
@@ -48,6 +49,8 @@ const blendAtom = atom({ plugin: 'eidola', key: 'blend' } as const, null as numb
 const liveAtom = atom({ plugin: 'eidola', key: 'live' } as const, null as Mood | null)
 const inkAtom = atom({ plugin: 'eidola', key: 'ink' } as const, 0)
 const frameAtom = atom({ plugin: 'eidola', key: 'frame' } as const, {} as Record<string, boolean>)
+const pickerAtom = atom({ plugin: 'eidola', key: 'picker' } as const, false)
+const pickerFilterAtom = atom({ plugin: 'eidola', key: 'pickerFilter' } as const, 'all' as 'all' | 'pane' | 'band')
 
 /** Whether an Engram's HUD frame shows: as the person toggled it, else as it ships. */
 function isFramed(frames: Record<string, boolean>, engram: Engram | undefined): boolean {
@@ -85,6 +88,8 @@ const svgCache = new Map<string, string>()
 const fileCache = new Map<string, string | null>()
 /** Cell rows the live band takes: it fills the band's own minimum height. */
 const BAND_ROWS = 7
+/** The Wisp's band: tall enough for sky, lanterns, the boardwalk and the water under them. */
+const WISP_BAND_ROWS = 9
 /** The Lich's band: tall enough for brow, eyes, nose and teeth at the pane's scale. */
 const LICH_BAND_ROWS = 12
 
@@ -149,6 +154,18 @@ async function vesselFor($: EngineInterface, engram: Engram, state: VesselState,
   return fileCache.get(key) ?? spriteSvg(state, size)
 }
 
+/**
+ * A still sized to fill a `width` × `height` box edge to edge: kept in
+ * proportion and centred, what overflows the box cut off, as a cover image.
+ */
+function filling(svg: string, width: number, height: number): string {
+  return svg.replace(/^<svg\b[^>]*>/, tag =>
+    tag
+      .replace(/\s(width|height|preserveAspectRatio)="[^"]*"/g, '')
+      .replace(/>$/, ` width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice">`),
+  )
+}
+
 /** The width that fits a drawing inside a size-by-size box, read from its viewBox. */
 function fitWidth(svg: string, size: number): number {
   const box = /viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"/.exec(svg)
@@ -208,9 +225,25 @@ const FRAME_STATES: Record<VesselState, { colour: string; name: string; line: st
   sleeping: { colour: '#5a6070', name: 'ASLEEP', line: 'dormant' },
 }
 
+/**
+ * A pane backdrop's height in px: a row taller than its rows at 19 px each,
+ * clipped to them. A row is drawn a fraction of a pixel taller than 19, so a
+ * backdrop of exactly rows × 19 stops a few pixels short of the HUD's bottom
+ * brackets, which sit on the rows; drawn taller and clipped it meets them.
+ */
+function overdrawn(rows: number): number {
+  return (rows + 1) * PX_PER_ROW
+}
+
 /** The sigil's size in cells: about 56 px square. */
 const SIGIL_COLS = 7
 const SIGIL_ROWS = 3
+/**
+ * Where the sigil's ring sits in its rows, in px from their top: from the
+ * state label's cap height to the foot of the detail line under it, as
+ * measured on the desktop, so it stands level with both lines of text.
+ */
+const SIGIL_SPAN = { top: 8, bottom: 52 }
 
 /** How busy a HUD's recording runs in a state. */
 function waveLevel(state: VesselState): 'idle' | 'working' | 'attention' {
@@ -223,7 +256,7 @@ const FRAME_GOLD = '#b8913a'
 const FRAME_GREY = '#9aa3b2'
 
 /**
- * The Vessel in a HUD frame: brackets at the corners, its state in its
+ * The Vessel in a HUD frame: brackets at three corners, its state in its
  * colour with the detail under it, the Engram's name at the top right, and
  * a level meter in the bottom left.
  */
@@ -243,7 +276,8 @@ function framed(
   const clip = (text: string) => (text.length > width ? text.slice(0, width - 1) + '…' : text)
   const detail = clip((view.detail || look.line).toLowerCase())
   const tag = (awake?.engram.name ?? 'Eidola').toUpperCase()
-  const label = labelSvg(look.name, look.colour, awake?.vessel.hud?.label)
+  const isBottom = awake?.vessel.hud?.layout === 'bottom'
+  const label = labelSvg(look.name, look.colour, awake?.vessel.hud?.label, isBottom ? 'small' : 'large')
   const at = (key: string, top: number, left: number, child: RenderElement) => (
     <Box key={key} position="absolute" top={top} left={left}>
       {child}
@@ -275,17 +309,34 @@ function framed(
       {bracket('frame-tl', 0, 0, false, false)}
       {bracket('frame-tr', 0, cols - 2, true, false)}
       {bracket('frame-bl', rows - 1, 0, false, true)}
-      {bracket('frame-br', rows - 1, cols - 2, true, true)}
-      {at(
-        'frame-state',
-        1,
-        3,
-        <Box width={Math.ceil(label.width / PX_PER_COLUMN)} height={2}>
-          <Svg key={`frame-label:${view.state}:${awake?.vessel.hud?.label ?? 'bold'}`} source={label.svg} alt={look.name} width={label.width} height={LABEL_PX} />
-        </Box>,
-      )}
-      {at('frame-detail', 3, 3, <Text color={detailColour}>{detail}</Text>)}
+      {/* The bottom-right corner is the picker's triangle, drawn over every desktop pane. */}
+      {/* The state and its detail: large at the top left, or small on the bottom row, the detail at its right. */}
+      {isBottom
+        ? // Both in the band's last two rows, centred in them: the water, under the waterline.
+          at(
+            'frame-state',
+            rows - 2,
+            3,
+            <Box width={cols - 7} height={2} flexDirection="row" alignItems="center" justifyContent="space-between">
+              <Svg key={`frame-label:${view.state}:${awake?.vessel.hud?.label ?? 'bold'}:s`} source={label.svg} alt={look.name} width={label.width} height={label.height} />
+              <Text key="frame-detail" color={detailColour}>
+                {detail}
+              </Text>
+            </Box>,
+          )
+        : [
+            at(
+              'frame-state',
+              1,
+              3,
+              <Box width={Math.ceil(label.width / PX_PER_COLUMN)} height={2}>
+                <Svg key={`frame-label:${view.state}:${awake?.vessel.hud?.label ?? 'bold'}:l`} source={label.svg} alt={look.name} width={label.width} height={label.height} />
+              </Box>,
+            ),
+            at('frame-detail', 3, 3, <Text color={detailColour}>{detail}</Text>),
+          ]}
       {cols >= 44 &&
+        awake?.vessel.hud?.tag !== 'none' &&
         (awake?.vessel.hud?.tag === 'livecam'
           ? at('frame-tag', 1, cols - 23, <Client key="frame-cam" module="./frame-cam.tsx" props={{ name: tag, camera: awake.vessel.hud.camera ?? 'CAM 01' }} width={20} height={2} />)
           : awake?.vessel.hud?.tag === 'sigil'
@@ -293,7 +344,7 @@ function framed(
                 'frame-tag',
                 1,
                 cols - 3 - SIGIL_COLS,
-                <Client key="frame-sigil" module="./frame-sigil.tsx" props={{ colour: look.colour, level: waveLevel(view.state), cols: SIGIL_COLS, rows: SIGIL_ROWS }} width={SIGIL_COLS} height={SIGIL_ROWS} />,
+                <Client key="frame-sigil" module="./frame-sigil.tsx" props={{ colour: look.colour, level: waveLevel(view.state), cols: SIGIL_COLS, rows: SIGIL_ROWS, ...SIGIL_SPAN }} width={SIGIL_COLS} height={SIGIL_ROWS} />,
               )
             : at('frame-tag', 1, cols - tag.length - 3, <Text color={FRAME_GOLD}>{tag}</Text>))}
       {rows >= 6 &&
@@ -384,16 +435,27 @@ async function setEngram($: EngineInterface, id: string | null): Promise<void> {
   const engram = engramOf(id)
   setStatus($, engram ? `${engram.engram.name} · awake` : undefined)
   // An open pane is retitled with the new name; a closed one stays closed.
+  // One that draws only in the band has no Vessel to show there: the pane closes.
   try {
     const panes = await $.ui.panes()
     if (panes.some(one => one.id === PANE)) {
-      await $.ui.open({ id: PANE, title: paneTitle(engram) })
+      if (engram && isBandOnly(engram)) {
+        await update($, pickerAtom, () => false)
+        await $.ui.close({ id: PANE })
+      } else {
+        await $.ui.open({ id: PANE, title: paneTitle(engram) })
+      }
     }
   } catch {
     // The old title is only cosmetic.
   }
   // A different Engram may suggest a different placement.
   $.ui.invalidate('ui.render')
+}
+
+/** An Engram that draws only in the band: the pane, opened, only lists Engrams. */
+function isBandOnly(engram: Engram | undefined): boolean {
+  return engram !== undefined && showsOf(engram) === 'band'
 }
 
 /** The pane's title: the awake Engram's name, else Eidola. */
@@ -432,6 +494,174 @@ async function placeText($: EngineInterface): Promise<string> {
   const now = await currentPlacement($)
   const options = PLACEMENT_SETTINGS.map(one => `  ${one}: ${PLACEMENT_HELP[one]}`).join('\n')
   return `Placement: ${now} (setting: ${placementSetting}).\nChange it with /eidola place <setting>:\n${options}`
+}
+
+// ── The picker ─────────────────────────────────────────────────────────
+
+/**
+ * Back from the picker to the awake Engram: in the pane, or, for one that
+ * draws only in the band, back to the band, the pane closed.
+ */
+async function closePicker($: EngineInterface, awake: Engram | undefined): Promise<void> {
+  await update($, pickerAtom, () => false)
+  if (isBandOnly(awake)) {
+    await $.ui.close({ id: PANE }).catch(() => undefined)
+  }
+}
+
+/** Which Engrams the picker lists: all, those that draw in a pane, those that draw in the band. */
+const PICKER_FILTERS = ['all', 'pane', 'band'] as const
+type PickerFilter = (typeof PICKER_FILTERS)[number]
+const FILTER_LABELS: Record<PickerFilter, string> = { all: 'All', pane: 'Pane', band: 'Band' }
+
+/** Whether an Engram is listed under a filter: one that shows in both is listed under each. */
+function isListed(engram: Engram, filter: PickerFilter): boolean {
+  const shows = showsOf(engram)
+  return filter === 'all' || shows === 'both' || shows === filter
+}
+
+/** Thumbnails by Engram, view and size: a scene is costly to draw, so once each. */
+const thumbCache = new Map<string, string | null>()
+
+/**
+ * A still of an Engram at rest, `width` × `height` px, as it looks where it
+ * draws: its pane view for one that shows in a pane (or both), its band view
+ * for one that shows only in the band. A scene draws that view; a Vessel is
+ * set on its stage, or drawn alone where it gets none.
+ */
+async function thumbFor($: EngineInterface, engram: Engram, view: 'pane' | 'band', width: number, height: number): Promise<{ svg: string; width: number }> {
+  // Its own still for the view, where it ships one, fitted to the box by its viewBox.
+  const file = engram.vessel.thumbnails?.[view]
+  if (file) {
+    const at = `${engram.vessel.pack}/${file}`
+    if (!fileCache.has(at)) {
+      try {
+        fileCache.set(at, await $.fs.read(`${$.plugin.root}/vessels/${at}`))
+      } catch {
+        fileCache.set(at, null)
+      }
+    }
+    const still = fileCache.get(at)
+    if (still) {
+      return { svg: filling(still, width, height), width }
+    }
+  }
+  const key = `${engram.engram.id}:${view}:${width}x${height}`
+  const scene = engram.vessel.scene
+  if (scene) {
+    let svg = thumbCache.get(key)
+    if (!svg) {
+      svg = renderScene(SCENES[scene][view]('idle', width, height), await $.clock.now())
+      thumbCache.set(key, svg)
+    }
+    return { svg, width }
+  }
+  const vessel = await vesselFor($, engram, 'idle', height)
+  // The band's strip sets the Vessel on a small square stage; the pane on one that fills it.
+  const stage = view === 'band' ? { width: height, height } : { width, height }
+  if (!thumbCache.has(key)) {
+    thumbCache.set(key, stageSvg(vessel, 'idle', stage) ?? null)
+  }
+  const staged = thumbCache.get(key)
+  return staged ? { svg: staged, width: stage.width } : { svg: vessel, width: fitWidth(vessel, height) }
+}
+
+/** A card's still, in rows: a pane view is tall, a band view short and wide. */
+const THUMB_ROWS: Record<'pane' | 'band', number> = { pane: 10, band: 4 }
+
+/**
+ * The bundled Engrams as cards, filtered by where they draw: a still of each,
+ * its name, what it is, where it shows, and a button to awaken it (or, for the
+ * one awake, to put it to sleep). Opened and closed by the corner triangle.
+ */
+async function picker(
+  $: EngineInterface,
+  els: Elements['desktop'],
+  cols: number,
+  rows: number,
+  awake: Engram | undefined,
+  brass: string,
+): Promise<RenderElement> {
+  const { Box, Text, Button, Svg } = els
+  const filter = await read($, pickerFilterAtom)
+  const perRow = cols >= 40 ? 2 : 1
+  const gap = 2
+  const cardCols = Math.floor((cols - 2 - gap * (perRow - 1)) / perRow)
+  const thumbW = (cardCols - 2) * PX_PER_COLUMN
+  const all = Object.values(ENGRAMS)
+  const engrams = all.filter(engram => isListed(engram, filter))
+  const cards = await Promise.all(
+    engrams.map(async engram => {
+      const id = engram.engram.id
+      const isAwake = awake?.engram.id === id
+      const shows = showsOf(engram)
+      const view = shows === 'band' ? 'band' : 'pane'
+      const thumbRows = THUMB_ROWS[view]
+      const thumbH = thumbRows * PX_PER_ROW
+      const thumb = await thumbFor($, engram, view, thumbW, thumbH)
+      return (
+        <Box key={`card:${id}`} flexDirection="column" width={cardCols} borderStyle="single" borderColor={isAwake ? brass : '#2c323c'}>
+          <Box key="thumb" width={cardCols - 2} height={thumbRows} alignItems="center" justifyContent="center" backgroundColor="#07090c">
+            <Svg key={`thumb:${id}:${view}:${thumbW}x${thumbH}`} source={thumb.svg} alt={`${engram.engram.name}, ${view} view`} width={Math.min(thumb.width, thumbW)} height={thumbH} />
+          </Box>
+          <Box key="name" flexDirection="row" justifyContent="space-between">
+            <Text bold>{engram.engram.name}</Text>
+            {isAwake ? <Text color={brass}>awake</Text> : <Text dimColor>{SHOWS_LABELS[shows]}</Text>}
+          </Box>
+          <Text key="about" dimColor>
+            {engram.engram.meta.description}
+          </Text>
+          {isAwake ? (
+            <Button key={`sleep:${id}`} label="Sleep" onPress={() => void setEngram($, null)} />
+          ) : (
+            <Button
+              key={`awaken:${id}`}
+              label="Awaken"
+              variant="primary"
+              onPress={async () => {
+                await setEngram($, id)
+                await update($, pickerAtom, () => false)
+              }}
+            />
+          )}
+        </Box>
+      )
+    }),
+  )
+  const lines: RenderElement[] = []
+  for (let i = 0; i < cards.length; i += perRow) {
+    lines.push(
+      <Box key={`row:${i}`} flexDirection="row" gap={gap}>
+        {cards.slice(i, i + perRow)}
+      </Box>,
+    )
+  }
+  return (
+    <Box flexDirection="column" width={cols} minHeight={rows} paddingLeft={1} paddingRight={1} gap={1}>
+      <Box key="head" flexDirection="row" justifyContent="space-between" alignItems="center">
+        {/* A breadcrumb back to the Vessel the picker opened over. */}
+        <Box key="crumbs" flexDirection="row" alignItems="center" gap={1}>
+          <Button key="picker-back" label={`‹ ${awake?.engram.name ?? 'Eidola'}`} dimColor onPress={() => void closePicker($, awake)} />
+          <Text dimColor>/</Text>
+          <Text bold color={brass}>
+            ENGRAMS
+          </Text>
+        </Box>
+        <Text dimColor>{filter === 'all' ? `${all.length} bundled` : `${engrams.length} of ${all.length}`}</Text>
+      </Box>
+      <Box key="filters" flexDirection="row" gap={1}>
+        {PICKER_FILTERS.map(one => (
+          <Button
+            key={`filter:${one}`}
+            label={FILTER_LABELS[one]}
+            variant={one === filter ? 'primary' : 'secondary'}
+            onPress={() => void update($, pickerFilterAtom, () => one)}
+          />
+        ))}
+      </Box>
+      {lines.length ? lines : <Text dimColor>{`No Engrams draw in the ${filter}.`}</Text>}
+    </Box>
+  )
 }
 
 export const register: Register = (on, options) => {
@@ -562,6 +792,7 @@ export const register: Register = (on, options) => {
   // /eidola        diagnostics: surfaces, pane, band, network reach
   // /eidola media  toggles the media test in the pane
   // /eidola place  shows or sets where the Vessel appears
+  // /eidola mood   sets the mood by hand, until the next prompt
   on('command.run', { command: 'eidola' }, async ($, e) => {
     const [sub = '', value = ''] = e.args.trim().toLowerCase().split(/\s+/)
 
@@ -596,7 +827,25 @@ export const register: Register = (on, options) => {
     if (sub === 'ink') {
       await bumpInk($)
       const awake = engramOf(await read($, engramAtom))
-      return { text: awake?.vessel.scene === 'lich' ? 'The Lich is scorched.' : 'The Kraken inks.' }
+      const scene = awake?.vessel.scene
+      return { text: scene === 'lich' ? 'The Lich is scorched.' : scene === 'wisp' ? 'The Wisp gutters, and a lantern goes out.' : 'The Kraken inks.' }
+    }
+
+    // A mood by hand, to watch a live Engram take it: it holds until the
+    // session's next event (a prompt, a tool) sets the mood again.
+    if (sub === 'mood') {
+      const moods: Mood[] = ['idle', 'working', 'attention']
+      if (!moods.includes(value as Mood)) {
+        return { text: 'Usage: /eidola mood idle|working|attention. It holds until your next prompt.' }
+      }
+      const mood = value as Mood
+      const before = await read($, moodAtom)
+      const at = await $.clock.now()
+      await update($, moodBeforeAtom, () => before)
+      await update($, moodAtom, () => mood)
+      await update($, moodAtAtom, () => at)
+      await show($, { state: MOOD_STATE[mood], detail: 'by hand' })
+      return { text: `Mood: ${mood}. It holds until your next prompt.` }
     }
 
     if (sub === 'live') {
@@ -703,6 +952,21 @@ export const register: Register = (on, options) => {
       liveClocks.set(e.element, data.clock)
       return {}
     }
+    // The corner triangle, clicked: the picker opens, or closes. In the band it
+    // opens the pane on the picker, or closes the pane if it is open on it.
+    if ((e.element === 'frame-corner' || e.element === 'band-corner') && data && typeof data === 'object' && (data as { corner?: unknown }).corner === 'toggle') {
+      const awake = engramOf(await read($, engramAtom))
+      const isOpen = (await read($, pickerAtom)) || (isBandOnly(awake) && (await isPanePlaced($)))
+      if (e.component === 'AbovePrompt' && !isOpen) {
+        await update($, pickerAtom, () => true)
+        await openPane($)
+      } else if (isOpen) {
+        await closePicker($, awake)
+      } else {
+        await update($, pickerAtom, () => true)
+      }
+      return {}
+    }
     return next(e)
   })
 
@@ -721,7 +985,9 @@ export const register: Register = (on, options) => {
       return { text: `No Engram called "${id}". Bundled Engrams:\n${listText(await read($, engramAtom))}` }
     }
     await setEngram($, id)
-    void openPane($).catch(() => undefined)
+    if (!isBandOnly(engram)) {
+      void openPane($).catch(() => undefined)
+    }
     return { text: `${engram.engram.name} is awake. Their Soul applies from your next message.` }
   })
 
@@ -797,11 +1063,12 @@ export const register: Register = (on, options) => {
       const cols = e.props.bodyColumns
       const rows = Math.max(4, e.props.scroll.bodyRows - 1)
       // The water the same height as the drawing over it: any taller and the pane scrolls.
-      const { width, height } = sceneSize(cols, rows, e.props.placement)
+      const { width } = sceneSize(cols, rows, e.props.placement)
+      const height = overdrawn(rows)
       const now = await $.clock.now()
       const water = sceneFor('pane', `kraken-water:${width}x${height}`, () => renderScene(krakenWaterScene(width, height), now))
       return (
-        <Box width={cols} height={rows}>
+        <Box width={cols} height={rows} overflow="hidden" alignItems="flex-start">
           {/* Nothing here may change with the mood, alt included: a changed prop reloads the drawing. */}
           <Svg key="scene:water" source={water} alt={`${awake.engram.name} in deep water`} width={width} height={height} isInteractive />
           <Box position="absolute" top={0} left={0}>
@@ -818,13 +1085,14 @@ export const register: Register = (on, options) => {
       const cols = e.props.bodyColumns
       const rows = Math.max(6, e.props.scroll.bodyRows - 1)
       // The dark the same height as the drawing over it: any taller and the pane scrolls.
-      const { width, height } = sceneSize(cols, rows, e.props.placement)
+      const { width } = sceneSize(cols, rows, e.props.placement)
+      const height = overdrawn(rows)
       const now = await $.clock.now()
       const backdrop = sceneFor('pane', `lich-void:${width}x${height}`, () => renderScene(voidScene(width, height, 'pane'), now))
       const shared = { ...(await liveProps($)), cols, rows }
       const [a, b, c, d] = lichSlices(rows)
       return (
-        <Box width={cols} height={rows}>
+        <Box width={cols} height={rows} overflow="hidden" alignItems="flex-start">
           {/* Nothing here may change with the mood, alt included: a changed prop reloads the drawing. */}
           <Svg key="scene:void" source={backdrop} alt={`${awake.engram.name} in the dark`} width={width} height={height} isInteractive />
           <Box position="absolute" top={0} left={0} flexDirection="column">
@@ -894,16 +1162,40 @@ export const register: Register = (on, options) => {
       </Box>
     )
     }
-    const tree = await vessel()
-    // The HUD frame over whatever the Vessel is, when it is on; never over a test.
+    // Never a frame, a corner or the picker over a test.
     const isTest = (await read($, measureAtom)) || (await read($, blendAtom)) !== null || (await read($, liveAtom)) !== null || (await read($, mediaAtom))
     const awake = engramOf(await read($, engramAtom))
-    if (e.surface !== 'desktop' || isTest || !isFramed(await read($, frameAtom), awake)) {
-      return tree
+    if (e.surface !== 'desktop' || isTest) {
+      return vessel()
     }
+    const els = $.ui.resolve(e) as Elements['desktop']
     const cols = e.props.bodyColumns
     const rows = Math.max(4, e.props.scroll.bodyRows - 1)
-    return framed($.ui.resolve(e) as Elements['desktop'], tree, cols, rows, awake ? await read($, viewAtom) : { state: 'sleeping', detail: '' }, awake)
+    const brass = awake?.vessel.hud?.bracket ?? FRAME_GOLD
+    // An Engram that draws only in the band has nothing to show here but the picker.
+    const isPicking = (await read($, pickerAtom)) || isBandOnly(awake)
+    let body: RenderElement
+    if (isPicking) {
+      body = await picker($, els, cols, rows, awake, brass)
+    } else {
+      // The HUD frame over whatever the Vessel is, when it is on.
+      const tree = await vessel()
+      body = isFramed(await read($, frameAtom), awake)
+        ? framed(els, tree, cols, rows, awake ? await read($, viewAtom) : { state: 'sleeping', detail: '' }, awake)
+        : tree
+    }
+    if (cols < 8 || rows < 4) {
+      return body
+    }
+    const { Box, Client } = els
+    return (
+      <Box width={cols} height={rows}>
+        {body}
+        <Box key="corner" position="absolute" top={rows - 2} left={cols - 3}>
+          <Client key="frame-corner" module="./frame-corner.tsx" props={{ colour: brass, isOpen: isPicking }} width={3} height={2} />
+        </Box>
+      </Box>
+    )
   })
 
   // ── The band above the prompt: shown only while no pane is placed ────
@@ -985,6 +1277,38 @@ export const register: Register = (on, options) => {
           <Svg key="scene:band-water" source={water} alt={`${engram.engram.name} in deep water`} width={width} height={height} isInteractive />
           <Box position="absolute" top={0} left={0}>
             <Client key="kraken-band" module="./kraken-live.tsx" props={{ mood, cols, rows, view: 'band', ink: await read($, inkAtom) }} width={cols} height={rows} />
+          </Box>
+        </Box>,
+      )
+    }
+
+    // The Wisp in its fen: the fen drawn once, the spirit and its lanterns live
+    // over it, in a HUD of its own whose corner opens the picker in the pane.
+    // A row taller than its rows, clipped to them, so the HUD meets its edges.
+    if (awake?.vessel.scene === 'wisp' && e.surface === 'desktop') {
+      const els = $.ui.resolve(e) as Elements['desktop']
+      const { Box, Svg, Client } = els
+      const cols = e.props.bodyColumns
+      const rows = WISP_BAND_ROWS
+      const width = cols * PX_PER_COLUMN
+      const height = overdrawn(rows)
+      const now = await $.clock.now()
+      const fen = sceneFor('band', `wisp-fen:${cols}x${rows}`, () => renderScene(fenScene(width, height, cols, rows), now))
+      const tree = (
+        <Box width={cols} height={rows} overflow="hidden" alignItems="flex-start">
+          <Svg key="scene:band-fen" source={fen} alt={`${engram.engram.name} in the fen`} width={width} height={height} isInteractive />
+          <Box position="absolute" top={0} left={0}>
+            <Client key="wisp-band" module="./wisp-live.tsx" props={{ mood, cols, rows, ink: await read($, inkAtom) }} width={cols} height={rows} />
+          </Box>
+        </Box>
+      )
+      const body = isFramed(await read($, frameAtom), awake) ? framed(els, tree, cols, rows, await read($, viewAtom), awake) : tree
+      const brass = awake.vessel.hud?.bracket ?? FRAME_GOLD
+      return withSurvey(
+        <Box width={cols} height={rows}>
+          {body}
+          <Box key="corner" position="absolute" top={rows - 2} left={cols - 3}>
+            <Client key="band-corner" module="./frame-corner.tsx" props={{ colour: brass, isOpen: await read($, pickerAtom) }} width={3} height={2} />
           </Box>
         </Box>,
       )

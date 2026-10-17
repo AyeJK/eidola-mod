@@ -12,8 +12,12 @@ import type { ClientModule, RenderElement } from 'claude-code'
 
 import { mixHex, short } from './live-pixels'
 
-/** `level`: how busy it turns; `colour`: the colour it fades to. */
-type Props = { colour: string; level: 'idle' | 'working' | 'attention'; cols: number; rows: number }
+/**
+ * `level`: how busy it turns; `colour`: the colour it fades to; `top` and
+ * `bottom`: the band of its region, in px from its top, the ring is fitted
+ * to (the whole height when absent).
+ */
+type Props = { colour: string; level: 'idle' | 'working' | 'attention'; cols: number; rows: number; top?: number; bottom?: number }
 
 type Sigil = {
   colour: string
@@ -103,11 +107,15 @@ const FrameSigil: ClientModule<Props, State> = (props, surface) => {
 
   const W = props.cols * CW
   const H = props.rows * CH
-  const R = Math.min(W, H) / 2 - 2
+  const top = props.top ?? 0
+  const bottom = props.bottom ?? H
+  const cy = (top + bottom) / 2
+  // Fitted to its band, the ring keeps a pixel clear; the whole region keeps two.
+  const R = Math.min(W, bottom - top) / 2 - (props.top === undefined ? 2 : 1)
   // Three strengths of ink, so neighbours share a Box.
   const shades = [0, 0.4, 0.7, 1].map(k => short(mixHex(DARK, sigil.colour, k)))
   const shadeAt = (gx: number, gy: number) => {
-    const ink = inkAt((gx + 0.5) * (CW / PX) - W / 2, (gy + 0.5) * (CH / PY) - H / 2, R, sigil)
+    const ink = inkAt((gx + 0.5) * (CW / PX) - W / 2, (gy + 0.5) * (CH / PY) - cy, R, sigil)
     return ink < 0.2 ? 0 : ink < 0.45 ? 1 : ink < 0.75 ? 2 : 3
   }
 

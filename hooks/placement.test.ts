@@ -40,7 +40,8 @@ describe('placement rules', () => {
 describe('/eidola place', () => {
   test('with no setting, says where the Vessel is and what the choices are', async $ => {
     const out = await $.command.run({ command: 'eidola', args: 'place', ...TYPED })
-    expect(out.text).toContain('Placement: auto (setting: default)')
+    // The default Wisp suggests the band.
+    expect(out.text).toContain('Placement: band (setting: default)')
     expect(out.text).toContain('auto: band only while no pane is placed')
   })
 

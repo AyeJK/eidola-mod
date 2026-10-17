@@ -3,7 +3,8 @@
 A pixel Vessel in a pane that reacts to what Claude is doing, plus the awake Engram's Soul in the system prompt.
 
 - States: idle, thinking, working, attention, success, responding, error, waiting (asleep when no Engram is awake)
-- Commands: `/eidola` (open the pane and print diagnostics), `/eidola place [setting]` (show or set where the Vessel appears), `/eidola media` (toggle the media test), `/awaken <engram>`, `/sleep`, `/engrams`
+- Commands: `/eidola` (open the pane and print diagnostics), `/eidola place [setting]` (show or set where the Vessel appears), `/eidola frame` (toggle the awake Engram's HUD), `/eidola mood idle|working|attention` (set the mood by hand until the next prompt), `/eidola ink` (show a failure), `/eidola media` (toggle the media test), `/awaken <engram>`, `/sleep`, `/engrams`
+- The Engram picker: click the triangle in the bottom-right corner of the pane, or of the band for a band-only Engram, to list the bundled Engrams, filter them by where they draw, and awaken one
 
 ## Options
 
@@ -52,6 +53,9 @@ Run these from this folder before pushing:
 claude plugin validate .
 npx -p typescript tsc -p .
 claude plugin test .
+node scripts/bake-thumbs.mjs --check
 ```
+
+The Kraken's and the Lich's picker thumbnails are stills of their live drawings, baked into `vessels/<pack>/thumb-*.svg`. After changing how one of them draws, bake them again with `node scripts/bake-thumbs.mjs`: it runs each drawing in the test runner, keeps its best-composed frame, and writes the stills. `--check` only checks that every thumbnail an Engram names exists and fits a desktop Svg.
 
 `tsc` needs the engine's types at `.claude-plugin/types/claude-code/index.d.ts` (git-ignored). The engine writes them there when it loads the mod from this folder (`claude --plugin-dir .`). The render tests mount the pane and the band on terminal and desktop. A mount fails when a surface refuses the tree (an element it lacks, a prop it doesn't take), which is how an empty desktop pane shows up in a test.

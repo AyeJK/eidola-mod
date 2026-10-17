@@ -112,7 +112,9 @@ describe('the Kraken Engram', () => {
     // On desktop: still water drawn once, the Kraken drawn live over it.
     const water = await pane.find({ type: 'Svg' })
     expect(water?.props?.width).toBe(252)
-    expect(water?.props?.height).toBe(739)
+    // A row taller than its 39 rows, clipped to them, so it meets the HUD's bottom brackets.
+    expect(water?.props?.height).toBe(760)
+    expect((await pane.findAll({ type: 'Box' })).some(box => box.props?.overflow === 'hidden' && box.props?.height === 39)).toBe(true)
     const live = await pane.find({ type: 'Client' })
     expect(String(live?.props?.module)).toMatch(/kraken-live.tsx$/)
     expect((live?.props?.props as { mood?: string; ink?: number } | undefined)?.mood).toBe('idle')

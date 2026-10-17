@@ -184,6 +184,12 @@ declare module 'claude-code' {
       picker: boolean
       /** Internal: which Engrams the picker lists: all, those that draw in a pane, in the band, or yours (Engram plugins). */
       pickerFilter: 'all' | 'pane' | 'band' | 'yours'
+      /** Internal: which of the picker's dropdowns is open, if either. */
+      pickerMenu: 'surface' | 'source' | null
+      /** Internal: the surface the picker lists Engrams for: all, those that draw in a pane, or in the band. */
+      pickerSurface: 'all' | 'pane' | 'band'
+      /** Internal: where the listed Engrams come from: all, bundled with Eidola, or yours (Engram plugins). */
+      pickerSource: 'all' | 'bundled' | 'yours'
       /** Internal: the Engram whose page the pane shows, over the picker or by itself (`/engrams <id>`); null for none. */
       page: string | null
       /** Internal: the page's HUD preview: its own mood and error, apart from the session's. */

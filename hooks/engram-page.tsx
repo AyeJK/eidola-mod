@@ -11,7 +11,7 @@
 import type { Elements, RenderElement } from 'claude-code'
 
 import type { Mood, Preview, VesselState } from '../types'
-import type { Engram, SceneName, SelfScene } from './engram-types'
+import type { Engram } from './engram-types'
 import { FRAME_STATES } from './hud'
 import { ICON_NAMES, ICON_PX, iconSvg } from './icons'
 import type { SurfaceIcon } from './icons'
@@ -23,8 +23,17 @@ import { WORDMARK_HEIGHT, WORDMARK_WIDTH, wordmarkSvg } from './wordmark'
 /** The elements a screen draws with. `Svg` only where `isRich`. */
 export type Els = Pick<Elements['desktop'], 'Box' | 'Text' | 'Button' | 'Svg'>
 
-/** What every screen piece needs: its elements, whether it may draw stills, and its width in cells. */
-export type Kit = { els: Els; isRich: boolean; cols: number }
+/** How a button looks: the gold primary (Awaken), the deep red danger (Sleep), a neutral button, a chip on or off, or a gold underlined link. */
+export type PillTone = 'primary' | 'danger' | 'neutral' | 'on' | 'off' | 'link'
+
+/** Draws a button on the desktop, where register.tsx draws its label as a Client and wires the press. */
+export type PillDraw = (key: string, label: string, onPress: () => void, tone: PillTone) => RenderElement
+
+/**
+ * What every screen piece needs: its elements, whether it may draw stills,
+ * its width in cells, and, on the desktop, how a button is drawn.
+ */
+export type Kit = { els: Els; isRich: boolean; cols: number; pill?: PillDraw }
 
 /** The surfaces, in the order their icons stand. */
 export const SURFACE_ICONS: readonly SurfaceIcon[] = ['pane', 'band', 'shrine']
@@ -57,36 +66,33 @@ export function surfaceIcon(kit: Kit, icon: SurfaceIcon, colour: string, key: st
   )
 }
 
-/** The primary button: the surface's own, its text in capitals. A Button takes its label alone, so no colour of ours. */
-export function primaryButton(kit: Kit, key: string, label: string, onPress: () => void): RenderElement {
-  const { Button } = kit.els
-  return <Button key={key} label={label.toUpperCase()} variant="primary" onPress={onPress} />
-}
-
-/** A secondary button: normal case. */
-export function secondaryButton(kit: Kit, key: string, label: string, onPress: () => void): RenderElement {
-  const { Button } = kit.els
-  return <Button key={key} label={label} variant="secondary" onPress={onPress} />
-}
-
 /**
- * A chip: a `line` border and its label dimmed, or, selected, an `amber-line`
- * border on an amber fill and its label at full strength. A Button takes its
- * label alone, so the label keeps the surface's text colour.
+ * The one control every screen draws, in four tones: the gold primary, a
+ * neutral button, and a chip on or off. On the desktop it is register.tsx's
+ * (`kit.pill`): a rounded box with its label drawn as a Client, the whole
+ * label the hit, one click, no inverting under the pointer. In text, a
+ * Button in a bordered box.
  */
-export function chip(kit: Kit, key: string, label: string, isOn: boolean, onPress: () => void): RenderElement {
+function pill(kit: Kit, key: string, label: string, onPress: () => void, tone: PillTone): RenderElement {
+  if (kit.pill) {
+    return kit.pill(key, label, onPress, tone)
+  }
   const { Box, Button } = kit.els
   return (
-    <Box
-      key={`chip-${key}`}
-      borderStyle="round"
-      borderColor={isOn ? THEME.amberLine : THEME.line}
-      {...(isOn ? { backgroundColor: THEME.amberFill } : {})}
-      hover={{ borderColor: THEME.amberLine }}
-    >
-      <Button key={key} label={label.toUpperCase()} plain {...(isOn ? {} : { dimColor: true })} onPress={onPress} />
+    <Box key={`pill-${key}`} borderStyle="round" borderColor={tone === 'on' || tone === 'primary' ? THEME.gold : THEME.line} paddingX={1}>
+      <Button key={key} label={label} plain {...(tone === 'off' ? { dimColor: true } : {})} onPress={onPress} />
     </Box>
   )
+}
+
+/** A button: neutral, the gold primary, or the deep red danger. */
+export function button(kit: Kit, key: string, label: string, onPress: () => void, tone: 'neutral' | 'primary' | 'danger' = 'neutral'): RenderElement {
+  return pill(kit, key, label, onPress, tone)
+}
+
+/** A chip: raised in bold when on, muted when off. */
+export function chip(kit: Kit, key: string, label: string, isOn: boolean, onPress: () => void): RenderElement {
+  return pill(kit, key, label, onPress, isOn ? 'on' : 'off')
 }
 
 /** A label: gold capitals, as "AWAKE" and "WHERE IT DRAWS". */
@@ -122,33 +128,55 @@ export function accentRule(kit: Kit, key = 'rule'): RenderElement {
   )
 }
 
-/** The header: back, the wordmark, and the Surfaces button with each surface's icon, amber when it is on. */
-export function header(
-  kit: Kit,
-  back: { key: string; onPress: () => void },
-  surfaces: Surfaces,
-  onSurfaces: () => void,
-): RenderElement {
+/** The wordmark's scale in the header: twice its own size, so it reads as the screen's name. */
+const WORDMARK_SCALE = 2
+
+/**
+ * The header: Back, then the wordmark at twice its size, and at the right
+ * the screen's main action where it has one (a page's Awaken or Sleep). In
+ * text, the same in bold.
+ */
+export function header(kit: Kit, back: { key: string; onPress: () => void }, action: RenderElement | null = null): RenderElement {
   const { Box, Text, Svg } = kit.els
-  const isOn: Record<SurfaceIcon, boolean> = { pane: surfaces.pane, band: surfaces.band, shrine: false }
   return (
-    <Box key="head" flexDirection="row" justifyContent="space-between" alignItems="center">
-      <Box key="head-left" flexDirection="row" alignItems="center" gap={1}>
-        {secondaryButton(kit, back.key, '‹', back.onPress)}
+    <Box key="head" flexDirection="row" justifyContent="space-between" alignItems="center" flexShrink={0}>
+      <Box key="head-left" flexDirection="row" alignItems="center" gap={2}>
+        {button(kit, back.key, '← Back', back.onPress)}
         {kit.isRich ? (
-          <Svg key="wordmark" source={wordmarkSvg(THEME.gold)} alt="Eidola" width={WORDMARK_WIDTH} height={WORDMARK_HEIGHT} />
+          <Svg key="wordmark" source={wordmarkSvg(THEME.gold)} alt="Eidola" width={WORDMARK_WIDTH * WORDMARK_SCALE} height={WORDMARK_HEIGHT * WORDMARK_SCALE} />
         ) : (
           <Text key="wordmark" bold color={THEME.gold}>
             EIDOLA
           </Text>
         )}
       </Box>
-      <Box key="head-surfaces" flexDirection="row" alignItems="center" gap={1}>
-        {secondaryButton(kit, 'surfaces', 'Surfaces', onSurfaces)}
-        {SURFACE_ICONS.map(icon => surfaceIcon(kit, icon, isOn[icon] ? THEME.amber : THEME.faint, `head-icon:${icon}`))}
-      </Box>
+      {action}
     </Box>
   )
+}
+
+/** One choice of a dropdown. */
+export type DropdownOption = { id: string; label: string }
+
+/**
+ * The filter dropdown in text, where no `Client` draws: the chosen option
+ * and a caret as a chip, and, open, the options as chips in the flow under
+ * it. The desktop draws its own (register.tsx), every row a full-width hit.
+ */
+export function dropdown(
+  kit: Kit,
+  input: { key: string; prefix: string; options: readonly DropdownOption[]; value: string; isOpen: boolean; onToggle: () => void; onPick: (id: string) => void },
+): { trigger: RenderElement; menu: RenderElement | null } {
+  const { Box } = kit.els
+  const { key, options, value, isOpen } = input
+  const chosen = options.find(one => one.id === value) ?? options[0]
+  const trigger = chip(kit, `${key}-toggle`, `${input.prefix}: ${chosen?.label ?? ''} ${isOpen ? '▴' : '▾'}`, isOpen, input.onToggle)
+  const menu = isOpen ? (
+    <Box key={`${key}-menu`} flexDirection="row" flexWrap="wrap" gap={1}>
+      {options.map(one => chip(kit, `${key}:${one.id}`, one.label, one.id === value, () => input.onPick(one.id)))}
+    </Box>
+  ) : null
+  return { trigger, menu }
 }
 
 /** A screen's title, bold white, its count label at the right, the accent rule under them. */
@@ -178,7 +206,7 @@ export function panel(kit: Kit, key: string, title: string, link: RenderElement 
     body.push(row)
   })
   return (
-    <Box key={key} flexDirection="column" borderStyle="round" borderColor={THEME.line} backgroundColor={THEME.panel} paddingX={1}>
+    <Box key={key} flexDirection="column" borderStyle="round" borderColor={THEME.line} backgroundColor={THEME.panel} paddingX={kit.isRich ? 2 : 1} paddingY={kit.isRich ? 1 : 0}>
       <Box key={`${key}-head`} flexDirection="row" justifyContent="space-between" alignItems="center">
         {label(kit, title)}
         {link}
@@ -247,22 +275,29 @@ export function whereRows(surfaces: Surfaces, engram: Engram): WhereRow[] {
 
 // ── The page ───────────────────────────────────────────────────────────
 
-/** What an Engram does when something goes wrong, by scene. */
-const ON_ERROR: Record<SceneName | SelfScene, string> = {
-  kraken: 'It inks and flees into the deep.',
-  lich: 'It is scorched, and its fire flares.',
-  wisp: 'It gutters, and a lantern goes out.',
-  self: 'It plays its own error effect.',
-}
-
 const RIGHTS: Record<Engram['rights'], string> = {
   original: 'Original: made by its author.',
   licensed: 'Licensed: shared with permission.',
 }
 
-/** The preview's rows: a pane view tall, a band-only Engram's band strip. */
-export function previewRows(engram: Engram): number {
-  return engram.vessel.shows.includes('pane') ? 14 : 9
+/** A screen's side padding, in cells: roomier on the desktop. */
+export function screenPad(kit: Kit): number {
+  return kit.isRich ? 2 : 1
+}
+
+/** A screen's width inside its padding, in cells. */
+export function screenInner(kit: Kit): number {
+  return kit.cols - 2 * screenPad(kit)
+}
+
+/**
+ * The preview's rows, from the pane's: a pane view about half the pane tall,
+ * a band-only Engram's band strip about a third, each within bounds so it
+ * neither shrinks to a sliver nor pushes the page off the pane.
+ */
+export function previewRows(engram: Engram, paneRows = 0): number {
+  const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
+  return engram.vessel.shows.includes('pane') ? clamp(Math.round(paneRows * 0.45), 14, 28) : clamp(Math.round(paneRows * 0.32), 10, 18)
 }
 
 /** What the page draws and what its buttons do, from register.tsx. */
@@ -271,8 +306,10 @@ export type PageInput = {
   isAwake: boolean
   surfaces: Surfaces
   preview: Preview
-  /** The live scene at the preview's mood, `cols - 2` wide and `previewRows` tall: desktop only. */
+  /** The live scene at the preview's mood, `screenInner` wide and `previewRows` tall: desktop only. */
   scene: RenderElement | null
+  /** The pane's rows: the page fills them, and the preview is sized from them. */
+  rows: number
   /** The terminal's picture of the preview's mood: its face. */
   face: string
   back: { onPress: () => void }
@@ -287,50 +324,18 @@ export type PageInput = {
   onPublish: (() => void) | undefined
 }
 
-/** The HUD preview's corner mark: a short gold L, one cell. */
-function cornerMark(kit: Kit, key: string, top: number, left: number, isRight: boolean, isBottom: boolean): RenderElement {
-  const { Box } = kit.els
-  const across = <Box key="across" width="100%" height="8%" backgroundColor={THEME.gold} />
-  const down = (
-    <Box key="down" flexDirection="row" height="92%" justifyContent={isRight ? 'flex-end' : 'flex-start'}>
-      <Box width="18%" height="100%" backgroundColor={THEME.gold} />
-    </Box>
-  )
-  return (
-    <Box key={key} position="absolute" top={top} left={left} flexDirection="column" width={1} height={1}>
-      {isBottom ? [down, across] : [across, down]}
-    </Box>
-  )
-}
-
-/** The preview's words: the Engram, its mood (or the error) in amber, and a line under it. */
-function previewWords(input: PageInput): { tag: string; mood: string; colour: string; line: string; corner: string } {
-  const look = input.preview.isError ? FRAME_STATES.error : FRAME_STATES[MOOD_STATE[input.preview.mood]]
-  return {
-    tag: `EIDOLA · ${input.engram.name.toUpperCase()}`,
-    mood: look.name,
-    colour: input.preview.isError ? THEME.errorText : THEME.amber,
-    line: look.line,
-    corner: input.isAwake ? 'PREVIEW · AWAKE' : 'PREVIEW · NOT AWAKE',
-  }
-}
-
-/** The HUD preview: the live scene in its dark frame with gold corners and its words, or the same in text. */
+/**
+ * The preview: the live scene alone, edge to edge, nothing written over it:
+ * the chips under it say which mood it shows. In text, the mood and the face.
+ */
 function hudPreview(kit: Kit, input: PageInput): RenderElement {
   const { Box, Text } = kit.els
-  const words = previewWords(input)
   if (!kit.isRich || input.scene === null) {
+    const look = input.preview.isError ? FRAME_STATES.error : FRAME_STATES[MOOD_STATE[input.preview.mood]]
     return (
-      <Box key="preview" flexDirection="column" borderStyle="round" borderColor={THEME.gold} paddingX={1}>
-        <Box key="preview-top" flexDirection="row" justifyContent="space-between">
-          <Text color={THEME.gold}>{words.tag}</Text>
-          <Text color={THEME.faint}>{words.corner}</Text>
-        </Box>
-        <Text key="preview-mood" bold color={words.colour}>
-          {words.mood}
-        </Text>
-        <Text key="preview-line" color={THEME.muted}>
-          {words.line}
+      <Box key="preview" flexDirection="column" borderStyle="round" borderColor={THEME.line} paddingX={1}>
+        <Text key="preview-mood" bold color={input.preview.isError ? THEME.errorText : THEME.amber}>
+          {look.name}
         </Text>
         <Text key="preview-face" color={THEME.frost}>
           {input.face}
@@ -338,40 +343,18 @@ function hudPreview(kit: Kit, input: PageInput): RenderElement {
       </Box>
     )
   }
-  const width = kit.cols - 2
-  const rows = previewRows(input.engram)
   return (
-    <Box key="preview" width={width} height={rows} overflow="hidden" backgroundColor={THEME.preview}>
+    <Box key="preview" width={screenInner(kit)} height={previewRows(input.engram, input.rows)} overflow="hidden" backgroundColor={THEME.preview}>
       {input.scene}
-      {cornerMark(kit, 'preview-tl', 0, 0, false, false)}
-      {cornerMark(kit, 'preview-tr', 0, width - 1, true, false)}
-      {cornerMark(kit, 'preview-bl', rows - 1, 0, false, true)}
-      {cornerMark(kit, 'preview-br', rows - 1, width - 1, true, true)}
-      <Box key="preview-words" position="absolute" top={1} left={2} flexDirection="column">
-        <Text color={THEME.gold}>
-          {words.tag}
-        </Text>
-        <Text key="preview-mood" bold color={words.colour}>
-          {words.mood}
-        </Text>
-        <Text key="preview-line" color={THEME.muted}>
-          {words.line}
-        </Text>
-      </Box>
-      <Box key="preview-corner" position="absolute" top={1} left={Math.max(2, width - words.corner.length - 2)}>
-        <Text color={THEME.faint}>
-          {words.corner}
-        </Text>
-      </Box>
     </Box>
   )
 }
 
-/** A small card of the page: its label, and what it says. */
+/** A small card of the page: its label, and what it says, with room around both. */
 function factCard(kit: Kit, key: string, title: string, text: string, width: number): RenderElement {
   const { Box, Text } = kit.els
   return (
-    <Box key={key} flexDirection="column" width={width} borderStyle="round" borderColor={THEME.line} backgroundColor={THEME.card} paddingX={1}>
+    <Box key={key} flexDirection="column" width={width} gap={kit.isRich ? 1 : 0} borderStyle="round" borderColor={THEME.line} backgroundColor={THEME.card} paddingX={kit.isRich ? 2 : 1} paddingY={kit.isRich ? 1 : 0}>
       {label(kit, title, `${key}-label`)}
       <Text key={`${key}-text`} color={THEME.frost} wrap="wrap">
         {text}
@@ -381,19 +364,22 @@ function factCard(kit: Kit, key: string, title: string, text: string, width: num
 }
 
 /**
- * An Engram's page: back to the picker; the HUD preview running its live
- * scene, with three mood chips and an Error button that change the preview
- * only; its label, name, rule and description; Awaken or Sleep, Remix with
- * Claude, and Publish on the pages of your own Engrams; where it
- * draws; and what it draws, where it comes from, its rights and what it does
- * on an error.
+ * An Engram's page, filling the pane. Back, and Awaken (gold) or Sleep at
+ * the header's right; the live preview, about half the pane tall; the mood
+ * chips and Error under it, which change the preview only; the name with
+ * Remix with Claude (and Publish, on your own) at its right; what it is; and
+ * three facts: what it draws, where it comes from, its rights.
+ * Nothing is said twice: the action says whether it is awake, the chips say
+ * the preview's mood, the Draws fact says where it draws.
  */
 export function engramPage(kit: Kit, input: PageInput): RenderElement {
-  const { Box, Text, Button } = kit.els
+  const { Box, Text } = kit.els
   const { engram, preview } = input
   const id = engram.id
-  const perRow = kit.cols >= 40 ? 2 : 1
-  const factCols = Math.floor((kit.cols - 2 - (perRow - 1)) / perRow)
+  const inner = screenInner(kit)
+  const gap = kit.isRich ? 2 : 1
+  const perRow = inner >= 60 ? 3 : inner >= 40 ? 2 : 1
+  const factCols = Math.floor((inner - gap * (perRow - 1)) / perRow)
   const facts = [
     factCard(kit, 'fact-draws', 'Draws', `${engram.plugin ? 'its own' : engram.vessel.scene} scene · ${showsLabel(engram)}`, factCols),
     factCard(
@@ -404,59 +390,44 @@ export function engramPage(kit: Kit, input: PageInput): RenderElement {
       factCols,
     ),
     factCard(kit, 'fact-rights', 'Rights', RIGHTS[engram.rights], factCols),
-    factCard(kit, 'fact-error', 'On error', ON_ERROR[engram.vessel.scene], factCols),
   ]
   const factRows: RenderElement[] = []
   for (let i = 0; i < facts.length; i += perRow) {
     factRows.push(
-      <Box key={`facts:${i}`} flexDirection="row" gap={1}>
+      <Box key={`facts:${i}`} flexDirection="row" alignItems="stretch" gap={gap}>
         {facts.slice(i, i + perRow)}
       </Box>,
     )
   }
-  const where = whereRows(input.surfaces, engram).map(row => (
-    <Box key={`where:${row.icon}`} flexDirection="row" gap={1} alignItems="flex-start">
-      {surfaceIcon(kit, row.icon, row.isOn ? THEME.amber : THEME.faint, `where-icon:${row.icon}`)}
-      <Box key="where-text" flexDirection="column" flexShrink={1}>
-        <Text bold color={THEME.white}>
-          {ICON_NAMES[row.icon]}
-        </Text>
-        <Text color={THEME.muted} wrap="wrap">
-          {row.text}
-        </Text>
-      </Box>
-    </Box>
-  ))
-  const surfacesLink = <Button key="page-surfaces" label="Surfaces" plain onPress={input.onSurfaces} />
   return (
-    <Box key={`page:${id}`} flexDirection="column" width={kit.cols} paddingX={1} gap={1} backgroundColor={THEME.void}>
-      {header(kit, { key: 'page-back', ...input.back }, input.surfaces, input.onSurfaces)}
-      {hudPreview(kit, input)}
-      <Box key="preview-row" flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="wrap">
-        <Box key="preview-moods" flexDirection="row" gap={1}>
+    <Box key={`page:${id}`} flexDirection="column" width={kit.cols} minHeight={input.rows} paddingX={screenPad(kit)} paddingY={1} gap={gap} backgroundColor={THEME.void}>
+      {header(
+        kit,
+        { key: 'page-back', ...input.back },
+        input.isAwake ? button(kit, 'page-sleep', 'Sleep', input.onSleep, 'danger') : button(kit, 'page-awaken', 'Awaken', input.onAwaken, 'primary'),
+      )}
+      <Box key="hero" flexDirection="column" gap={1}>
+        {hudPreview(kit, input)}
+        <Box key="preview-moods" flexDirection="row" flexWrap="wrap" gap={1}>
           {PREVIEW_MOODS.map(mood => chip(kit, `preview-mood:${mood}`, MOOD_NAMES[mood], !preview.isError && preview.mood === mood, () => input.onMood(mood)))}
-        </Box>
-        <Box key="preview-error-box" borderStyle="round" borderColor={THEME.ember}>
-          <Button key="preview-error" label="Error" plain onPress={input.onError} />
+          {chip(kit, 'preview-error', 'Error', preview.isError, input.onError)}
         </Box>
       </Box>
-      <Box key="about" flexDirection="column">
-        {label(kit, `${input.isAwake ? 'Awake · ' : ''}${engram.plugin ? 'your Engram' : 'bundled Engram'}`, 'about-label')}
-        <Text key="about-name" bold color={THEME.white}>
-          {engram.name}
-        </Text>
-        {accentRule(kit, 'about-rule')}
+      <Box key="about" flexDirection="column" gap={1}>
+        <Box key="about-head" flexDirection="row" flexWrap="wrap" justifyContent="space-between" alignItems="center" gap={1}>
+          <Text key="about-name" bold color={THEME.white}>
+            {engram.name}
+          </Text>
+          <Box key="actions" flexDirection="row" flexWrap="wrap" gap={1}>
+            {button(kit, 'page-remix', 'Remix with Claude', input.onRemix)}
+            {input.onPublish ? button(kit, 'page-publish', 'Publish', input.onPublish) : null}
+          </Box>
+        </Box>
         <Text key="about-description" color={THEME.body} wrap="wrap">
           {engram.description}
         </Text>
       </Box>
-      <Box key="actions" flexDirection="row" flexWrap="wrap" gap={1}>
-        {input.isAwake ? secondaryButton(kit, 'page-sleep', 'Sleep', input.onSleep) : primaryButton(kit, 'page-awaken', 'Awaken', input.onAwaken)}
-        {secondaryButton(kit, 'page-remix', 'Remix with Claude', input.onRemix)}
-        {input.onPublish ? secondaryButton(kit, 'page-publish', 'Publish', input.onPublish) : null}
-      </Box>
-      {panel(kit, 'where', 'Where it draws', surfacesLink, where)}
-      <Box key="facts" flexDirection="column" gap={1}>
+      <Box key="facts" flexDirection="column" gap={gap}>
         {factRows}
       </Box>
     </Box>

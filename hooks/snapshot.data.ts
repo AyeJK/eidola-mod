@@ -5,7 +5,7 @@
 // place of the old one, and change no other entry.
 
 export const SNAPSHOTS: Record<string, unknown> = {
-  // Task 1: the picker cards: each kept Engram's name, where it shows, what it is, its button, the filters that list it, and their order among themselves.
+  // Task 1: the picker cards: each kept Engram's name, what it is, its button, the Surface options that list it, and their order among themselves.
   "cards: order of the kept Engrams": [
     "wisp",
     "kraken",
@@ -14,11 +14,10 @@ export const SNAPSHOTS: Record<string, unknown> = {
   "card: kraken": {
     "id": "kraken",
     "name": "Kraken",
-    "shows": "pane + band",
     "description": "Something vast in the deep water beside your work. It surfaces when there is work to do.",
     "button": {
       "key": "awaken:kraken",
-      "label": "AWAKEN"
+      "label": "Awaken"
     },
     "listedUnder": [
       "all",
@@ -29,11 +28,10 @@ export const SNAPSHOTS: Record<string, unknown> = {
   "card: lich": {
     "id": "lich",
     "name": "Lich",
-    "shows": "pane + band",
     "description": "A crowned skull of alchemical signs, soul-fire in its sockets. It burns brighter while you work.",
     "button": {
       "key": "awaken:lich",
-      "label": "AWAKEN"
+      "label": "Awaken"
     },
     "listedUnder": [
       "all",
@@ -44,11 +42,10 @@ export const SNAPSHOTS: Record<string, unknown> = {
   "card: wisp": {
     "id": "wisp",
     "name": "Wisp",
-    "shows": "band only",
     "description": "A will-o'-the-wisp in a night fen. It flies where it likes, its ghost fire burning the colour of your work, and speaks in flickers.",
     "button": {
       "key": "awaken:wisp",
-      "label": "AWAKEN"
+      "label": "Awaken"
     },
     "listedUnder": [
       "all",
@@ -60,44 +57,44 @@ export const SNAPSHOTS: Record<string, unknown> = {
   "thumbnail: kraken, docked pane, two cards a row": {
     "rows": 5,
     "alt": "Kraken, pane view",
-    "width": 176,
-    "height": 95,
-    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 722\" width=\"176\" height=\"95\" preserveAspectRatio=\"xMidYMid slice\"><title>kraken/thumb-pane.svg</title></svg>"
+    "width": 232,
+    "height": 122,
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 722\" width=\"232\" height=\"122\" preserveAspectRatio=\"xMidYMid slice\"><title>kraken/thumb-pane.svg</title></svg>"
   },
   "thumbnail: lich, docked pane, two cards a row": {
     "rows": 5,
     "alt": "Lich, pane view",
-    "width": 176,
-    "height": 95,
-    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 480 361\" width=\"176\" height=\"95\" preserveAspectRatio=\"xMidYMid slice\"><title>lich/thumb-pane.svg</title></svg>"
+    "width": 232,
+    "height": 122,
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 480 361\" width=\"232\" height=\"122\" preserveAspectRatio=\"xMidYMid slice\"><title>lich/thumb-pane.svg</title></svg>"
   },
   "thumbnail: wisp, docked pane, two cards a row": {
     "rows": 5,
     "alt": "Wisp, band view",
-    "width": 176,
-    "height": 44,
-    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 171\" width=\"176\" height=\"44\" preserveAspectRatio=\"xMidYMid slice\"><title>wisp/thumb-band.svg</title></svg>"
+    "width": 232,
+    "height": 46,
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 171\" width=\"232\" height=\"46\" preserveAspectRatio=\"xMidYMid slice\"><title>wisp/thumb-band.svg</title></svg>"
   },
   "thumbnail: kraken, narrow pane, one card a row": {
     "rows": 7,
     "alt": "Kraken, pane view",
-    "width": 224,
-    "height": 133,
-    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 722\" width=\"224\" height=\"133\" preserveAspectRatio=\"xMidYMid slice\"><title>kraken/thumb-pane.svg</title></svg>"
+    "width": 272,
+    "height": 160,
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 960 722\" width=\"272\" height=\"160\" preserveAspectRatio=\"xMidYMid slice\"><title>kraken/thumb-pane.svg</title></svg>"
   },
   "thumbnail: lich, narrow pane, one card a row": {
     "rows": 7,
     "alt": "Lich, pane view",
-    "width": 224,
-    "height": 133,
-    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 480 361\" width=\"224\" height=\"133\" preserveAspectRatio=\"xMidYMid slice\"><title>lich/thumb-pane.svg</title></svg>"
+    "width": 272,
+    "height": 160,
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 480 361\" width=\"272\" height=\"160\" preserveAspectRatio=\"xMidYMid slice\"><title>lich/thumb-pane.svg</title></svg>"
   },
   "thumbnail: wisp, narrow pane, one card a row": {
     "rows": 7,
     "alt": "Wisp, band view",
-    "width": 224,
+    "width": 272,
     "height": 56,
-    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 171\" width=\"224\" height=\"56\" preserveAspectRatio=\"xMidYMid slice\"><title>wisp/thumb-band.svg</title></svg>"
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 171\" width=\"272\" height=\"56\" preserveAspectRatio=\"xMidYMid slice\"><title>wisp/thumb-band.svg</title></svg>"
   },
 
   // Task 3: the pane and band in each mood, the clock fixed. Long SVG sources are their length and hash.

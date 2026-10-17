@@ -198,6 +198,26 @@ async function openPicker(pane: Pick<Mounted<'desktop', 'Pane'>, 'pointer'>): Pr
   await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
 }
 
+/** Picks a Surface in the picker's dropdown: its trigger, then the option. */
+async function pickSurface(pane: Pick<Mounted<'desktop', 'Pane'>, 'pointer'>, surface: 'all' | 'pane' | 'band'): Promise<void> {
+  await pane.pointer({ type: 'down', x: 1, y: 0, button: 'left', in: 'filter-toggle:surface' })
+  await pane.pointer({ type: 'down', x: 1, y: 0, button: 'left', in: `filter-option:surface:${surface}` })
+}
+
+/** The alt of each Svg under `node`, in order. */
+function alts(node: unknown, out: string[] = []): string[] {
+  if (Array.isArray(node)) {
+    node.forEach(child => alts(child, out))
+  } else if (node && typeof node === 'object') {
+    const el = node as { type?: string; props?: { alt?: unknown }; children?: unknown[] }
+    if (el.type === 'Svg' && typeof el.props?.alt === 'string') {
+      out.push(el.props.alt)
+    }
+    alts(el.children ?? [], out)
+  }
+  return out
+}
+
 describe('snapshot: picker cards', () => {
   test('each kept Engram\'s card, where it is listed, and their order among themselves', async ($, on) => {
     engine(on, null)
@@ -213,19 +233,22 @@ describe('snapshot: picker cards', () => {
 
     const under: Record<Kept, string[]> = { kraken: [], lich: [], wisp: [] }
     for (const filter of ['all', 'pane', 'band'] as const) {
-      await pane.press({ key: `filter:${filter}` })
+      await pickSurface(pane, filter)
       for (const id of await listed()) {
         under[id].push(filter)
       }
     }
-    await pane.press({ key: 'filter:all' })
+    await pickSurface(pane, 'all')
 
     for (const id of KEPT) {
       const card = await pane.find({ type: 'Box', key: `card:${id}` })
-      // Name, what it is, where it shows: the card's text in order.
-      const [name, description, shows] = texts(card?.children ?? [])
-      const button = (await pane.findAll({ type: 'Button' })).find(one => String(one.key).endsWith(`:${id}`))
-      snap(`card: ${id}`, { id, name, shows, description, button: { key: button?.key, label: button?.props.label }, listedUnder: under[id] })
+      // Its name, drawn large (the Svg after its still); what it is, the card's one text.
+      const name = alts(card?.children ?? [])[1]
+      const [description] = texts(card?.children ?? [])
+      // Its button: a label drawn by pill.tsx, keyed by what it does.
+      const button = (await pane.findAll({ type: 'Client' })).find(one => String(one.key).endsWith(`:${id}`) && /pill\.tsx$/.test(String(one.props?.module)))
+      const label = (button?.props?.props as { label?: string } | undefined)?.label
+      snap(`card: ${id}`, { id, name, description, button: { key: button?.key, label }, listedUnder: under[id] })
     }
     await pane.unmount()
   })
@@ -246,13 +269,14 @@ describe('snapshot: picker thumbnails', () => {
       const pane = await $.ui.mount({ plugin: 'eidola', surface: 'desktop', component: 'Pane', requestId: 'eidola', props: { ...PANE_PROPS, bodyColumns } })
       await openPicker(pane)
       for (const id of KEPT) {
-        // The card's first child is the box its still sits in.
+        // The card's first child holds the still's rows in the flow; its second
+        // is the still, laid over them and bleeding past the card's inset.
         type Drawn = { props?: Record<string, unknown>; children?: Drawn[] }
         const card = await pane.find({ type: 'Box', key: `card:${id}` })
-        const box = (card?.children ?? [])[0] as Drawn | undefined
-        const svg = box?.children?.[0]
+        const [spacer, layer] = (card?.children ?? []) as Drawn[]
+        const svg = layer?.children?.[0]
         snap(`thumbnail: ${id}, ${layout}`, {
-          rows: box?.props?.height,
+          rows: spacer?.props?.height,
           alt: svg?.props?.alt,
           width: svg?.props?.width,
           height: svg?.props?.height,

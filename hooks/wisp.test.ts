@@ -219,9 +219,9 @@ describe('the Wisp', () => {
 
     // The pane, over a band-only Engram, is the picker; its breadcrumb closes it.
     const pane = await $.ui.mount(PANE)
-    expect(await pane.find({ type: 'Button', key: 'awaken:kraken' })).toBeDefined()
-    expect(await pane.find({ type: 'Button', key: 'picker-back' })).toMatchObject({ props: { label: '‹' } })
-    await pane.press({ key: 'picker-back' })
+    expect(await pane.find({ type: 'Client', key: 'awaken:kraken' })).toBeDefined()
+    expect((await pane.find({ type: 'Client', key: 'picker-back' }))?.props?.props).toMatchObject({ label: '← Back' })
+    await pane.pointer({ type: 'down', x: 1, y: 0, button: 'left', in: 'picker-back' })
     expect(closed).toEqual(['eidola'])
     await pane.unmount()
   })

@@ -188,10 +188,10 @@ describe('the band-only Engram and the pane (the 0.6.0 bug, fixed)', () => {
     const drawn = await $.ui.mount(PANE)
     expect((await drawn.findAll({ type: 'Svg' })).map(svg => svg.props?.alt)).toContain('Wisp in the fen')
     expect(await drawn.find({ type: 'Client', key: 'wisp-band' })).toBeDefined()
-    expect(await drawn.find({ type: 'Button', key: 'awaken:kraken' })).toBeUndefined()
+    expect(await drawn.find({ type: 'Client', key: 'awaken:kraken' })).toBeUndefined()
     // Its corner still opens the picker over it.
     await drawn.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
-    expect(await drawn.find({ type: 'Button', key: 'awaken:kraken' })).toBeDefined()
+    expect(await drawn.find({ type: 'Client', key: 'awaken:kraken' })).toBeDefined()
     await drawn.unmount()
   })
 

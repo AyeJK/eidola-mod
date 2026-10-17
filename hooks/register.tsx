@@ -9,6 +9,7 @@ import { ENGRAMS_DIR, loadEngrams } from './loader'
 import type { Skipped } from './loader'
 import { MANIFEST, checkThumbnail, validate } from './validate'
 import { CONTRACT, fallbackKey, faultLine, judge, lineOf, slotKey } from './handoff'
+import type { PillDraw, PillTone } from './engram-page'
 import type { Fault, Verdict } from './handoff'
 import { BLEND_STEPS, blendTestSvg } from './blend-test'
 import { MEASURE_EDGE, MEASURE_GROUND, MEASURE_HELP, REFERENCE_PX, bandReport, paneReport, referenceSvg } from './measure'
@@ -25,7 +26,6 @@ import {
   readOnOff,
   readStatusLine,
   readSurfaces,
-  showsLabel,
   surfacesLine,
   switchOf,
   whereItDraws,
@@ -47,23 +47,21 @@ import { FRAME_GREY, FRAME_STATES, labelSvg } from './hud'
 import { SCENES } from './scenes'
 import {
   FRESH_PREVIEW,
-  SURFACE_ICONS,
   chip,
   divider,
   drawingLine,
   engramPage,
   header,
+  button,
   label,
   previewRows,
-  primaryButton,
-  secondaryButton,
-  surfaceIcon,
-  titleBlock,
+  screenInner,
+  screenPad,
+  dropdown,
 } from './engram-page'
 import type { Els, Kit } from './engram-page'
 import { surfacesPage } from './surfaces-page'
 import type { SurfacesControl } from './surfaces-page'
-import type { SurfaceIcon } from './icons'
 import { THEME } from './theme'
 import { BACKDROP, BAND_SCENE_PX, BAND_STAGE_PX, PX_PER_COLUMN, PX_PER_ROW, VEIL, sceneSize, stageSize } from './stage'
 
@@ -88,7 +86,9 @@ const liveAtom = atom({ plugin: 'eidola', key: 'live' } as const, null as Mood |
 const inkAtom = atom({ plugin: 'eidola', key: 'ink' } as const, 0)
 const frameAtom = atom({ plugin: 'eidola', key: 'frame' } as const, {} as Record<string, boolean>)
 const pickerAtom = atom({ plugin: 'eidola', key: 'picker' } as const, false)
-const pickerFilterAtom = atom({ plugin: 'eidola', key: 'pickerFilter' } as const, 'all' as 'all' | 'pane' | 'band' | 'yours')
+const pickerMenuAtom = atom({ plugin: 'eidola', key: 'pickerMenu' } as const, null as 'surface' | 'source' | null)
+const pickerSurfaceAtom = atom({ plugin: 'eidola', key: 'pickerSurface' } as const, 'all' as 'all' | 'pane' | 'band')
+const pickerSourceAtom = atom({ plugin: 'eidola', key: 'pickerSource' } as const, 'all' as 'all' | 'bundled' | 'yours')
 const pageAtom = atom({ plugin: 'eidola', key: 'page' } as const, null as string | null)
 const previewAtom = atom({ plugin: 'eidola', key: 'preview' } as const, FRESH_PREVIEW as Preview)
 const surfacesAtom = atom({ plugin: 'eidola', key: 'surfaces' } as const, false)
@@ -831,7 +831,7 @@ async function setEngram($: EngineInterface, id: string | null): Promise<void> {
         await update($, pageAtom, () => null)
         await $.ui.close({ id: PANE })
       } else {
-        await $.ui.open({ id: PANE, title: paneTitle(engram) })
+        await $.ui.open({ id: PANE, title: PANE_TITLE })
       }
     }
   } catch {
@@ -841,10 +841,8 @@ async function setEngram($: EngineInterface, id: string | null): Promise<void> {
   $.ui.invalidate('ui.render')
 }
 
-/** The pane's title: the awake Engram's name, else Eidola. */
-function paneTitle(engram: Engram | undefined): string {
-  return engram ? engram.name : 'Eidola'
-}
+/** The pane's title: always Eidola, whichever Engram is awake; the status line names the Engram. */
+const PANE_TITLE = 'Eidola'
 
 // With "hide the band while the pane is open" on, the band steps aside while
 // the pane is placed. Every open and close redraws it to keep that true.
@@ -859,7 +857,7 @@ async function isPanePlaced($: EngineInterface): Promise<boolean> {
 }
 
 async function openPane($: EngineInterface) {
-  const opened = await $.ui.open({ id: PANE, title: paneTitle(await engramOf($, await read($, engramAtom))) })
+  const opened = await $.ui.open({ id: PANE, title: PANE_TITLE })
   $.ui.invalidate('ui.render')
   return opened
 }
@@ -1034,6 +1032,7 @@ async function isOnDesktop($: EngineInterface): Promise<boolean> {
  */
 async function closePicker($: EngineInterface, awake: Engram | undefined): Promise<void> {
   await update($, pickerAtom, () => false)
+  await update($, pickerMenuAtom, () => null)
   await update($, pageAtom, () => null)
   await update($, surfacesAtom, () => false)
   if (drawsBandViewInPane(awake)) {
@@ -1049,6 +1048,7 @@ async function isScreenOpen($: EngineInterface): Promise<boolean> {
 /** Opens an Engram's page, its preview fresh: idle, nothing scorched. */
 async function openPage($: EngineInterface, id: string): Promise<void> {
   await update($, previewAtom, () => FRESH_PREVIEW)
+  await update($, pickerMenuAtom, () => null)
   await update($, surfacesAtom, () => false)
   await update($, pageAtom, () => id)
 }
@@ -1106,19 +1106,26 @@ async function previewError($: EngineInterface): Promise<void> {
   await update($, previewAtom, was => ({ ...was, isError: true, ink: was.ink + 1, inkAt: at }))
 }
 
-/** Which Engrams the picker lists: all, those that draw in a pane, those that draw in the band, yours. */
-const PICKER_FILTERS = ['all', 'pane', 'band', 'yours'] as const
-type PickerFilter = (typeof PICKER_FILTERS)[number]
-const FILTER_LABELS: Record<PickerFilter, string> = { all: 'All', pane: 'Pane', band: 'Band', yours: 'Yours' }
+/** The picker's Surface dropdown: all Engrams, those that draw in a pane, those that draw in the band. */
+const SURFACE_FILTERS = ['all', 'pane', 'band'] as const
+type SurfaceFilter = (typeof SURFACE_FILTERS)[number]
+const SURFACE_LABELS: Record<SurfaceFilter, string> = { all: 'All', pane: 'Pane', band: 'Band' }
+
+/** The picker's Source dropdown: all Engrams, those bundled with Eidola, yours. */
+const SOURCE_FILTERS = ['all', 'bundled', 'yours'] as const
+type SourceFilter = (typeof SOURCE_FILTERS)[number]
+const SOURCE_LABELS: Record<SourceFilter, string> = { all: 'All', bundled: 'Bundled', yours: 'Yours' }
 
 /** Whether an Engram is one of the person's: an Engram plugin, not one bundled with Eidola. */
 function isYours(engram: Engram): boolean {
   return engram.plugin !== undefined
 }
 
-/** Whether an Engram is listed under a filter: one that shows in both is listed under each. */
-function isListed(engram: Engram, filter: PickerFilter): boolean {
-  return filter === 'all' || (filter === 'yours' ? isYours(engram) : drawsIn(engram)[filter])
+/** Whether an Engram is listed under both dropdowns: one that shows in both surfaces is listed under each. */
+function isListed(engram: Engram, surface: SurfaceFilter, source: SourceFilter): boolean {
+  const isSurface = surface === 'all' || drawsIn(engram)[surface]
+  const isSource = source === 'all' || (source === 'yours' ? isYours(engram) : !isYours(engram))
+  return isSurface && isSource
 }
 
 /**
@@ -1155,9 +1162,9 @@ function folderArg(folder: string): string {
   return /\s/.test(folder) ? `"${folder}"` : folder
 }
 
-/** Back from the Yours view to the whole picker: "or remix one". */
+/** Back from the Yours view to every source: "or remix one". */
 function showAll($: EngineInterface): () => void {
-  return () => void update($, pickerFilterAtom, () => 'all')
+  return () => void update($, pickerSourceAtom, () => 'all')
 }
 
 /** Thumbnails by Engram, view and size: a scene is costly to draw, so once each. */
@@ -1203,6 +1210,52 @@ async function thumbFor($: EngineInterface, engram: Engram, view: 'pane' | 'band
 }
 
 /**
+ * Where a card's buttons sit: past its top and right edges, a row up and two
+ * cells out, so the card clips the corner tab's own rounding there and the
+ * tab meets its edges square (`cornerTab`).
+ */
+const CARD_INSET = { top: -1, right: -2 }
+
+/**
+ * How far a card's still reaches past the card's content, in cells: up and
+ * out to each side, past the inset the surface keeps inside a border. The
+ * card clips it at its rounded edge, so the still meets the border with no
+ * margin, its top corners the card's own.
+ */
+const STILL_BLEED = { top: 1, left: 2 }
+
+/**
+ * A card's still, flush with its top and sides: a spacer in the flow, the
+ * still's rows tall, and the still itself laid over it, reaching past the
+ * card's inset by `STILL_BLEED`, centred, clipped by the card.
+ */
+function cardStill(els: Elements['desktop'], cardCols: number, rows: number, still: RenderElement): RenderElement[] {
+  const { Box } = els
+  return [
+    <Box key="thumb" width="100%" height={rows} />,
+    <Box
+      key="thumb-layer"
+      position="absolute"
+      top={-STILL_BLEED.top}
+      left={-STILL_BLEED.left}
+      width={cardCols + 2 * STILL_BLEED.left}
+      height={rows + STILL_BLEED.top}
+      overflow="hidden"
+      alignItems="center"
+      justifyContent="center"
+      backgroundColor={THEME.void}
+    >
+      {still}
+    </Box>,
+  ]
+}
+
+/** Cells drawn past each side of a card's still, clipped: so it meets the border whatever a cell measures. */
+const THUMB_BLEED = 1
+/** Pixels drawn past its top and bottom, clipped likewise: a sliver, so nothing of the still is lost. */
+const THUMB_BLEED_PX = 4
+
+/**
  * A card's still: 16:9 across the card, in whole rows. A band view, short and
  * wide, is letterboxed in the same box: as wide as the card, a quarter as tall.
  */
@@ -1210,6 +1263,9 @@ function thumbBox(thumbW: number): { rows: number; bandHeight: number } {
   const rows = Math.max(3, Math.round((thumbW * 9) / 16 / PX_PER_ROW))
   return { rows, bandHeight: Math.min(rows * PX_PER_ROW, Math.round(thumbW / 4)) }
 }
+
+/** The awake strip's name on the desktop: 20 px, bold white. */
+const STRIP_NAME_PX = 20
 
 /** The awake strip's still: 8 cells by 3 rows. */
 const STRIP_THUMB = { cols: 8, rows: 3 }
@@ -1220,13 +1276,28 @@ function stillView(engram: Engram): 'pane' | 'band' {
 }
 
 /**
- * The awake strip: a small still with the mood in amber, the "AWAKE" label,
- * the name, where it draws now, and Details and Sleep.
+ * The awake strip: a small still, the "AWAKE" label, the name large, and
+ * Sleep in deep red. The whole strip opens the Engram's page, as a card's
+ * body does; Sleep, drawn over it, acts at once. The picker says "awake"
+ * here alone; the cards below don't repeat it.
  */
 async function awakeStrip($: EngineInterface, kit: Kit, awake: Engram): Promise<RenderElement> {
-  const { Box, Text, Svg } = kit.els
-  const state = MOOD_STATE[await read($, moodAtom)]
-  const mood = FRAME_STATES[state].name
+  const { Box, Text, Svg, Button } = kit.els
+  const sleep = button(kit, 'strip-sleep', 'Sleep', () => void setEngram($, null), 'danger')
+  if (!kit.isRich) {
+    // In text the name is the way to the page.
+    return (
+      <Box key="strip" flexDirection="row" justifyContent="space-between" alignItems="center" borderStyle="round" borderColor={THEME.line} paddingX={1}>
+        <Box key="strip-text" flexDirection="column">
+          {label(kit, 'Awake', 'strip-label')}
+          <Button key="strip-open" label={awake.name} plain onPress={() => void openPage($, awake.id)} />
+        </Box>
+        {sleep}
+      </Box>
+    )
+  }
+  const els = kit.els as Elements['desktop']
+  const { Client } = els
   let still: RenderElement | null = null
   if (kit.isRich) {
     const width = STRIP_THUMB.cols * PX_PER_COLUMN
@@ -1236,11 +1307,6 @@ async function awakeStrip($: EngineInterface, kit: Kit, awake: Engram): Promise<
     still = (
       <Box key="strip-thumb" width={STRIP_THUMB.cols} height={STRIP_THUMB.rows} overflow="hidden" backgroundColor={THEME.void}>
         <Svg key={`strip-thumb:${awake.id}:${view}`} source={thumb.svg} alt={`${awake.name}, awake`} width={width} height={height} />
-        <Box key="strip-mood" position="absolute" top={0} left={0}>
-          <Text bold color={THEME.amber}>
-            {mood}
-          </Text>
-        </Box>
       </Box>
     )
   }
@@ -1249,28 +1315,38 @@ async function awakeStrip($: EngineInterface, kit: Kit, awake: Engram): Promise<
       <Box key="strip-left" flexDirection="row" alignItems="center" gap={1}>
         {still}
         <Box key="strip-text" flexDirection="column">
-          <Box key="strip-labels" flexDirection="row" gap={1}>
-            {label(kit, 'Awake', 'strip-label')}
-            {kit.isRich ? null : (
-              <Text key="strip-mood" bold color={THEME.amber}>
-                {mood}
-              </Text>
-            )}
-          </Box>
-          <Text key="strip-name" bold color={THEME.white}>
-            {awake.name}
-          </Text>
-          <Text key="strip-where" color={THEME.muted}>
-            {`${LABELS[state]} · ${drawingLine(surfaces, awake)}`}
-          </Text>
+          {label(kit, 'Awake', 'strip-label')}
+          {bigText(els, `strip-name:${awake.id}`, awake.name, STRIP_NAME_PX, THEME.white, Math.max(8, screenInner(kit) - STRIP_THUMB.cols - 16) * PX_PER_COLUMN)}
         </Box>
       </Box>
-      <Box key="strip-actions" flexDirection="row" gap={1}>
-        {secondaryButton(kit, 'strip-details', 'Details', () => void openPage($, awake.id))}
-        {secondaryButton(kit, 'strip-sleep', 'Sleep', () => void setEngram($, null))}
+      {/* The whole banner opens the awake Engram's page: a clear region over it, as a card's body. */}
+      <Box key="strip-hit" position="absolute" top={0} left={0}>
+        <Client key="open:strip" module="./card-hit.tsx" props={{ id: awake.id, cols: screenInner(kit), rows: STRIP_THUMB.rows }} width={screenInner(kit)} height={STRIP_THUMB.rows} />
+      </Box>
+      {/* Positioned, and after the region, so Sleep is drawn over it and takes its own clicks. */}
+      <Box key="strip-actions" position="relative" flexDirection="row" gap={1}>
+        {sleep}
       </Box>
     </Box>
   )
+}
+
+/**
+ * The rows `text` wraps to in `cols` cells, word by word, as a card's
+ * description does: enough for its click area to cover it.
+ */
+function wrappedRows(text: string, cols: number): number {
+  let rows = 1
+  let used = 0
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (used && used + 1 + word.length > cols) {
+      rows += 1
+      used = word.length
+    } else {
+      used += (used ? 1 : 0) + word.length
+    }
+  }
+  return rows
 }
 
 /** Edit with Claude's icon on a card of yours: a pencil. */
@@ -1297,7 +1373,9 @@ type Broken = {
 async function notLoadingCard($: EngineInterface, kit: Kit, broken: Broken, cardCols: number): Promise<RenderElement> {
   const { Box, Text, Button, Svg, Client } = kit.els as Elements['desktop']
   const { key, name, where, engram } = broken
-  const fix = secondaryButton(kit, `fix:${key}`, 'Fix with Claude', withClaude($, broken.fix))
+  const fix = kit.isRich
+    ? cornerTab(kit.els as Elements['desktop'], `fix:${key}`, 'Fix with Claude', withClaude($, broken.fix), CORNER_NEUTRAL)
+    : button(kit, `fix:${key}`, 'Fix with Claude', withClaude($, broken.fix))
   if (!kit.isRich) {
     return (
       <Box key={`card:${key}`} flexDirection="column" width={cardCols} borderStyle="round" borderColor={THEME.ember} paddingX={1}>
@@ -1322,57 +1400,55 @@ async function notLoadingCard($: EngineInterface, kit: Kit, broken: Broken, card
       </Box>
     )
   }
-  const inner = cardCols - 2
-  const thumbW = inner * PX_PER_COLUMN
-  const box = thumbBox(thumbW)
+  const thumbW = (cardCols + 2 * STILL_BLEED.left + 2 * THUMB_BLEED) * PX_PER_COLUMN
+  const box = thumbBox(cardCols * PX_PER_COLUMN)
   const view = engram ? stillView(engram) : 'pane'
-  const thumbH = view === 'pane' ? box.rows * PX_PER_ROW : box.bandHeight
+  const thumbH = view === 'pane' ? (box.rows + STILL_BLEED.top) * PX_PER_ROW + 2 * THUMB_BLEED_PX : box.bandHeight
   // Its own still where it was read; else the resting sprite. Dimmed either way.
   const still = engram ? await thumbFor($, engram, view, thumbW, thumbH) : { svg: filling(spriteSvg('idle', Math.min(thumbW, thumbH)), thumbW, thumbH), width: thumbW }
   return (
-    <Box key={`card:${key}`} flexDirection="column" width={cardCols} borderStyle="round" borderColor={THEME.ember} backgroundColor={THEME.card}>
-      <Box key="thumb" width={inner} height={box.rows} alignItems="center" justifyContent="center" backgroundColor={THEME.void}>
-        <Svg key={`thumb:${key}:${view}:${thumbW}x${thumbH}:dim`} source={dimmed(still.svg)} alt={`${name}, not loading`} width={Math.min(still.width, thumbW)} height={thumbH} />
-        <Box key="broken-badge" position="absolute" top={0} left={1} backgroundColor={THEME.void} borderStyle="round" borderColor={THEME.ember}>
-          <Text bold color={THEME.errorText}>
-            NOT LOADING
-          </Text>
-        </Box>
-      </Box>
-      <Box key="name" flexDirection="row" paddingX={1}>
+    <Box key={`card:${key}`} flexDirection="column" width={cardCols} overflow="hidden" borderStyle="round" borderColor={THEME.ember} backgroundColor={THEME.card}>
+      {cardStill(kit.els as Elements['desktop'], cardCols, box.rows, <Svg key={`thumb:${key}:${view}:${thumbW}x${thumbH}:dim`} source={dimmed(still.svg)} alt={`${name}, not loading`} width={still.width} height={thumbH} />)}
+      <Box key="name" flexDirection="row" gap={1} paddingX={1} paddingTop={1}>
         <Text bold color={THEME.white}>
           {name}
         </Text>
+        <Text key="broken-badge" bold color={THEME.errorText}>
+          NOT LOADING
+        </Text>
       </Box>
-      <Box key="about" height={2} overflow="hidden" paddingX={1}>
+      <Box key="about" flexGrow={1} paddingX={1} paddingBottom={1}>
         <Text color={THEME.muted} wrap="wrap">
           {where}
         </Text>
       </Box>
-      {divider(kit, 'foot-divider')}
-      <Box key="foot" flexDirection="row" justifyContent="flex-end" paddingX={1}>
-        {fix}
-      </Box>
       {engram ? (
         <Box key="hit" position="absolute" top={0} left={0}>
-          <Client key={`open:${key}`} module="./card-hit.tsx" props={{ id: engram.id }} width={inner} height={box.rows + 3} />
+          <Client key={`open:${key}`} module="./card-hit.tsx" props={{ id: engram.id, cols: cardCols, rows: box.rows + 2 + wrappedRows(where, cardCols - 4) }} width={cardCols} height={box.rows + 2 + wrappedRows(where, cardCols - 4)} />
         </Box>
       ) : null}
+      {/* Last, so it is over the body's click: Fix at the still's top right. */}
+      <Box key="card-actions" position="absolute" top={CARD_INSET.top} right={CARD_INSET.right}>
+        {fix}
+      </Box>
     </Box>
   )
 }
 
 /**
- * An Engram's card: its still (with an "AWAKE" badge on the awake one), its
- * name, two lines of what it is, and a footer of the surfaces it can draw on,
- * where it shows, and Awaken or Sleep. The card's body opens its page; the
- * button acts at once. In text, the name is the way to the page.
+ * An Engram's card: its still, edge to edge, with Awaken at its top right;
+ * its name; and what it is, wrapped in full. No surfaces: where an Engram
+ * draws is its page's to say. The awake one has an amber border and no
+ * button: the awake strip above says it is awake and puts it to sleep. The
+ * card's body opens its page; the button, laid over it, acts at once. While
+ * the filter menu is open (`isCovered`) the body takes no clicks, so the
+ * menu over it does. In text, the name is the way to the page.
  *
  * One of yours has a "YOURS" badge by its name, "Remix of …" under it, and
  * Edit with Claude, an icon button, before Awaken; one marked not loading is
  * drawn as such (`notLoadingCard`).
  */
-async function engramCard($: EngineInterface, kit: Kit, engram: Engram, awake: Engram | undefined, cardCols: number): Promise<RenderElement> {
+async function engramCard($: EngineInterface, kit: Kit, engram: Engram, awake: Engram | undefined, cardCols: number, isCovered = false): Promise<RenderElement> {
   const { Box, Text, Button, Svg, Client } = kit.els as Elements['desktop']
   const id = engram.id
   const fault = faults.get(id)
@@ -1381,22 +1457,30 @@ async function engramCard($: EngineInterface, kit: Kit, engram: Engram, awake: E
   }
   const isAwake = awake?.id === id
   const isMine = isYours(engram)
+  const onAwaken = async () => {
+    await setEngram($, id)
+    await update($, pickerAtom, () => false)
+  }
   const awaken = isAwake
-    ? secondaryButton(kit, `sleep:${id}`, 'Sleep', () => void setEngram($, null))
-    : primaryButton(kit, `awaken:${id}`, 'Awaken', async () => {
-        await setEngram($, id)
-        await update($, pickerAtom, () => false)
-      })
+    ? null
+    : kit.isRich
+      ? cornerTab(kit.els as Elements['desktop'], `awaken:${id}`, 'Awaken', onAwaken, CORNER_GOLD)
+      : button(kit, `awaken:${id}`, 'Awaken', onAwaken, 'primary')
   // Edit with Claude: a square icon button, a pencil. A Button takes its label
   // alone, so the pencil is its label and its name.
-  const button = isMine ? (
-    <Box key="foot-buttons" flexDirection="row" gap={1}>
-      {secondaryButton(kit, `edit:${id}`, EDIT_ICON, withClaude($, `edit ${id}`))}
-      {awaken}
-    </Box>
-  ) : (
-    awaken
-  )
+  const actions =
+    isMine || awaken ? (
+      <Box key="card-buttons" flexDirection="row" gap={1}>
+        {isMine ? (
+          // The pencil is a plain button: a row down and, alone, in from the
+          // edge, clear of the clipped space the corner tab hangs into.
+          <Box key="edit-at" marginTop={kit.isRich ? 2 : 0} marginRight={kit.isRich && !awaken ? 3 : 0}>
+            {button(kit, `edit:${id}`, EDIT_ICON, withClaude($, `edit ${id}`))}
+          </Box>
+        ) : null}
+        {awaken}
+      </Box>
+    ) : null
   const base = isMine && engram.remixOf !== undefined ? (registry.get(engram.remixOf)?.name ?? engram.remixOf) : undefined
   const remixLine =
     base === undefined ? null : (
@@ -1409,86 +1493,68 @@ async function engramCard($: EngineInterface, kit: Kit, engram: Engram, awake: E
       YOURS
     </Text>
   ) : null
-  const can = drawsIn(engram)
-  const isOn: Record<SurfaceIcon, boolean> = { pane: can.pane, band: can.band, shrine: engram.vessel.shows.includes('shrine') }
-  const shows = (
-    <Text key="foot-text" color={THEME.faint}>
-      {showsLabel(engram)}
-    </Text>
-  )
   const border = isAwake ? THEME.amberLine : THEME.line
   if (!kit.isRich) {
     return (
       <Box key={`card:${id}`} flexDirection="column" width={cardCols} borderStyle="round" borderColor={border} paddingX={1}>
-        <Box key="name" flexDirection="row" gap={1}>
-          <Button key={`open:${id}`} label={engram.name} plain onPress={() => void openPage($, id)} />
-          {isAwake ? (
-            <Text key="awake-badge" bold color={THEME.amber}>
-              AWAKE
-            </Text>
-          ) : null}
-          {yoursBadge}
+        <Box key="name" flexDirection="row" justifyContent="space-between" alignItems="center" gap={1}>
+          <Box key="name-left" flexDirection="row" gap={1}>
+            <Button key={`open:${id}`} label={engram.name} plain onPress={() => void openPage($, id)} />
+            {yoursBadge}
+          </Box>
+          {actions}
         </Box>
         {remixLine}
         <Text key="about" color={THEME.muted} wrap="wrap">
           {engram.description}
         </Text>
-        <Box key="foot" flexDirection="row" flexWrap="wrap" justifyContent="space-between" alignItems="center" gap={1}>
-          {shows}
-          {button}
-        </Box>
       </Box>
     )
   }
-  const inner = cardCols - 2
-  const thumbW = inner * PX_PER_COLUMN
-  const box = thumbBox(thumbW)
+  // The still is drawn a cell past each side and clipped by its box, so it
+  // meets the card's border exactly, whatever a cell measures on the surface.
+  const thumbW = (cardCols + 2 * STILL_BLEED.left + 2 * THUMB_BLEED) * PX_PER_COLUMN
+  const box = thumbBox(cardCols * PX_PER_COLUMN)
   const view = stillView(engram)
-  const thumbH = view === 'pane' ? box.rows * PX_PER_ROW : box.bandHeight
+  const thumbH = view === 'pane' ? (box.rows + STILL_BLEED.top) * PX_PER_ROW + 2 * THUMB_BLEED_PX : box.bandHeight
   const thumb = await thumbFor($, engram, view, thumbW, thumbH)
+  // The still, the gap above the name, the name, the remix line, the description.
+  const hitRows = box.rows + 1 + CARD_NAME_ROWS + (remixLine ? 1 : 0) + wrappedRows(engram.description, cardCols - 4)
   return (
-    <Box key={`card:${id}`} flexDirection="column" width={cardCols} borderStyle="round" borderColor={border} backgroundColor={THEME.card} hover={{ borderColor: THEME.amberLine }}>
-      <Box key="thumb" width={inner} height={box.rows} alignItems="center" justifyContent="center" backgroundColor={THEME.void}>
-        <Svg key={`thumb:${id}:${view}:${thumbW}x${thumbH}`} source={thumb.svg} alt={`${engram.name}, ${view} view`} width={Math.min(thumb.width, thumbW)} height={thumbH} />
-        {isAwake ? (
-          <Box key="awake-badge" position="absolute" top={0} left={1} backgroundColor={THEME.void} borderStyle="round" borderColor={THEME.amberLine}>
-            <Text bold color={THEME.amber}>
-              AWAKE
-            </Text>
-          </Box>
-        ) : null}
-      </Box>
-      <Box key="name" flexDirection="row" gap={1} paddingX={1}>
-        <Text bold color={THEME.white}>
-          {engram.name}
-        </Text>
+    <Box key={`card:${id}`} flexDirection="column" width={cardCols} overflow="hidden" borderStyle="round" borderColor={border} backgroundColor={THEME.card} hover={{ borderColor: THEME.amberLine }}>
+      {cardStill(kit.els as Elements['desktop'], cardCols, box.rows, <Svg key={`thumb:${id}:${view}:${thumbW}x${thumbH}`} source={thumb.svg} alt={`${engram.name}, ${view} view`} width={thumb.width} height={thumbH} />)}
+      <Box key="name" flexDirection="row" alignItems="center" gap={1} paddingX={1} paddingTop={1}>
+        {bigText(kit.els as Elements['desktop'], `name:${id}`, engram.name, CARD_NAME_PX, THEME.white, Math.max(8, cardCols - 12) * PX_PER_COLUMN)}
         {yoursBadge}
       </Box>
       {remixLine}
-      <Box key="about" height={2} overflow="hidden" paddingX={1}>
+      <Box key="about" flexGrow={1} paddingX={1} paddingBottom={1}>
         <Text color={THEME.muted} wrap="wrap">
           {engram.description}
         </Text>
       </Box>
-      {divider(kit, 'foot-divider')}
-      <Box key="foot" flexDirection="row" flexWrap="wrap" justifyContent="space-between" alignItems="center" paddingX={1}>
-        <Box key="foot-shows" flexDirection="row" alignItems="center" gap={1}>
-          <Box key="foot-icons" flexDirection="row">
-            {SURFACE_ICONS.map(icon => surfaceIcon(kit, icon, isOn[icon] ? THEME.amber : THEME.iconOff, `card-icon:${icon}`))}
-          </Box>
-          {shows}
-        </Box>
-        {button}
-      </Box>
       {/* The body, over the still, the name and the description: a click opens the page. */}
-      <Box key="hit" position="absolute" top={0} left={0}>
-        <Client key={`open:${id}`} module="./card-hit.tsx" props={{ id }} width={inner} height={box.rows + 3 + (remixLine ? 1 : 0)} />
-      </Box>
+      {isCovered ? null : (
+        <Box key="hit" position="absolute" top={0} left={0}>
+          <Client key={`open:${id}`} module="./card-hit.tsx" props={{ id, cols: cardCols, rows: hitRows }} width={cardCols} height={hitRows} />
+        </Box>
+      )}
+      {/* Last, so it is over the body's click: the buttons at the still's top right. */}
+      {actions ? (
+        <Box key="card-actions" position="absolute" top={CARD_INSET.top} right={CARD_INSET.right}>
+          {actions}
+        </Box>
+      ) : null}
     </Box>
   )
 }
 
-/** The round amber "+" of the New Engram tile and the empty Yours view. */
+/** The New Engram tile's mark on the desktop: a "+" in an amber ring on a dark amber fill, 48 px. */
+function plusRing(colour: string, fill: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"><circle cx="24" cy="24" r="22.5" fill="${fill}" stroke="${colour}" stroke-opacity="0.55" stroke-width="1.5"/><path d="M24 15v18M15 24h18" stroke="${colour}" stroke-width="2" stroke-linecap="round"/></svg>`
+}
+
+/** The round amber "+" of the New Engram tile and the empty Yours view, in text. */
 function plusMark(kit: Kit, key: string): RenderElement {
   const { Box, Text } = kit.els
   return (
@@ -1501,28 +1567,58 @@ function plusMark(kit: Kit, key: string): RenderElement {
 }
 
 /**
- * A dashed box, centred: the round amber "+", a title in bold white, one
- * muted line, Create with Claude, and "or remix one" back to the whole
- * picker. The New Engram tile at the head of the Yours view (`width` a
- * card's), and the empty Yours view (the picker's width).
+ * The invitation to make one: centred with room around it, the "+" in its
+ * amber ring, a large white title, one muted line, Create with Claude in
+ * gold, and "or remix one", a gold link back to every source. The New Engram
+ * tile at the head of the Yours view (`width` a card's), and the empty Yours
+ * view (the listing's width). In text, the same in a dashed box.
  */
 function makeTile($: EngineInterface, kit: Kit, key: string, title: string, line: string, width: number): RenderElement {
   const { Box, Text, Button } = kit.els
+  if (!kit.isRich) {
+    return (
+      <Box key={key} flexDirection="column" width={width} alignItems="center" justifyContent="center" gap={1} borderStyle="dashed" borderColor={THEME.line} paddingX={1} paddingY={1}>
+        {plusMark(kit, `${key}-plus`)}
+        <Box key={`${key}-words`} flexDirection="column" alignItems="center">
+          <Text bold color={THEME.white}>
+            {title}
+          </Text>
+          <Text color={THEME.muted} wrap="wrap">
+            {line}
+          </Text>
+        </Box>
+        {button(kit, `${key}-create`, 'Create with Claude', withClaude($, 'new'), 'primary')}
+        <Button key={`${key}-remix`} label="or remix one" plain onPress={showAll($)} />
+      </Box>
+    )
+  }
+  const els = kit.els as Elements['desktop']
+  const { Svg } = els
+  const inner = Math.max(8, width - 4) * PX_PER_COLUMN
   return (
-    <Box key={key} flexDirection="column" width={width} alignItems="center" justifyContent="center" gap={1} borderStyle="dashed" borderColor={THEME.line} paddingX={1} paddingY={1}>
-      {plusMark(kit, `${key}-plus`)}
-      <Box key={`${key}-words`} flexDirection="column" alignItems="center">
-        <Text bold color={THEME.white}>
-          {title}
-        </Text>
+    <Box key={key} flexDirection="column" width={width} alignItems="center" justifyContent="center" gap={1} paddingX={2} paddingY={3} backgroundColor={THEME.void}>
+      <Svg key={`${key}-plus`} source={plusRing(THEME.amber, THEME.amberFill)} alt="New Engram" width={48} height={48} />
+      <Box key={`${key}-words`} flexDirection="column" alignItems="center" gap={1}>
+        {bigText(els, `${key}-title`, title, 24, THEME.white, inner, 'middle')}
         <Text color={THEME.muted} wrap="wrap">
           {line}
         </Text>
       </Box>
-      {primaryButton(kit, `${key}-create`, 'Create with Claude', withClaude($, 'new'))}
-      <Button key={`${key}-remix`} label="or remix one" plain onPress={showAll($)} />
+      <Box key={`${key}-create-at`} paddingTop={1}>
+        {button(kit, `${key}-create`, 'Create with Claude', withClaude($, 'new'), 'primary')}
+      </Box>
+      {pillLink(kit, `${key}-remix`, 'or remix one', showAll($))}
     </Box>
   )
+}
+
+/** A gold underlined link on the desktop, through `kit.pill`; a plain Button in text. */
+function pillLink(kit: Kit, key: string, label: string, onPress: () => void): RenderElement {
+  if (kit.pill) {
+    return kit.pill(key, label, onPress, 'link')
+  }
+  const { Button } = kit.els
+  return <Button key={key} label={label} plain onPress={onPress} />
 }
 
 /** The Yours view's not-loading cards for Engram plugins whose engram.json didn't load: no Engram to read, so no page. */
@@ -1538,58 +1634,347 @@ function skippedBroken(): Broken[] {
   })
 }
 
+/** The rows a dropdown's trigger takes on the desktop, where a border is a line, not a cell: its menu opens just under it. */
+const FILTER_TRIGGER_ROWS = 2
+
+/** A picker dropdown: its name, its options and their labels. */
+type Dropdown = { id: 'surface' | 'source'; name: string; options: readonly string[]; labels: Record<string, string> }
+const DROPDOWNS: readonly Dropdown[] = [
+  { id: 'surface', name: 'Surface', options: SURFACE_FILTERS, labels: SURFACE_LABELS },
+  { id: 'source', name: 'Source', options: SOURCE_FILTERS, labels: SOURCE_LABELS },
+]
+
+/** A dropdown's width in cells, trigger and menu alike: its name, its longest option, the caret and padding. */
+function dropdownCols(one: Dropdown): number {
+  return one.name.length + 1 + Math.max(...one.options.map(id => (one.labels[id] ?? id).length)) + 2 + 2
+}
+
+/** An option picked, from a menu or a text chip: the picker lists it, the menu closes. */
+async function pickFilter($: EngineInterface, which: string, id: string): Promise<void> {
+  if (which === 'surface' && (SURFACE_FILTERS as readonly string[]).includes(id)) {
+    await update($, pickerSurfaceAtom, () => id as SurfaceFilter)
+  }
+  if (which === 'source' && (SOURCE_FILTERS as readonly string[]).includes(id)) {
+    await update($, pickerSourceAtom, () => id as SourceFilter)
+  }
+  await update($, pickerMenuAtom, () => null)
+}
+
+/** The theme's colours, as a `filter-row.tsx` row is handed them. */
+const ROW_COLOURS = { white: THEME.white, text: THEME.frost, muted: THEME.muted, on: THEME.gold }
+
 /**
- * The picker: the header, the "Engrams" title with its count and rule, the
- * awake strip, the filter chips with their counts, and the Engrams as cards.
- * Opened and closed by the corner triangle. The Yours filter shows the New
- * Engram tile, then your Engrams, those not loading as such; with none of
- * yours, the empty state.
+ * A dropdown's trigger on the desktop: its name muted, the chosen option, a
+ * caret, in a rounded box; raised while its menu is open. One
+ * `filter-row.tsx` Client: the whole row is the hit.
+ */
+function dropdownTrigger(els: Elements['desktop'], one: Dropdown, value: string, isOpen: boolean, suffix = ''): RenderElement {
+  const { Box, Client } = els
+  const cols = dropdownCols(one)
+  return (
+    <Box
+      key={`filter-trigger:${one.id}${suffix}`}
+      borderStyle="round"
+      borderColor={isOpen ? THEME.lineHover : THEME.line}
+      backgroundColor={isOpen ? THEME.raised : THEME.panel}
+      hover={{ borderColor: THEME.lineHover }}
+    >
+      <Client
+        key={`filter-toggle:${one.id}${suffix}`}
+        module="./filter-row.tsx"
+        props={{ prefix: one.name, label: one.labels[value] ?? value, caret: isOpen ? '▲' : '▼', pick: 'toggle', isOn: false, cols, ...ROW_COLOURS }}
+        width={cols}
+        height={1}
+      />
+    </Box>
+  )
+}
+
+/**
+ * A dropdown's open menu on the desktop: a rounded panel of its options,
+ * each a roomy rounded row of its own: the chosen one on a dark gold fill,
+ * its label and check in gold; the rest in frost, each raised under the
+ * pointer. Each row's words are a `filter-row.tsx` Client, the whole row's
+ * width the hit; the row's box (fill, rounding, hover) is drawn here.
+ */
+function dropdownMenu(els: Elements['desktop'], one: Dropdown, value: string): RenderElement {
+  const { Box, Client } = els
+  const cols = dropdownCols(one)
+  return (
+    <Box key={`filter-menu:${one.id}`} flexDirection="column" borderStyle="round" borderColor={THEME.lineHover} backgroundColor={THEME.panel} paddingX={1}>
+      {one.options.map(id => {
+        const isOn = id === value
+        const fill = isOn ? THEME.amberFill : THEME.panel
+        return (
+          <Box
+            key={`filter-row:${one.id}:${id}`}
+            borderStyle="round"
+            borderColor={fill}
+            backgroundColor={fill}
+            hover={{ borderColor: isOn ? THEME.amberFill : THEME.raised, backgroundColor: isOn ? THEME.amberFill : THEME.raised }}
+          >
+            <Client
+              key={`filter-option:${one.id}:${id}`}
+              module="./filter-row.tsx"
+              props={{ prefix: '', label: one.labels[id] ?? id, caret: isOn ? '✓' : '', pick: id, isOn, cols, ...ROW_COLOURS }}
+              width={cols}
+              height={1}
+            />
+          </Box>
+        )
+      })}
+    </Box>
+  )
+}
+
+/** Pixels between a dropdown's trigger and its open menu. */
+const MENU_GAP_PX = 6
+const MENU_GAP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 ${MENU_GAP_PX}" width="1" height="${MENU_GAP_PX}"></svg>`
+
+/** The listing's "Engrams" heading on the desktop, px. */
+const LISTING_TITLE_PX = 20
+
+/** Rows a dropdown's click-catcher reaches above the listing: past the header and the awake strip. */
+const CATCH_ABOVE = 40
+
+/**
+ * The picker: the header, the awake strip, then "Engrams" with the Surface
+ * and Source dropdowns at its right, and the Engrams as cards, each row as
+ * tall as its tallest card. On the desktop an open menu is laid over the
+ * cards, with a clear catcher under it over everything else: a click
+ * anywhere outside the menu closes it. In text a menu opens in the flow.
+ * Opened by the corner triangle or /engrams; left by the header's back
+ * button alone. Source Yours shows the New Engram tile, then your Engrams,
+ * those not loading as such; with none of yours, the empty state.
  */
 async function picker($: EngineInterface, kit: Kit, rows: number, awake: Engram | undefined): Promise<RenderElement> {
   const { Box, Text } = kit.els
-  const filter = await read($, pickerFilterAtom)
+  const surface = await read($, pickerSurfaceAtom)
+  const source = await read($, pickerSourceAtom)
+  const open = await read($, pickerMenuAtom)
+  const values: Record<Dropdown['id'], string> = { surface, source }
   const cols = kit.cols
-  const perRow = cols >= 40 ? 2 : 1
+  const inner = screenInner(kit)
+  const perRow = inner >= 40 ? 2 : 1
   const gap = 2
-  const cardCols = Math.floor((cols - 2 - gap * (perRow - 1)) / perRow)
+  const cardCols = Math.floor((inner - gap * (perRow - 1)) / perRow)
   const all = await listed($)
   const bundled = all.filter(engram => !isYours(engram)).length
   // Yours: your Engram plugins, those whose engram.json didn't load included.
   const unread = skippedBroken()
   const yours = all.length - bundled + unread.length
-  const counted = (one: PickerFilter) => (one === 'yours' ? yours : all.filter(engram => isListed(engram, one)).length)
-  const engrams = all.filter(engram => isListed(engram, filter))
-  const cards = await Promise.all(engrams.map(engram => engramCard($, kit, engram, awake, cardCols)))
-  if (filter === 'yours') {
-    // The New Engram tile first, then yours, then those that couldn't be read.
-    cards.unshift(makeTile($, kit, 'new-engram', 'New Engram', 'Describe a creature; Claude makes it with you.', cardCols))
-    cards.push(...(await Promise.all(unread.map(one => notLoadingCard($, kit, one, cardCols)))))
-  }
+  const engrams = all.filter(engram => isListed(engram, surface, source))
+  const isCovered = kit.isRich && open !== null
+  // Each card, drawn at a width: the New Engram tile first under Yours, then
+  // the Engrams, then (under Yours) those that couldn't be read.
+  const makers: ((width: number) => RenderElement | Promise<RenderElement>)[] = [
+    ...(source === 'yours' ? [(width: number) => makeTile($, kit, 'new-engram', 'New Engram', 'Describe a creature; Claude makes it with you.', width)] : []),
+    ...engrams.map(engram => (width: number) => engramCard($, kit, engram, awake, width, isCovered)),
+    ...(source === 'yours' ? unread.map(one => (width: number) => notLoadingCard($, kit, one, width)) : []),
+  ]
+  // The last column takes the cells the even split leaves over, so a row ends
+  // exactly where the awake strip and the dropdowns end.
+  const lastCols = inner - gap * (perRow - 1) - cardCols * (perRow - 1)
+  const cards = await Promise.all(makers.map((make, i) => make(i % perRow === perRow - 1 ? lastCols : cardCols)))
   const lines: RenderElement[] = []
   for (let i = 0; i < cards.length; i += perRow) {
     lines.push(
-      <Box key={`row:${i}`} flexDirection="row" gap={gap}>
+      <Box key={`row:${i}`} flexDirection="row" alignItems="stretch" gap={gap}>
         {cards.slice(i, i + perRow)}
       </Box>,
     )
   }
+  const none = surface === 'all' ? 'No Engrams here yet.' : `No Engrams here draw in the ${surface}.`
+  let triggers: RenderElement[]
+  let overlay: RenderElement[] = []
+  let textMenu: RenderElement | null = null
+  if (kit.isRich) {
+    const els = kit.els as Elements['desktop']
+    const { Client, Svg } = els
+    triggers = DROPDOWNS.map(one => dropdownTrigger(els, one, values[one.id], open === one.id))
+    const shown = DROPDOWNS.find(one => one.id === open)
+    if (shown) {
+      // The menu sits under its own trigger: the triggers to its right, and the gaps between, are its offset.
+      const after = DROPDOWNS.slice(DROPDOWNS.indexOf(shown) + 1)
+      const right = after.reduce((sum, one) => sum + dropdownCols(one) + 1, 0)
+      const thumbRows = thumbBox(cardCols * PX_PER_COLUMN).rows
+      const catchRows = CATCH_ABOVE + 4 + lines.length * (thumbRows + 8)
+      overlay = [
+        <Box key="menu-catch-at" position="absolute" top={-CATCH_ABOVE} left={-screenPad(kit)}>
+          <Client key="menu-catch" module="./card-hit.tsx" props={{ id: '', cols, rows: catchRows }} width={cols} height={catchRows} />
+        </Box>,
+        // The triggers again, over the catcher, where they stand: a click on the
+        // other one opens its menu in place of this one, on this one closes it.
+        <Box key="filter-triggers-over" position="absolute" top={0} right={0} flexDirection="row" gap={1}>
+          {DROPDOWNS.map(one => dropdownTrigger(els, one, values[one.id], open === one.id, ':over'))}
+        </Box>,
+        <Box key="filter-menu-at" position="absolute" top={FILTER_TRIGGER_ROWS} right={right} flexDirection="column" alignItems="flex-end">
+          {/* An empty Svg, laid out to the pixel: the gap between the trigger and its menu. */}
+          <Svg key="menu-gap" source={MENU_GAP_SVG} alt="spacing" width={1} height={MENU_GAP_PX} />
+          {dropdownMenu(els, shown, values[shown.id])}
+        </Box>,
+      ]
+    }
+  } else {
+    const menus = DROPDOWNS.map(one =>
+      dropdown(kit, {
+        key: one.id,
+        prefix: one.name,
+        options: one.options.map(id => ({ id, label: one.labels[id] ?? id })),
+        value: values[one.id],
+        isOpen: open === one.id,
+        onToggle: () => void update($, pickerMenuAtom, was => (was === one.id ? null : one.id)),
+        onPick: id => void pickFilter($, one.id, id),
+      }),
+    )
+    triggers = menus.map(one => one.trigger)
+    textMenu = menus.find(one => one.menu)?.menu ?? null
+  }
   return (
-    <Box flexDirection="column" width={cols} minHeight={rows} paddingLeft={1} paddingRight={1} gap={1} backgroundColor={THEME.void}>
-      {header(kit, { key: 'picker-back', onPress: () => void closePicker($, awake) }, surfaces, () => void showSurfaces($))}
-      {titleBlock(kit, 'Engrams', `${bundled} bundled${yours ? ` · ${yours} yours` : ''}`)}
+    <Box flexDirection="column" width={cols} minHeight={rows} paddingX={screenPad(kit)} paddingY={1} gap={gap} backgroundColor={THEME.void}>
+      {header(kit, { key: 'picker-back', onPress: () => void closePicker($, awake) })}
       {awake ? await awakeStrip($, kit, awake) : null}
-      <Box key="filters" flexDirection="row" flexWrap="wrap" gap={1}>
-        {PICKER_FILTERS.map(one => chip(kit, `filter:${one}`, `${FILTER_LABELS[one]} ${counted(one)}`, one === filter, () => void update($, pickerFilterAtom, () => one)))}
+      <Box key="listing" flexDirection="column" gap={1}>
+        <Box key="listing-head" flexDirection="row" justifyContent="space-between" alignItems="center">
+          {kit.isRich ? (
+            bigText(kit.els as Elements['desktop'], 'listing-title', 'Engrams', LISTING_TITLE_PX, THEME.white, 20 * PX_PER_COLUMN)
+          ) : (
+            <Text key="listing-title" bold color={THEME.white}>
+              Engrams
+            </Text>
+          )}
+          <Box key="listing-filters" flexDirection="row" gap={1}>
+            {triggers}
+          </Box>
+        </Box>
+        {textMenu}
+        {source === 'yours' && !yours ? (
+          makeTile($, kit, 'yours-empty', 'Make your own Engram', 'Describe a creature and Claude builds it with you.', inner)
+        ) : lines.length ? (
+          lines
+        ) : (
+          <Text key="none" color={THEME.muted}>
+            {none}
+          </Text>
+        )}
+        {/* Last, so they are painted over the cards: the catcher, then the menu over it. */}
+        {overlay}
       </Box>
-      {filter === 'yours' && !yours ? (
-        makeTile($, kit, 'yours-empty', 'Make your own Engram', 'Describe a creature, or start from any Engram, and Claude makes it with you.', cols - 2)
-      ) : lines.length ? (
-        lines
-      ) : (
-        <Text key="none" color={THEME.muted}>
-          {`No Engrams draw in the ${filter}.`}
-        </Text>
-      )}
+    </Box>
+  )
+}
+
+/** A font stack an `Svg` can draw with: it loads no web font, so the system's. */
+const SVG_FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+
+/** Text escaped for an Svg's markup. */
+function svgEscape(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * Text larger than a `Text` can draw (no size of ours is taken there): an
+ * Svg of one line, `px` tall, bold, in a colour, as wide as `width` px,
+ * anchored left or centred. A card's name, a tile's title.
+ */
+function bigText(els: Elements['desktop'], key: string, text: string, px: number, colour: string, width: number, anchor: 'start' | 'middle' = 'start'): RenderElement {
+  const { Svg } = els
+  const height = Math.round(px * 1.4)
+  const x = anchor === 'middle' ? Math.round(width / 2) : 0
+  const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"><text x="${x}" y="${Math.round(px * 1.05)}" text-anchor="${anchor}" font-family="${SVG_FONT}" font-size="${px}" font-weight="700" fill="${colour}">${svgEscape(text)}</text></svg>`
+  return <Svg key={key} source={source} alt={text} width={width} height={height} />
+}
+
+/** A card's name on the desktop: 17 px, bold white. Two rows tall. */
+const CARD_NAME_PX = 17
+const CARD_NAME_ROWS = 2
+
+/** What each button the pane last drew does, by its key: a `pill.tsx` label posts, and this answers. */
+const pressActions = new Map<string, () => void>()
+
+/** How each tone of button looks on the desktop: its fill, border and label, at rest and under the pointer. */
+const PILL_LOOKS: Record<PillTone, { fill: string; border: string; fg: string; hoverFill: string; hoverBorder: string; hoverFg: string; bold: boolean }> = {
+  primary: { fill: THEME.goldFill, border: THEME.goldFill, fg: THEME.ink, hoverFill: THEME.goldHover, hoverBorder: THEME.goldHover, hoverFg: THEME.ink, bold: true },
+  neutral: { fill: THEME.panel, border: THEME.line, fg: THEME.frost, hoverFill: THEME.raised, hoverBorder: THEME.lineHover, hoverFg: THEME.white, bold: false },
+  on: { fill: THEME.raised, border: THEME.lineHover, fg: THEME.white, hoverFill: THEME.raised, hoverBorder: THEME.lineHover, hoverFg: THEME.white, bold: true },
+  off: { fill: THEME.panel, border: THEME.line, fg: THEME.muted, hoverFill: THEME.panel, hoverBorder: THEME.lineHover, hoverFg: THEME.frost, bold: false },
+  link: { fill: THEME.void, border: THEME.void, fg: THEME.gold, hoverFill: THEME.void, hoverBorder: THEME.void, hoverFg: THEME.goldHover, bold: false },
+  danger: { fill: THEME.dangerFill, border: THEME.dangerFill, fg: THEME.white, hoverFill: THEME.dangerHover, hoverBorder: THEME.dangerHover, hoverFg: THEME.white, bold: true },
+}
+
+/**
+ * The desktop's buttons: a rounded box in the tone's fill and border, which
+ * the surface lights under the pointer, around a `pill.tsx` label, the whole
+ * label the hit, pressed in one click. The press is kept by key, for the
+ * label's post.
+ */
+function pillDrawer(els: Elements['desktop']): PillDraw {
+  const { Box, Client } = els
+  return (key, label, onPress, tone) => {
+    pressActions.set(key, onPress)
+    const look = PILL_LOOKS[tone]
+    const cols = label.length + 2
+    if (tone === 'link') {
+      // A link: the gold words underlined, no box.
+      return (
+        <Box key={`pill-${key}`}>
+          <Client key={key} module="./pill.tsx" props={{ label, fg: look.fg, hoverFg: look.hoverFg, bold: false, underline: true, cols }} width={cols} height={1} />
+        </Box>
+      )
+    }
+    return (
+      <Box
+        key={`pill-${key}`}
+        borderStyle="round"
+        borderColor={look.border}
+        backgroundColor={look.fill}
+        paddingX={1}
+        hover={{ borderColor: look.hoverBorder, backgroundColor: look.hoverFill }}
+      >
+        <Client key={key} module="./pill.tsx" props={{ label, fg: look.fg, hoverFg: look.hoverFg, bold: look.bold, cols }} width={cols} height={1} />
+      </Box>
+    )
+  }
+}
+
+/** A corner tab's colours: its fill at rest and under the pointer, and its label. */
+type CornerLook = { fill: string; hoverFill: string; fg: string; bold: boolean }
+const CORNER_GOLD: CornerLook = { fill: THEME.goldFill, hoverFill: THEME.goldHover, fg: THEME.ink, bold: true }
+const CORNER_NEUTRAL: CornerLook = { fill: THEME.raised, hoverFill: THEME.lineHover, fg: THEME.frost, bold: false }
+
+/**
+ * A card's button as a tab in its top right corner (Awaken, Fix with
+ * Claude): a filled, rounded box with its label a `pill.tsx` Client, pressed
+ * in one click. The card lays it past its own top and right edges
+ * (`CARD_INSET`) and clips it there, so of its four rounded corners only the
+ * bottom left shows: it meets the card's top and right edges square, and its
+ * top right is the card's own corner. The padding sets the label in what
+ * shows: two rows down past the clipped top, more cells on the right than the
+ * left for the clipped side.
+ */
+/** Pixels the corner tab's label is set down below its padding rows, so its gaps above and below match. */
+const TAB_NUDGE_PX = 7
+const TAB_NUDGE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 ${TAB_NUDGE_PX}" width="1" height="${TAB_NUDGE_PX}"></svg>`
+
+function cornerTab(els: Elements['desktop'], key: string, label: string, onPress: () => void, look: CornerLook): RenderElement {
+  const { Box, Svg, Client } = els
+  pressActions.set(key, onPress)
+  const cols = label.length + 2
+  return (
+    <Box
+      key={`corner-${key}`}
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={look.fill}
+      backgroundColor={look.fill}
+      paddingTop={2}
+      paddingLeft={1}
+      paddingRight={3}
+      hover={{ borderColor: look.hoverFill, backgroundColor: look.hoverFill }}
+    >
+      {/* An empty Svg, laid out to the pixel on the desktop, evens the gap above the label with the gap below. */}
+      <Svg key="tab-nudge" source={TAB_NUDGE_SVG} alt="spacing" width={1} height={TAB_NUDGE_PX} />
+      <Client key={key} module="./pill.tsx" props={{ label, fg: look.fg, hoverFg: look.fg, bold: look.bold, cols }} width={cols} height={1} />
     </Box>
   )
 }
@@ -1654,15 +2039,16 @@ async function previewScene($: EngineInterface, els: Elements['desktop'], engram
 }
 
 /** An Engram's page, its buttons wired: the preview's chips change the preview alone. */
-async function pageScreen($: EngineInterface, kit: Kit, engram: Engram, awake: Engram | undefined): Promise<RenderElement> {
+async function pageScreen($: EngineInterface, kit: Kit, engram: Engram, awake: Engram | undefined, rows: number): Promise<RenderElement> {
   const preview = await read($, previewAtom)
-  const scene = kit.isRich ? await previewScene($, kit.els as Elements['desktop'], engram, kit.cols - 2, previewRows(engram), preview) : null
+  const scene = kit.isRich ? await previewScene($, kit.els as Elements['desktop'], engram, screenInner(kit), previewRows(engram, rows), preview) : null
   return engramPage(kit, {
     engram,
     isAwake: awake?.id === engram.id,
     surfaces,
     preview,
     scene,
+    rows,
     face: FACES[preview.isError ? 'error' : MOOD_STATE[preview.mood]],
     back: { onPress: () => void closePage($, awake) },
     onSurfaces: () => void showSurfaces($),
@@ -2074,6 +2460,28 @@ export const register: Register = (on, options) => {
       }
       return {}
     }
+    // A button's label, clicked: its press, as the screen last drew it.
+    const press = pressActions.get(e.element)
+    if (press && data && typeof data === 'object' && (data as { press?: unknown }).press === true) {
+      press()
+      return {}
+    }
+    // A dropdown row, clicked: a trigger opens or closes its menu; an option picks.
+    const pick = data && typeof data === 'object' ? (data as { filter?: unknown }).filter : undefined
+    if ((e.element.startsWith('filter-toggle:') || e.element.startsWith('filter-option:')) && typeof pick === 'string') {
+      const which = e.element.split(':')[1] === 'source' ? 'source' : 'surface'
+      if (pick === 'toggle') {
+        await update($, pickerMenuAtom, was => (was === which ? null : which))
+      } else {
+        await pickFilter($, which, pick)
+      }
+      return {}
+    }
+    // Outside an open menu, clicked: it closes.
+    if (e.element === 'menu-catch') {
+      await update($, pickerMenuAtom, () => null)
+      return {}
+    }
     // A card's body, clicked: its Engram's page opens over the picker.
     const open = data && typeof data === 'object' ? (data as { open?: unknown }).open : undefined
     if (e.element.startsWith('open:') && typeof open === 'string') {
@@ -2301,19 +2709,25 @@ export const register: Register = (on, options) => {
         return vessel()
       }
       const kit: Kit = { els: $.ui.resolve(e) as unknown as Els, isRich: false, cols }
-      return isSurfaces ? surfacesScreen($, kit, awake) : page ? pageScreen($, kit, page, awake) : picker($, kit, rows, awake)
+      return isSurfaces ? surfacesScreen($, kit, awake) : page ? pageScreen($, kit, page, awake, rows) : picker($, kit, rows, awake)
     }
     const els = $.ui.resolve(e) as Elements['desktop']
-    const kit: Kit = { els, isRich: true, cols }
+    pressActions.clear()
+    const kit: Kit = { els, isRich: true, cols, pill: pillDrawer(els) }
+    // A screen (Surfaces, a page, the picker) is as tall as it needs, the
+    // pane scrolling it, with no corner: back is the header's button.
+    if (isSurfaces) {
+      return surfacesScreen($, kit, awake)
+    }
+    if (page) {
+      return pageScreen($, kit, page, awake, rows)
+    }
+    if (isPicking) {
+      return picker($, kit, rows, awake)
+    }
     const brass = awake?.vessel.hud?.bracket ?? FRAME_GOLD
     let body: RenderElement
-    if (isSurfaces) {
-      body = surfacesScreen($, kit, awake)
-    } else if (page) {
-      body = await pageScreen($, kit, page, awake)
-    } else if (isPicking) {
-      body = await picker($, kit, rows, awake)
-    } else if (awake && drawsBandViewInPane(awake) && !isSelfDrawn(awake)) {
+    if (awake && drawsBandViewInPane(awake) && !isSelfDrawn(awake)) {
       // One that doesn't show in the pane, the pane opened by hand: its band
       // view, across the middle of the pane.
       const { Box } = els
@@ -2337,7 +2751,7 @@ export const register: Register = (on, options) => {
       <Box width={cols} height={rows}>
         {body}
         <Box key="corner" position="absolute" top={rows - 2} left={cols - 3}>
-          <Client key="frame-corner" module="./frame-corner.tsx" props={{ colour: brass, isOpen: isPicking || page !== undefined || isSurfaces }} width={3} height={2} />
+          <Client key="frame-corner" module="./frame-corner.tsx" props={{ colour: brass, isOpen: false }} width={3} height={2} />
         </Box>
       </Box>
     )

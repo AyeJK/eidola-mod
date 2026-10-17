@@ -74,7 +74,7 @@ describe('removal: the bundle', () => {
       .map(box => /^card:(.+)$/.exec(String(box.key))?.[1])
       .filter((id): id is string => id !== undefined)
     expect([...cards].sort()).toEqual(KEPT)
-    expect(await pane.find({ type: 'Text', text: '3 BUNDLED' })).toBeDefined()
+    expect(await pane.find({ type: 'Box', key: 'listing' })).toBeDefined()
     await pane.unmount()
 
     const listed = (await $.command.run({ command: 'engrams', args: '', ...TYPED })).text ?? ''

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 import type { On, RenderSurface, UiPane } from 'claude-code'
-import type { ElementQuery, FoundElement } from 'claude-code/testing'
+import type { ElementQuery, FoundElement, Mounted } from 'claude-code/testing'
 
 import { servePackages } from './packages.data'
 import { ALL_OFF_TEXT, ALL_OFF_TITLE, HIDE_LABEL } from './surfaces-page'
@@ -60,6 +60,11 @@ function engine(on: On, deny?: string) {
   return session
 }
 
+/** Clicks a desktop button: its label is a `pill.tsx` Client, pressed on the pointer going down. */
+async function click(ui: Pick<Mounted<'desktop', 'Pane'>, 'pointer'>, key: string): Promise<void> {
+  await ui.pointer({ type: 'down', x: 1, y: 0, button: 'left', in: key })
+}
+
 type Ui = { find: (query: ElementQuery) => Promise<FoundElement | undefined>; findAll: (query: ElementQuery) => Promise<FoundElement[]> }
 
 /** A switch's look: its track's border and fill, its knob's colour and side, its press, and the row's border. */
@@ -91,7 +96,7 @@ describe('the Surfaces screen', () => {
     const pane = await $.ui.mount(PANE)
 
     expect(await pane.find({ type: 'Box', key: 'surfaces-page' })).toBeDefined()
-    expect(await pane.find({ type: 'Button', key: 'surfaces-back' })).toMatchObject({ props: { label: '‹' } })
+    expect((await pane.find({ type: 'Client', key: 'surfaces-back' }))?.props?.props).toMatchObject({ label: '← Back' })
     expect(await pane.find({ type: 'Text', text: 'Surfaces' })).toMatchObject({ props: { bold: true, color: THEME.white } })
     expect(await pane.find({ type: 'Text', text: '2 OF 2 ON' })).toMatchObject({ props: { color: THEME.gold } })
     for (const [id, name] of [
@@ -108,7 +113,7 @@ describe('the Surfaces screen', () => {
     expect(await pane.find({ type: 'Text', text: '✓' })).toMatchObject({ props: { color: THEME.amber } })
     expect(await pane.find({ type: 'Button', key: 'check:hide' })).toMatchObject({ props: { label: HIDE_LABEL } })
     expect(await pane.find({ type: 'Box', key: 'surfaces-warning' })).toBeUndefined()
-    // The icons beside each row, and in the header, amber while on.
+    // The icons beside each row, amber while on.
     const svgs = await pane.findAll({ type: 'Svg' })
     for (const alt of ['Pane', 'Band', 'Status line']) {
       expect(svgs.some(svg => svg.props?.alt === alt && String(svg.props?.source).includes(`color="${THEME.amber}"`))).toBe(true)
@@ -126,7 +131,7 @@ describe('the Surfaces screen', () => {
     expect(session.writes.at(-1)).toEqual({ key: 'eidola.band', value: false })
     expect(await switchLook(pane, 'band')).toEqual(OFF)
     expect(await pane.find({ type: 'Text', text: '1 OF 2 ON' })).toBeDefined()
-    // The header's Band icon goes faint with it.
+    // The Band row's icon goes faint with it.
     const band = (await pane.findAll({ type: 'Svg' })).filter(svg => svg.props?.alt === 'Band').map(svg => String(svg.props?.source))
     expect(band.every(source => source.includes(`color="${THEME.faint}"`))).toBe(true)
 
@@ -202,37 +207,37 @@ describe('the Surfaces screen', () => {
     await pane.unmount()
   })
 
-  test('the Surfaces button and link open it over the picker and a page; back returns to each', async ($, on) => {
+  test('the picker and a page have no Surfaces button; /eidola place opens it over either, and back returns to each', async ($, on) => {
     const session = engine(on)
     await $.command.run({ command: 'awaken', args: 'lich', ...TYPED })
     const pane = await $.ui.mount(PANE)
     await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
+    expect(await pane.find({ key: 'surfaces' })).toBeUndefined()
 
-    // From the picker's header.
-    await pane.press({ key: 'surfaces' })
+    // Over the picker: back returns to it.
+    await $.command.run({ command: 'eidola', args: 'place', ...TYPED })
     expect(await pane.find({ type: 'Box', key: 'surfaces-page' })).toBeDefined()
-    expect(await pane.find({ type: 'Button', key: 'awaken:kraken' })).toBeUndefined()
-    await pane.press({ key: 'surfaces-back' })
+    expect(await pane.find({ type: 'Client', key: 'awaken:kraken' })).toBeUndefined()
+    await click(pane, 'surfaces-back')
     expect(await pane.find({ type: 'Box', key: 'surfaces-page' })).toBeUndefined()
-    expect(await pane.find({ type: 'Button', key: 'awaken:kraken' })).toBeDefined()
+    expect(await pane.find({ type: 'Client', key: 'awaken:kraken' })).toBeDefined()
 
-    // From a page's "Where it draws" link: back to the page.
-    await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'open:kraken' })
-    await pane.press({ key: 'page-surfaces' })
+    // Over a page, which has no Surfaces link: back returns to the page.
+    await click(pane, 'open:kraken')
+    expect(await pane.find({ key: 'page-surfaces' })).toBeUndefined()
+    await $.command.run({ command: 'eidola', args: 'place', ...TYPED })
     expect(await pane.find({ type: 'Box', key: 'surfaces-page' })).toBeDefined()
-    await pane.press({ key: 'surfaces-back' })
+    await click(pane, 'surfaces-back')
     expect(await pane.find({ type: 'Box', key: 'page:kraken' })).toBeDefined()
 
-    // The corner closes every screen at once, back to the Lich.
-    await pane.press({ key: 'surfaces' })
-    await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
-    expect(await pane.find({ type: 'Box', key: 'surfaces-page' })).toBeUndefined()
-    expect(await pane.find({ type: 'Box', key: 'page:kraken' })).toBeUndefined()
+    // Back from the page, then the picker: the Lich.
+    await click(pane, 'page-back')
+    await click(pane, 'picker-back')
     expect(await pane.find({ type: 'Client', key: 'lich-0' })).toBeDefined()
 
-    // Opened by /eidola place, back returns to the awake Engram; nothing toasts.
+    // Opened by /eidola place over the Lich, back returns to it; nothing toasts.
     await $.command.run({ command: 'eidola', args: 'place', ...TYPED })
-    await pane.press({ key: 'surfaces-back' })
+    await click(pane, 'surfaces-back')
     expect(await pane.find({ type: 'Client', key: 'lich-0' })).toBeDefined()
     expect(session.toasts).toEqual([])
     await pane.unmount()
@@ -243,7 +248,7 @@ describe('the Surfaces screen', () => {
     await $.command.run({ command: 'awaken', args: 'wisp', ...TYPED })
     await $.command.run({ command: 'eidola', args: 'place', ...TYPED })
     const pane = await $.ui.mount(PANE)
-    await pane.press({ key: 'surfaces-back' })
+    await click(pane, 'surfaces-back')
     expect(session.closed).toContain('eidola')
     await pane.unmount()
   })

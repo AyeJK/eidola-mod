@@ -1,10 +1,10 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import type { CommandInfo, On, UiPane } from 'claude-code'
-import type { ElementQuery, Engine, FoundElement, Plugin } from 'claude-code/testing'
+import type { ElementQuery, Engine, FoundElement, Mounted, Plugin } from 'claude-code/testing'
 
 import { register as fixture } from '../test/fixtures/engram-plugin/hooks/register'
 import { servePackages } from './packages.data'
-import { RULE, THEME } from './theme'
+import { THEME } from './theme'
 
 const NOW = 1_760_000_000_000
 
@@ -22,6 +22,16 @@ const TERMINAL = { ...PANE, surface: 'terminal' } as const
 /** The first Text that shows exactly `text`: a Text carries no key to find it by. */
 async function exact(ui: { findAll: (query: ElementQuery) => Promise<FoundElement[]> }, text: string): Promise<FoundElement | undefined> {
   return (await ui.findAll({ type: 'Text', text })).find(one => one.text === text)
+}
+
+/** Clicks a Client by key, as the pointer going down on it: a desktop button's label, a card's body. */
+async function click(ui: Pick<Mounted<'desktop', 'Pane'>, 'pointer'>, key: string): Promise<void> {
+  await ui.pointer({ type: 'down', x: 1, y: 0, button: 'left', in: key })
+}
+
+/** What a desktop button's label (`pill.tsx`) is handed. */
+async function handed(ui: Pick<Mounted, 'find'>, key: string): Promise<Record<string, unknown> | undefined> {
+  return (await ui.find({ type: 'Client', key }))?.props?.props as Record<string, unknown> | undefined
 }
 
 type LiveProps = { mood?: string; ink?: number; cols?: number; rows?: number }
@@ -48,8 +58,16 @@ function engine(on: On): { toasts: string[] } {
 async function openLichPage($: Engine) {
   const pane = await $.ui.mount(PANE)
   await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
-  await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'open:lich' })
+  await click(pane, 'open:lich')
   return pane
+}
+
+/** A chip on (raised, its label bold white) or off (the panel, its label muted). */
+async function chipIs(ui: Pick<Mounted, 'find'>, key: string, isOn: boolean): Promise<void> {
+  expect(await ui.find({ type: 'Box', key: `pill-${key}` }), key).toMatchObject({
+    props: isOn ? { borderColor: THEME.lineHover, backgroundColor: THEME.raised } : { borderColor: THEME.line, backgroundColor: THEME.panel },
+  })
+  expect(await handed(ui, key), key).toMatchObject(isOn ? { fg: THEME.white, bold: true } : { fg: THEME.muted, bold: false })
 }
 
 describe('the Engram page', () => {
@@ -63,76 +81,88 @@ describe('the Engram page', () => {
     for (const id of ['wisp', 'kraken', 'lich']) {
       expect(await pane.find({ type: 'Client', key: `open:${id}` })).toBeDefined()
     }
-    await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'open:lich' })
+    await click(pane, 'open:lich')
     expect(await pane.find({ type: 'Box', key: 'page:lich' })).toBeDefined()
     expect(await pane.find({ type: 'Box', key: 'card:wisp' })).toBeUndefined()
-    // The live scene in its preview, and the corner still there to close it all.
+    // The live scene in its preview; no corner: back is the header's button.
     expect(await pane.find({ type: 'Client', key: 'preview-lich' })).toBeDefined()
-    expect(await pane.find({ type: 'Client', key: 'frame-corner' })).toBeDefined()
+    expect(await pane.find({ type: 'Client', key: 'frame-corner' })).toBeUndefined()
 
-    await pane.press({ key: 'page-back' })
+    await click(pane, 'page-back')
     expect(await pane.find({ type: 'Box', key: 'page:lich' })).toBeUndefined()
     expect(await pane.find({ type: 'Box', key: 'card:lich' })).toBeDefined()
 
     // The card's button awakens without opening the page.
-    await pane.press({ key: 'awaken:wisp' })
+    await click(pane, 'awaken:wisp')
     expect(await pane.find({ type: 'Box', key: 'page:wisp' })).toBeUndefined()
     expect((await $.command.run({ command: 'engrams', args: '', ...TYPED })).text).toContain('wisp (awake)')
     await pane.unmount()
   })
 
-  test('the page: header, preview, mood chips, Error, name and rule, Awaken, Where it draws and the four cards', async ($, on) => {
+  test('the page: Back and Awaken in the header, the preview, its chips and Error, the name, Remix, and three facts', async ($, on) => {
     const { toasts } = engine(on)
     await $.command.run({ command: 'awaken', args: 'kraken', ...TYPED })
     const pane = await openLichPage($)
 
-    expect(await pane.find({ type: 'Button', key: 'page-back' })).toMatchObject({ props: { label: '‹' } })
-    expect(await pane.find({ type: 'Box', key: 'preview' })).toMatchObject({ props: { backgroundColor: THEME.preview, height: 14 } })
+    expect(await handed(pane, 'page-back')).toMatchObject({ label: '← Back' })
+    // Awaken, the gold primary, at the header's right.
+    expect(await handed(pane, 'page-awaken')).toMatchObject({ label: 'Awaken', fg: THEME.ink, bold: true })
+    expect(await pane.find({ type: 'Box', key: 'pill-page-awaken' })).toMatchObject({ props: { backgroundColor: THEME.goldFill, borderColor: THEME.goldFill } })
+    const head = await pane.find({ type: 'Box', key: 'head' })
+    expect(JSON.stringify(head)).toContain('"page-awaken"')
+
+    // The preview: the live scene alone, edge to edge, about half the pane tall; nothing written over it.
+    expect(await pane.find({ type: 'Box', key: 'preview' })).toMatchObject({ props: { backgroundColor: THEME.preview, width: 48, height: 28 } })
     for (const corner of ['tl', 'tr', 'bl', 'br']) {
-      expect(await pane.find({ type: 'Box', key: `preview-${corner}` })).toBeDefined()
+      expect(await pane.find({ type: 'Box', key: `preview-${corner}` })).toBeUndefined()
     }
-    expect(await pane.find({ type: 'Text', text: 'EIDOLA · LICH' })).toMatchObject({ props: { color: THEME.gold } })
-    expect(await exact(pane, 'IDLE')).toMatchObject({ props: { bold: true, color: THEME.amber } })
-    expect(await pane.find({ type: 'Text', text: 'PREVIEW · NOT AWAKE' })).toBeDefined()
-    expect((await pane.findAll({ type: 'Button' })).filter(b => String(b.key).startsWith('preview-mood:')).map(b => b.props.label)).toEqual(['IDLE', 'WORKING', 'ATTENTION'])
-    expect(await pane.find({ type: 'Box', key: 'preview-error-box' })).toMatchObject({ props: { borderColor: THEME.ember } })
+    expect(await pane.find({ type: 'Text', text: 'EIDOLA · LICH' })).toBeUndefined()
+    expect(await pane.find({ type: 'Text', text: 'PREVIEW · NOT AWAKE' })).toBeUndefined()
+    // The chips under it say which mood it shows; Error is a chip among them.
+    expect((await pane.findAll({ type: 'Client' })).filter(c => /^preview-(mood:|error)/.test(String(c.key))).map(c => (c.props?.props as { label: string }).label)).toEqual([
+      'Idle',
+      'Working',
+      'Attention',
+      'Error',
+    ])
+    await chipIs(pane, 'preview-mood:idle', true)
+    await chipIs(pane, 'preview-mood:working', false)
+    await chipIs(pane, 'preview-error', false)
 
-    expect(await exact(pane, 'BUNDLED ENGRAM')).toMatchObject({ props: { color: THEME.gold } })
+    // The name, bold white, with Remix with Claude at its right; no kind label and no rule; the description.
     expect(await exact(pane, 'Lich')).toMatchObject({ props: { bold: true, color: THEME.white } })
-    const rule = await pane.find({ type: 'Box', key: 'about-rule' })
-    expect((rule?.children as Array<{ props: { backgroundColor: string } }>).map(bar => bar.props.backgroundColor)).toEqual([...RULE])
+    expect(await exact(pane, 'BUNDLED ENGRAM')).toBeUndefined()
+    expect(await pane.find({ type: 'Box', key: 'about-rule' })).toBeUndefined()
+    expect(await handed(pane, 'page-remix')).toMatchObject({ label: 'Remix with Claude', fg: THEME.frost })
     expect(await pane.find({ type: 'Text', text: 'A crowned skull' })).toMatchObject({ props: { color: THEME.body } })
-    expect(await pane.find({ type: 'Button', key: 'page-awaken' })).toMatchObject({ props: { label: 'AWAKEN', variant: 'primary' } })
 
-    // Where it draws, from the surfaces setting: the defaults put the Lich in the pane and the band.
-    expect(await pane.find({ type: 'Box', key: 'where' })).toMatchObject({ props: { borderColor: THEME.line, backgroundColor: THEME.panel } })
-    expect(await pane.find({ type: 'Text', text: 'WHERE IT DRAWS' })).toBeDefined()
-    expect(await pane.find({ type: 'Text', text: 'Draws in the pane, which opens by itself when it wakes.' })).toBeDefined()
-    expect(await pane.find({ type: 'Text', text: 'Draws in the band, hidden while the pane is open.' })).toBeDefined()
-    // The link opens the Surfaces screen; back returns to the page.
-    await pane.press({ key: 'page-surfaces' })
-    expect(await pane.find({ type: 'Box', key: 'surfaces-page' })).toBeDefined()
-    expect(toasts).toEqual([])
-    await pane.press({ key: 'surfaces-back' })
-    expect(await pane.find({ type: 'Box', key: 'page:lich' })).toBeDefined()
+    // No Where it draws: the Draws fact says it. No Surfaces link.
+    expect(await pane.find({ type: 'Box', key: 'where' })).toBeUndefined()
+    expect(await pane.find({ type: 'Text', text: 'WHERE IT DRAWS' })).toBeUndefined()
+    expect(await pane.find({ type: 'Client', key: 'page-surfaces' })).toBeUndefined()
 
+    // Three facts, two a row in a docked pane; no On error.
     for (const [title, text] of [
       ['DRAWS', 'lich scene · pane + band'],
       ['SOURCE', 'Bundled with Eidola · v'],
       ['RIGHTS', 'Original: made by its author.'],
-      ['ON ERROR', 'It is scorched'],
     ] as const) {
       expect(await exact(pane, title)).toMatchObject({ props: { color: THEME.gold } })
       expect(await pane.find({ type: 'Text', text })).toMatchObject({ props: { color: THEME.frost } })
     }
+    expect(await exact(pane, 'ON ERROR')).toBeUndefined()
+    expect(await pane.find({ type: 'Text', text: 'It is scorched' })).toBeUndefined()
+    expect((await pane.findAll({ type: 'Box' })).filter(box => String(box.key).startsWith('facts:')).map(box => box.key)).toEqual(['facts:0', 'facts:2'])
 
-    // Awaken from the page: it acts at once, and the page stays, now with Sleep.
-    await pane.press({ key: 'page-awaken' })
-    expect(await pane.find({ type: 'Button', key: 'page-sleep' })).toMatchObject({ props: { label: 'Sleep', variant: 'secondary' } })
-    expect(await pane.find({ type: 'Text', text: 'PREVIEW · AWAKE' })).toBeDefined()
+    // Awaken from the page: it acts at once, and the page stays, now with Sleep in deep red.
+    await click(pane, 'page-awaken')
+    expect(await handed(pane, 'page-sleep')).toMatchObject({ label: 'Sleep', fg: THEME.white, bold: true })
+    expect(await pane.find({ type: 'Box', key: 'pill-page-sleep' })).toMatchObject({ props: { backgroundColor: THEME.dangerFill } })
+    expect(await pane.find({ type: 'Client', key: 'page-awaken' })).toBeUndefined()
     expect((await $.command.run({ command: 'engrams', args: '', ...TYPED })).text).toContain('lich (awake)')
-    await pane.press({ key: 'page-sleep' })
-    expect(await pane.find({ type: 'Button', key: 'page-awaken' })).toBeDefined()
+    await click(pane, 'page-sleep')
+    expect(await pane.find({ type: 'Client', key: 'page-awaken' })).toBeDefined()
+    expect(toasts).toEqual([])
     await pane.unmount()
   })
 
@@ -142,30 +172,25 @@ describe('the Engram page', () => {
     const pane = await openLichPage($)
     const live = async () => (await pane.find({ type: 'Client', key: 'preview-lich' }))?.props?.props as LiveProps | undefined
 
-    expect(await live()).toMatchObject({ mood: 'idle', ink: 0, cols: 50, rows: 14 })
-    for (const [mood, name] of [
-      ['working', 'WORKING'],
-      ['attention', 'ATTENTION'],
-      ['idle', 'IDLE'],
-    ] as const) {
-      await pane.press({ key: `preview-mood:${mood}` })
+    expect(await live()).toMatchObject({ mood: 'idle', ink: 0, cols: 48, rows: 28 })
+    for (const mood of ['working', 'attention', 'idle'] as const) {
+      await click(pane, `preview-mood:${mood}`)
       expect((await live())?.mood).toBe(mood)
-      expect(await exact(pane, name)).toMatchObject({ props: { color: THEME.amber } })
-      expect(await pane.find({ type: 'Box', key: `chip-preview-mood:${mood}` })).toMatchObject({ props: { borderColor: THEME.amberLine, backgroundColor: THEME.amberFill } })
+      await chipIs(pane, `preview-mood:${mood}`, true)
+      await chipIs(pane, 'preview-error', false)
     }
 
-    // The error: the preview's own ink rises, and its words turn to the error.
-    await pane.press({ key: 'preview-error' })
+    // The error: the preview's own ink rises, and the Error chip is the one on.
+    await click(pane, 'preview-error')
     expect((await live())?.ink).toBe(1)
-    expect(await exact(pane, 'ERROR')).toMatchObject({ props: { color: THEME.errorText } })
-    expect(await exact(pane, 'fault')).toMatchObject({ props: { color: THEME.muted } })
-    // No mood chip is selected while the error shows; a chip clears it.
+    await chipIs(pane, 'preview-error', true)
+    // No mood chip is on while the error shows; a chip clears it.
     for (const mood of ['idle', 'working', 'attention']) {
-      expect(await pane.find({ type: 'Box', key: `chip-preview-mood:${mood}` })).toMatchObject({ props: { borderColor: THEME.line } })
+      await chipIs(pane, `preview-mood:${mood}`, false)
     }
-    await pane.press({ key: 'preview-mood:working' })
-    expect(await exact(pane, 'WORKING')).toBeDefined()
-    expect(await exact(pane, 'ERROR')).toBeUndefined()
+    await click(pane, 'preview-mood:working')
+    await chipIs(pane, 'preview-mood:working', true)
+    await chipIs(pane, 'preview-error', false)
     await pane.unmount()
   })
 
@@ -173,37 +198,36 @@ describe('the Engram page', () => {
     engine(on)
     await $.command.run({ command: 'awaken', args: 'lich', ...TYPED })
     const pane = await openLichPage($)
-    await pane.press({ key: 'preview-mood:attention' })
-    await pane.press({ key: 'preview-error' })
-    await pane.press({ key: 'preview-error' })
-    await pane.press({ key: 'preview-mood:working' })
+    await click(pane, 'preview-mood:attention')
+    await click(pane, 'preview-error')
+    await click(pane, 'preview-error')
+    await click(pane, 'preview-mood:working')
 
-    // The awake strip in the picker still says idle.
-    await pane.press({ key: 'page-back' })
-    expect(await exact(pane, 'Idle · drawing in Pane and Band')).toBeDefined()
-    // And the Lich in the pane is idle and unscorched.
-    await pane.press({ key: 'picker-back' })
+    // Back to the picker, then to the Lich in the pane: idle and unscorched.
+    await click(pane, 'page-back')
+    expect(await pane.find({ type: 'Box', key: 'strip' })).toBeDefined()
+    await click(pane, 'picker-back')
     const slice = (await pane.find({ type: 'Client', key: 'lich-0' }))?.props?.props as LiveProps | undefined
     expect(slice).toMatchObject({ mood: 'idle', ink: 0 })
 
-    // A page opened afresh starts its preview idle.
+    // A page opened afresh, from the awake strip, starts its preview idle.
     await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
-    await pane.press({ key: 'strip-details' })
+    await click(pane, 'open:strip')
     expect((await pane.find({ type: 'Client', key: 'preview-lich' }))?.props?.props).toMatchObject({ mood: 'idle', ink: 0 })
+    await chipIs(pane, 'preview-mood:idle', true)
     await pane.unmount()
   })
 
-  test('the Wisp, band only: its preview is its band strip, and Where it draws says so', async ($, on) => {
+  test('the Wisp, band only: its preview is its band strip, and its Draws fact says so', async ($, on) => {
     engine(on)
     await $.command.run({ command: 'awaken', args: 'kraken', ...TYPED })
     const pane = await $.ui.mount(PANE)
     await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
-    await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'open:wisp' })
-    expect(await pane.find({ type: 'Box', key: 'preview' })).toMatchObject({ props: { height: 9 } })
-    expect((await pane.find({ type: 'Client', key: 'preview-wisp' }))?.props?.props).toMatchObject({ mood: 'idle', rows: 9 })
-    expect(await pane.find({ type: 'Text', text: "Doesn't show in the pane. Opened by hand, the pane draws its band view." })).toBeDefined()
-    expect(await pane.find({ type: 'Text', text: 'Draws in the band above the prompt.' })).toBeDefined()
-    expect(await exact(pane, 'wisp scene · band only')).toBeDefined()
+    await click(pane, 'open:wisp')
+    // About a third of the pane tall, shorter than a pane view's.
+    expect(await pane.find({ type: 'Box', key: 'preview' })).toMatchObject({ props: { width: 48, height: 18 } })
+    expect((await pane.find({ type: 'Client', key: 'preview-wisp' }))?.props?.props).toMatchObject({ mood: 'idle', cols: 48, rows: 18 })
+    expect(await exact(pane, 'wisp scene · band only')).toMatchObject({ props: { color: THEME.frost } })
     await pane.unmount()
   })
 
@@ -215,7 +239,7 @@ describe('the Engram page', () => {
     const pane = await $.ui.mount(PANE)
     expect(await pane.find({ type: 'Box', key: 'page:kraken' })).toBeDefined()
     expect(await pane.find({ type: 'Client', key: 'preview-kraken' })).toBeDefined()
-    await pane.press({ key: 'page-back' })
+    await click(pane, 'page-back')
     expect(await pane.find({ type: 'Box', key: 'page:kraken' })).toBeUndefined()
     expect(await pane.find({ type: 'Box', key: 'card:kraken' })).toBeUndefined()
     expect(await pane.find({ type: 'Client', key: 'lich-0' })).toBeDefined()
@@ -224,7 +248,7 @@ describe('the Engram page', () => {
 })
 
 describe('the Engram page in the terminal', () => {
-  test('the same page in plain text: the preview in words, its chips and Error, where it draws, the cards', async ($, on) => {
+  test('the same page in plain text: the preview in words, its chips and Error, the name, the facts', async ($, on) => {
     engine(on)
     await $.command.run({ command: 'awaken', args: 'kraken', ...TYPED })
     await $.command.run({ command: 'engrams', args: 'lich', ...TYPED })
@@ -233,11 +257,16 @@ describe('the Engram page in the terminal', () => {
     expect(await term.findAll({ type: 'Client' })).toEqual([])
     expect(await term.find({ type: 'Box', key: 'page:lich' })).toBeDefined()
     expect(await term.find({ type: 'Text', text: 'EIDOLA' })).toBeDefined()
-    expect(await term.find({ type: 'Text', text: 'EIDOLA · LICH' })).toBeDefined()
-    expect(await term.find({ type: 'Text', text: 'PREVIEW · NOT AWAKE' })).toBeDefined()
-    expect(await exact(term, 'Lich')).toBeDefined()
-    expect(await term.find({ type: 'Text', text: 'WHERE IT DRAWS' })).toBeDefined()
-    expect(await term.find({ type: 'Text', text: 'It is scorched' })).toBeDefined()
+    expect(await term.find({ type: 'Button', key: 'page-back' })).toMatchObject({ props: { label: '← Back' } })
+    expect(await term.find({ type: 'Button', key: 'page-awaken' })).toMatchObject({ props: { label: 'Awaken' } })
+    expect(await term.find({ type: 'Box', key: 'pill-page-awaken' })).toMatchObject({ props: { borderColor: THEME.gold } })
+    // The preview in words: its mood, in amber, and the face.
+    expect(await term.find({ type: 'Box', key: 'preview' })).toMatchObject({ props: { borderColor: THEME.line } })
+    expect(await exact(term, 'IDLE')).toMatchObject({ props: { bold: true, color: THEME.amber } })
+    expect(await exact(term, 'Lich')).toMatchObject({ props: { bold: true } })
+    expect(await term.find({ type: 'Button', key: 'page-remix' })).toBeDefined()
+    expect(await term.find({ type: 'Text', text: 'WHERE IT DRAWS' })).toBeUndefined()
+    expect(await exact(term, 'DRAWS')).toBeDefined()
 
     for (const [mood, name] of [
       ['idle', 'IDLE'],
@@ -246,9 +275,11 @@ describe('the Engram page in the terminal', () => {
     ] as const) {
       await term.press({ key: `preview-mood:${mood}` })
       expect(await exact(term, name)).toMatchObject({ props: { color: THEME.amber } })
+      expect(await term.find({ type: 'Box', key: `pill-preview-mood:${mood}` })).toMatchObject({ props: { borderColor: THEME.gold } })
     }
     await term.press({ key: 'preview-error' })
     expect(await exact(term, 'ERROR')).toMatchObject({ props: { color: THEME.errorText } })
+    expect(await term.find({ type: 'Box', key: 'pill-preview-error' })).toMatchObject({ props: { borderColor: THEME.gold } })
 
     // The session is untouched: back to the Kraken, idle.
     await term.press({ key: 'page-back' })
@@ -259,6 +290,7 @@ describe('the Engram page in the terminal', () => {
     await desk.unmount()
   })
 })
+
 
 // ── Remix and Publish with Claude ─────────────────────────────────────
 //
@@ -322,23 +354,38 @@ function skillEngine(on: On): Skill {
   return skill
 }
 
+
 describe('Remix and Publish with Claude', () => {
   for (const surface of ['desktop', 'terminal'] as const) {
     test(`on ${surface}: a bundled page offers Remix with Claude, not Publish; Remix starts the skill`, async ($, on) => {
       const skill = skillEngine(on)
       await $.command.run({ command: 'awaken', args: 'kraken', ...TYPED })
       await $.command.run({ command: 'engrams', args: 'lich', ...TYPED })
-      const pane = await $.ui.mount(surface === 'desktop' ? PANE : TERMINAL)
-      expect(await pane.find({ type: 'Box', key: 'page:lich' })).toBeDefined()
-      expect(await pane.find({ type: 'Button', key: 'page-remix' })).toMatchObject({ props: { label: 'Remix with Claude', variant: 'secondary' } })
-      expect(await pane.find({ type: 'Button', key: 'page-publish' })).toBeUndefined()
-      expect(await pane.find({ type: 'Button', key: 'page-awaken' })).toBeDefined()
-      await pane.press({ key: 'page-remix' })
-      await skill.settle()
-      expect(skill.runs).toEqual(['remix lich'])
-      // The page stays, so the Engram shows while Claude works.
-      expect(await pane.find({ type: 'Box', key: 'page:lich' })).toBeDefined()
-      await pane.unmount()
+      if (surface === 'desktop') {
+        const pane = await $.ui.mount(PANE)
+        expect(await pane.find({ type: 'Box', key: 'page:lich' })).toBeDefined()
+        expect(await handed(pane, 'page-remix')).toMatchObject({ label: 'Remix with Claude' })
+        expect(await pane.find({ type: 'Box', key: 'pill-page-remix' })).toMatchObject({ props: { borderColor: THEME.line, backgroundColor: THEME.panel } })
+        expect(await pane.find({ type: 'Client', key: 'page-publish' })).toBeUndefined()
+        expect(await pane.find({ type: 'Client', key: 'page-awaken' })).toBeDefined()
+        await click(pane, 'page-remix')
+        await skill.settle()
+        expect(skill.runs).toEqual(['remix lich'])
+        // The page stays, so the Engram shows while Claude works.
+        expect(await pane.find({ type: 'Box', key: 'page:lich' })).toBeDefined()
+        await pane.unmount()
+      } else {
+        const pane = await $.ui.mount(TERMINAL)
+        expect(await pane.find({ type: 'Box', key: 'page:lich' })).toBeDefined()
+        expect(await pane.find({ type: 'Button', key: 'page-remix' })).toMatchObject({ props: { label: 'Remix with Claude' } })
+        expect(await pane.find({ type: 'Button', key: 'page-publish' })).toBeUndefined()
+        expect(await pane.find({ type: 'Button', key: 'page-awaken' })).toBeDefined()
+        await pane.press({ key: 'page-remix' })
+        await skill.settle()
+        expect(skill.runs).toEqual(['remix lich'])
+        expect(await pane.find({ type: 'Box', key: 'page:lich' })).toBeDefined()
+        await pane.unmount()
+      }
     })
   }
 
@@ -349,10 +396,11 @@ describe('Remix and Publish with Claude', () => {
     await $.command.run({ command: 'engrams', args: 'fixture', ...TYPED })
     const pane = await $.ui.mount(PANE)
     expect(await pane.find({ type: 'Box', key: 'page:fixture' })).toBeDefined()
-    expect(await exact(pane, 'YOUR ENGRAM')).toMatchObject({ props: { color: THEME.gold } })
-    expect(await pane.find({ type: 'Button', key: 'page-publish' })).toMatchObject({ props: { label: 'Publish', variant: 'secondary' } })
-    await pane.press({ key: 'page-remix' })
-    await pane.press({ key: 'page-publish' })
+    // Its Source fact says it is yours: an Engram plugin.
+    expect(await pane.find({ type: 'Text', text: 'Engram plugin eidola-engram-fixture · v0.1.0' })).toMatchObject({ props: { color: THEME.frost } })
+    expect(await handed(pane, 'page-publish')).toMatchObject({ label: 'Publish' })
+    await click(pane, 'page-remix')
+    await click(pane, 'page-publish')
     await skill.settle()
     expect(skill.runs).toEqual(['remix fixture', 'publish fixture'])
     await pane.unmount()

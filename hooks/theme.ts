@@ -44,6 +44,20 @@ export const THEME = {
   iconOff: '#2e2d2e',
   /** The HUD preview's frame, behind its scene. */
   preview: '#020308',
+  /** A raised surface: a selected chip or menu row, a control under the pointer. */
+  raised: '#232226',
+  /** A control's border under the pointer, or a selected chip's. */
+  lineHover: '#3a393d',
+  /** The primary button, Awaken: its fill. */
+  goldFill: '#c9a84c',
+  /** The primary button under the pointer. */
+  goldHover: '#dcbd62',
+  /** Text on the gold fill. */
+  ink: '#14110a',
+  /** The danger button, Sleep: its fill. */
+  dangerFill: '#7a1d1d',
+  /** The danger button under the pointer. */
+  dangerHover: '#962626',
 } as const
 
 export type ThemeColour = (typeof THEME)[keyof typeof THEME]

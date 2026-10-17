@@ -3,7 +3,9 @@ import type { UiPane } from 'claude-code'
 
 import type { VesselState } from '../types'
 import { renderScene } from './field'
+import { grimoireGlyphs, pageTop, sheetAt } from './grimoire3d'
 import { lichBandScene, lichPaneScene, voidScene } from './lich'
+import { GLYPH_BUDGET, drawGlyphs } from './live-glyphs'
 import { SVG_LIMIT } from './stage'
 
 const STATES: VesselState[] = ['idle', 'thinking', 'working', 'attention', 'success', 'responding', 'error', 'waiting', 'sleeping']
@@ -115,5 +117,105 @@ describe('the Lich Engram', () => {
     expect(await pane.find({ type: 'Client' })).toBeUndefined()
     expect(await pane.find({ type: 'Svg' })).toBeDefined()
     await pane.unmount()
+  })
+})
+
+const BAND = {
+  plugin: 'eidola',
+  surface: 'desktop',
+  component: 'AbovePrompt',
+  props: { hasSurvey: false, isWorking: false, maxRows: 12, bodyColumns: 120, scroll: { offset: 0, bodyRows: 11 }, view: {} },
+} as const
+
+/** The book as text, cell by cell: what a frame shows, colours and glyphs. */
+function bookText(book: Parameters<typeof grimoireGlyphs>[0], cols = 120, rows = 12): string {
+  const at = grimoireGlyphs(book, cols, rows)
+  return Array.from({ length: rows }, (_, y) => Array.from({ length: cols }, (_, x) => JSON.stringify(at(x, y, 8) ?? null)).join('')).join(String.fromCharCode(10))
+}
+
+describe('the grimoire in the band', () => {
+  test('lies open and still at idle', async ($, on) => {
+    on('ui.open', () => ({ value: { isPlaced: true as const } }))
+    on('ui.panes', () => ({ value: UNPLACED }))
+    on('ui.invalidate', () => ({ value: undefined }))
+    on('store.set', () => ({ value: undefined }))
+    on('clock.now', () => ({ value: NOW }))
+    await $.command.run({ command: 'awaken', args: 'lich', ...TYPED })
+    const band = await $.ui.mount(BAND)
+    await band.advance(500)
+    const first = JSON.stringify(await band.drawn({ in: 'lich-band' }))
+    // Its stacked page edges toward the glass, and signs written on it.
+    expect(first).toContain('===')
+    expect(first).toMatch(/[☿♀♂♁☽]/)
+    for (let i = 0; i < 4; i += 1) {
+      await band.advance(1500)
+      expect(JSON.stringify(await band.drawn({ in: 'lich-band' }))).toBe(first)
+    }
+    await band.unmount()
+
+    // Still means still: whatever the time, nothing moves at rest.
+    const rest = { flip: -1, pages: 3, heat: 0, alarm: 0, t: 0 }
+    expect(bookText({ ...rest, t: 40 })).toBe(bookText(rest))
+  })
+
+  test('turns its pages while it works', async ($, on) => {
+    on('ui.open', () => ({ value: { isPlaced: true as const } }))
+    on('ui.panes', () => ({ value: UNPLACED }))
+    on('ui.invalidate', () => ({ value: undefined }))
+    on('store.set', () => ({ value: undefined }))
+    // No session started, so no shared clock: the drawing keeps its own, and the mood turns a second in.
+    on('clock.now', () => ({ value: 1000 }))
+    on('turn.start', (_, e) => ({ turnId: e.turnId }))
+    on('ui.status', () => ({ value: undefined }))
+    await $.command.run({ command: 'awaken', args: 'lich', ...TYPED })
+    await $.turn.start({ text: 'work', turnId: 'grimoire' })
+    const band = await $.ui.mount({ ...BAND, props: { ...BAND.props, isWorking: true } })
+    const strip = await band.find({ type: 'Client' })
+    expect((strip?.props?.props as { mood?: string }).mood).toBe('working')
+    const frames = new Set<string>()
+    for (let i = 0; i < 40; i += 1) {
+      await band.advance(100)
+      frames.add(JSON.stringify(await band.drawn({ in: 'lich-band' })))
+    }
+    // A page lifting, going over, settling: many frames, not one.
+    expect(frames.size).toBeGreaterThan(8)
+    await band.unmount()
+  })
+
+  test('a turning page goes from the right to the left, over the pages, never through them', () => {
+    const tip = (flip: number) => sheetAt(flip).pts.at(-1)!
+    expect(tip(0)[0]).toBeGreaterThan(0.9)
+    expect(tip(1)[0]).toBeLessThan(-0.9)
+    for (let f = 0; f <= 1; f += 0.05) {
+      const { pts } = sheetAt(f)
+      for (const [u, h] of pts) {
+        expect(Number.isFinite(u) && Number.isFinite(h)).toBe(true)
+        if (Math.abs(u) <= 1) {
+          expect(h).toBeGreaterThan(pageTop(Math.abs(u)))
+        }
+      }
+    }
+    // Halfway over, it is off the pages; the frame shows it.
+    const flat = bookText({ flip: -1, pages: 0, heat: 1, alarm: 0, t: 0 })
+    expect(bookText({ flip: 0.5, pages: 0, heat: 1, alarm: 0, t: 0 })).not.toBe(flat)
+  })
+
+  test('its tree stays within the glyph budget, the widest band at its busiest', () => {
+    const elements = { Box: 'Box', Text: 'Text' } as unknown as Parameters<typeof drawGlyphs>[0]
+    for (const book of [
+      { flip: -1, pages: 0, heat: 0, alarm: 0, t: 0 },
+      { flip: 0.45, pages: 2, heat: 1, alarm: 0, t: 3 },
+      { flip: 0.3, pages: 5, heat: 0.5, alarm: 1, t: 7.5 },
+    ]) {
+      for (const [cols, rows] of [
+        [95, 12],
+        [240, 12],
+        [120, 7],
+      ] as const) {
+        const tree = drawGlyphs(elements, cols, rows, grimoireGlyphs(book, cols, rows))
+        const size = JSON.stringify(tree).length
+        expect(size, `${cols}x${rows} flip ${book.flip}: ${size}`).toBeLessThan(GLYPH_BUDGET + 2000)
+      }
+    }
   })
 })

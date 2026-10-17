@@ -17,6 +17,7 @@ import { ARCANE, COLOURS, ROBE_EMERALD, ROBE_PURPLE, FIRE, SCORCHED, WITCHLIGHT,
 import type { View } from './lich'
 import { BONE, CROWN, GEM, MANTLE, buildModel, modelBounds, sampleModel } from './lich3d'
 import type { Pose } from './lich3d'
+import { grimoireGlyphs } from './grimoire3d'
 import { drawGlyphs } from './live-glyphs'
 import { mixRamp, pick, short } from './live-pixels'
 
@@ -145,6 +146,10 @@ type Live = {
   arcane: number
   /** How far its robe has gone to purple (working), and to emerald (attention): 0 to 1 each. */
   heat: number
+  /** The band's grimoire: a page turning (0 to 1, or -1), which pages are open, when the next turns. */
+  flip: number
+  pages: number
+  nextFlip: number
   alarm: number
   blinkUntil: number
   nextBlink: number
@@ -452,6 +457,17 @@ function step(live: Live, W: number, H: number): void {
   live.witch = ease(live.witch, live.mood === 'attention' ? 1 : 0, 0.1)
   live.arcane = ease(live.arcane, live.mood === 'working' ? (live.act === 'chant' || live.act === 'surge' ? 1.5 : 1) : 0, 0.05)
   live.heat = ease(live.heat, live.mood === 'working' ? 1 : 0, 0.06)
+  // The grimoire turns its pages while it works, one after another; at rest it lies still.
+  if (live.flip >= 0) {
+    live.flip += 0.07
+    if (live.flip >= 1) {
+      live.flip = -1
+      live.pages += 1
+      live.nextFlip = live.tick + between(live, [6, 18])
+    }
+  } else if (live.mood === 'working' && live.tick >= live.nextFlip) {
+    live.flip = 0
+  }
   live.alarm = ease(live.alarm, live.mood === 'attention' ? 1 : 0, 0.08)
   live.scorch = ease(live.scorch, scorched ? 1 : 0, scorched ? 0.4 : 0.06)
 
@@ -552,6 +568,9 @@ function born(carry: Carry, view: View, tick: number): Live {
     witch: carry.mood === 'attention' ? 1 : 0,
     arcane: carry.mood === 'working' ? 1 : 0,
     heat: carry.mood === 'working' ? 1 : 0,
+    flip: -1,
+    pages: 0,
+    nextFlip: tick + 10,
     alarm: carry.mood === 'attention' ? 1 : 0,
     blinkUntil: 0,
     nextBlink: tick + 50,
@@ -581,8 +600,10 @@ function born(carry: Carry, view: View, tick: number): Live {
  * from the last of these.
  */
 function resync(live: Live): void {
-  const { mood, moodNext, moodTick, inkSeen, inkPending, inkTick } = live
+  const { mood, moodNext, moodTick, inkSeen, inkPending, inkTick, flip, pages, nextFlip } = live
   Object.assign(live, born({ mood, moodNext, moodTick, inkSeen, inkPending, inkTick }, live.view, live.tick))
+  // The grimoire keeps its place: an open book does not jump back a chapter.
+  Object.assign(live, { flip, pages, nextFlip })
 }
 
 type Sampled = { layer: number; v: number; glyph?: string }
@@ -699,6 +720,12 @@ const LichLive: ClientModule<Props, State> = (props, surface) => {
     const glyph = isScorched && cell.layer === BONE ? glyphFor(BONE, hash(x, live.tick), x, y, live.glyphT) : (cell.glyph ?? glyphFor(cell.layer, 0.15 + 0.9 * v, x, y, live.glyphT))
     return [colour, glyph] as const
   }
+  // In the band, the Lich's grimoire lies open.
+  if (view === 'band') {
+    const at = grimoireGlyphs({ flip: live.flip, pages: live.pages, heat: live.heat, alarm: live.alarm, t: live.t }, props.cols, props.rows)
+    return drawGlyphs({ Box, Text }, props.cols, count, (x, sy, levels) => at(x, sy + first, levels))
+  }
+
   const model = buildModel(poseOf(live, W, H), framing(view, W, H).cam)
   // Each cell sampled once a frame, at two heights: a glyph is tall.
   const cells = new Map<number, Sampled | null>()

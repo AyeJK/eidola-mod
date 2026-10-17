@@ -5,6 +5,8 @@ import type { VesselState } from '../types'
 import { renderScene } from './field'
 import { grimoireGlyphs, pageTop, sheetAt } from './grimoire3d'
 import { lichBandScene, lichPaneScene, voidScene } from './lich'
+import { advance, born, replay } from './lich-live'
+import type { Live } from './lich-live'
 import { GLYPH_BUDGET, drawGlyphs } from './live-glyphs'
 import { SVG_LIMIT } from './stage'
 
@@ -217,5 +219,46 @@ describe('the grimoire in the band', () => {
         expect(size, `${cols}x${rows} flip ${book.flip}: ${size}`).toBeLessThan(GLYPH_BUDGET + 2000)
       }
     }
+  })
+})
+
+describe('the Lich in slices', () => {
+  test('a slice that hears of a mood late lives it again, and stays one with the rest', () => {
+    const [W, H] = [416, 1444]
+    const carry = { mood: 'idle', moodNext: 'idle', moodTick: 0, inkSeen: 0, inkPending: false, inkTick: 0 } as const
+    const onTime = born(carry, 'pane', 0)
+    const late = born(carry, 'pane', 0)
+    const pastOnTime: Live[] = []
+    const pastLate: Live[] = []
+    const to = (live: Live, past: Live[], tick: number) => {
+      while (live.tick < tick) {
+        advance(live, past, W, H)
+      }
+    }
+    to(onTime, pastOnTime, 30)
+    to(late, pastLate, 30)
+    // The mood turns at tick 33: one copy hears at once, the other a second late.
+    onTime.moodNext = 'working'
+    onTime.moodTick = 33
+    to(onTime, pastOnTime, 43)
+    to(late, pastLate, 43)
+    expect(JSON.stringify(late)).not.toBe(JSON.stringify(onTime))
+    late.moodNext = 'working'
+    late.moodTick = 33
+    replay(late, pastLate, 33, W, H)
+    expect(JSON.stringify(late)).toBe(JSON.stringify(onTime))
+    // Ink heard late, too.
+    onTime.inkSeen = 1
+    onTime.inkPending = true
+    onTime.inkTick = 50
+    to(onTime, pastOnTime, 60)
+    to(late, pastLate, 60)
+    late.inkSeen = 1
+    late.inkPending = true
+    late.inkTick = 50
+    replay(late, pastLate, 50, W, H)
+    to(onTime, pastOnTime, 120)
+    to(late, pastLate, 120)
+    expect(JSON.stringify(late)).toBe(JSON.stringify(onTime))
   })
 })

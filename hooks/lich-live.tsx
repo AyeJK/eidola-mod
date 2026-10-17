@@ -92,9 +92,9 @@ type Plan = {
 
 const PLANS: Record<Mood, Plan> = {
   // Hanging in the dark, fire low, a few runes drifting round.
-  idle: { home: [0.5, 0, 0.27], spread: 0.1, pitch: 0.1, eyes: 0.55, flame: 0.15, runes: 0.5, spin: 0.15, churn: 0.6, light: 0.75, acts: [['turn', 3], ['chuckle', 1.5], ['drift', 2], ['gutter', 1.5], ['loom', 1], ['swoop', 2], ['dip', 1.5], ['pass', 1], ['vanish', 1.5], ['gesture', 1.5]], every: [50, 140] },
+  idle: { home: [0.5, 0, 0.27], spread: 0.1, pitch: 0.1, eyes: 0.55, flame: 0.15, runes: 0.5, spin: 0.15, churn: 0.6, light: 0.75, acts: [['turn', 3], ['chuckle', 1.5], ['drift', 2], ['gutter', 1.5], ['loom', 1], ['swoop', 2], ['dip', 1.5], ['pass', 1], ['vanish', 0.5], ['gesture', 1.5]], every: [50, 140] },
   // Burning: flame streaming from its sockets, every rune racing.
-  working: { home: [0.5, -80, 0.26], spread: 0.06, pitch: -0.04, eyes: 1.1, flame: 1, runes: 1, spin: 0.9, churn: 3, light: 1, acts: [['chant', 3], ['surge', 2], ['turn', 1], ['swoop', 0.8], ['dip', 0.6], ['vanish', 0.6]], every: [40, 100] },
+  working: { home: [0.5, -80, 0.26], spread: 0.06, pitch: -0.04, eyes: 1.1, flame: 1, runes: 1, spin: 0.9, churn: 3, light: 1, acts: [['chant', 3], ['surge', 2], ['turn', 1], ['swoop', 0.8], ['dip', 0.6], ['vanish', 0.2]], every: [40, 100] },
   // At the glass, eyes gone to witchlight, looking at you.
   attention: { home: [0.5, -380, 0.3], spread: 0.03, pitch: -0.02, eyes: 1.6, flame: 0.5, runes: 0.6, spin: 0.3, churn: 1, light: 1, acts: [['tilt', 3], ['speak', 2], ['loom', 1], ['beckon', 2]], every: [20, 50] },
 }
@@ -113,7 +113,7 @@ function planOf(view: View, mood: Mood): Plan {
   return view === 'band' ? { ...PLANS[mood], home: BAND_HOMES[mood], spread: mood === 'attention' ? 0.03 : 0.12, runes: 0 } : PLANS[mood]
 }
 
-type Live = {
+export type Live = {
   mood: Mood
   view: View
   planned: Mood | ''
@@ -177,7 +177,8 @@ type Live = {
   inkPending: boolean
   inkTick: number
 }
-type State = { live: Live }
+/** A copy's Lich, and the last few seconds of it, one snapshot a tick, to replay from. */
+type State = { live: Live; past: Live[] }
 
 const TICK_MS = 100
 const DT = TICK_MS / 1000
@@ -186,7 +187,13 @@ const CH = 19
 /** Ticks a split drawing may simulate at once, catching up. */
 const CATCH_UP = 50
 /** How far back a freshly mounted drawing starts: a whole number of these before now. */
-const ERA = 3000
+const ERA = 6000
+/** Ticks a vanishing takes, all told: going, gone, and gathered again. */
+const VANISH = 30
+/** Ticks before its end it starts to gather again; and the tick, a little before that, it moves while nothing of it shows. */
+const GATHER = 12
+/** Ticks of the past a copy keeps, to replay a change it heard of late. */
+const MEMORY = 80
 
 const EMBER = COLOURS.map(ramp => ramp.map(short))
 const COLD = WITCHLIGHT.map(short)
@@ -239,9 +246,9 @@ function poseOf(live: Live, W: number, H: number): Pose {
 function step(live: Live, W: number, H: number): void {
   live.tick += 1
   live.t = live.tick * DT
-  if (live.tick % ERA === ERA - 25) {
+  if (live.tick % ERA === ERA - 18) {
     live.act = 'vanish'
-    live.actUntil = live.tick + 50
+    live.actUntil = live.tick + VANISH
     live.route = []
   }
   if (live.tick % ERA === 0) {
@@ -288,7 +295,7 @@ function step(live: Live, W: number, H: number): void {
       live.route = flight(live, act, plan, homeY, W, H)
       live.actUntil = live.tick + 600
     } else if (act === 'vanish') {
-      live.actUntil = live.tick + 50
+      live.actUntil = live.tick + VANISH
     }
   }
 
@@ -394,8 +401,8 @@ function step(live: Live, W: number, H: number): void {
   let presence = 1
   if (live.act === 'vanish') {
     const left = live.actUntil - live.tick
-    presence = left > 20 ? 0 : 1
-    if (left === 26) {
+    presence = left > GATHER ? 0 : 1
+    if (left === GATHER + 1) {
       live.xTarget = plan.home[0] + (random(live) * 2 - 1) * Math.max(plan.spread, 0.2)
       live.x = live.xTarget
       live.y = homeY + (random(live) - 0.5) * (live.view === 'band' ? 0 : 0.06)
@@ -403,7 +410,11 @@ function step(live: Live, W: number, H: number): void {
       live.vy = 0
     }
   }
-  live.presence = ease(live.presence, presence, presence ? 0.09 : 0.11)
+  // Quick each way, and whole (or gone) once nearly there: no motes lingering at the edge.
+  live.presence = ease(live.presence, presence, presence ? 0.2 : 0.22)
+  if (presence ? live.presence > 0.97 : live.presence < 0.02) {
+    live.presence = presence
+  }
 
   // Where it is headed: home, or the next waypoint of a flight. A jump is
   // taken only once nothing of it is on the glass.
@@ -536,7 +547,7 @@ function flight(live: Live, act: Act, plan: Plan, homeY: number, W: number, H: n
  * first, a start is a resync: mid-vanish, nothing of it showing, gathering
  * itself again.
  */
-function born(carry: Carry, view: View, tick: number): Live {
+export function born(carry: Carry, view: View, tick: number): Live {
   const plan = planOf(view, carry.mood)
   const isResync = tick > 0
   return {
@@ -575,7 +586,7 @@ function born(carry: Carry, view: View, tick: number): Live {
     blinkUntil: 0,
     nextBlink: tick + 50,
     act: isResync ? 'vanish' : 'none',
-    actUntil: isResync ? tick + 25 : 0,
+    actUntil: isResync ? tick + GATHER + 2 : 0,
     nextAct: tick + 40,
     side: 1,
     vx: 0,
@@ -607,6 +618,44 @@ function resync(live: Live): void {
 }
 
 type Sampled = { layer: number; v: number; glyph?: string }
+
+const copy = (live: Live): Live => JSON.parse(JSON.stringify(live)) as Live
+
+/** One tick on, keeping what it was before it. */
+export function advance(live: Live, past: Live[], W: number, H: number): void {
+  past.push(copy(live))
+  if (past.length > MEMORY) {
+    past.shift()
+  }
+  step(live, W, H)
+}
+
+/**
+ * A change heard of after its tick (`at`) had already gone by: what the
+ * other copies did on time, this one does late, and from there their lots
+ * would part. So it goes back to before that tick and lives it again,
+ * knowing. Past what it remembers, it takes the change as it comes.
+ */
+export function replay(live: Live, past: Live[], at: number, W: number, H: number): void {
+  const from = past.findLastIndex(p => p.tick < at)
+  if (from < 0) {
+    return
+  }
+  const now = live.tick
+  const known = { moodNext: live.moodNext, moodTick: live.moodTick, inkSeen: live.inkSeen, inkTick: live.inkTick }
+  Object.assign(live, past[from]!)
+  past.length = from
+  live.moodNext = known.moodNext
+  live.moodTick = known.moodTick
+  if (known.inkSeen > live.inkSeen) {
+    live.inkSeen = known.inkSeen
+    live.inkPending = true
+    live.inkTick = known.inkTick
+  }
+  while (live.tick < now) {
+    advance(live, past, W, H)
+  }
+}
 
 const LichLive: ClientModule<Props, State> = (props, surface) => {
   const { Box, Text } = surface.elements
@@ -645,30 +694,41 @@ const LichLive: ClientModule<Props, State> = (props, surface) => {
       view,
       base,
     )
+    const past: Live[] = []
     while (now !== undefined && live.tick < now) {
-      step(live, W, H)
+      if (now - live.tick > MEMORY) {
+        step(live, W, H)
+      } else {
+        advance(live, past, W, H)
+      }
     }
-    state = { live }
+    state = { live, past }
     // Tell the hooks which clock this copy keeps: shared, or its own (and so not in step).
     surface.post({ clock: now === undefined ? `own (epoch ${props.epoch ?? 'none'})` : `shared, tick ${now}` })
     surface.every(TICK_MS, () => {
       const target = clock() ?? live.tick + 1
       for (let i = 0; i < CATCH_UP && live.tick < target; i += 1) {
-        step(live, W, H)
+        advance(live, past, W, H)
       }
-      surface.setState({ live })
+      surface.setState({ live, past })
     })
     surface.setState(state)
   }
-  const live = state.live
+  const { live, past } = state
   if (props.mood !== live.moodNext) {
     live.moodNext = props.mood
     live.moodTick = tickOf(props.moodAt, live.tick + 1)
+    if (live.moodTick <= live.tick) {
+      replay(live, past, live.moodTick, W, H)
+    }
   }
   if ((props.ink ?? 0) > live.inkSeen) {
     live.inkSeen = props.ink ?? 0
     live.inkPending = true
     live.inkTick = tickOf(props.inkAt, live.tick + 1)
+    if (live.inkTick <= live.tick) {
+      replay(live, past, live.inkTick, W, H)
+    }
   }
 
   const scorch = live.scorch
@@ -691,8 +751,8 @@ const LichLive: ClientModule<Props, State> = (props, surface) => {
         return undefined
       }
       const lot = hash(x * 5 + 1, y * 7 + 3)
-      // The band of motes at the edge of what is left narrows as it goes, to nothing.
-      const band = 0.12 * Math.min(1, presence * 5)
+      // The band of motes at the edge of what is left narrows to nothing as it goes, and as it comes whole.
+      const band = 0.12 * Math.min(1, presence * 5, (1 - presence) * 6)
       if (lot > presence + band) {
         return undefined
       }

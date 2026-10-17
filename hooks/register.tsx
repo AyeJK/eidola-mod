@@ -26,7 +26,7 @@ import { FACES, SPRITE_PALETTE, vesselSvg } from './sprite'
 import { renderScene } from './field'
 import { krakenWaterScene } from './kraken'
 import { voidScene } from './lich'
-import { LABEL_PX, SIGIL_PX, labelSvg, sigilSvg } from './hud'
+import { LABEL_PX, labelSvg } from './hud'
 import { SCENES } from './scenes'
 import { BAND_SCENE_PX, BAND_STAGE_PX, PX_PER_COLUMN, PX_PER_ROW, sceneSize, stageSize, stageSvg } from './stage'
 
@@ -208,15 +208,9 @@ const FRAME_STATES: Record<VesselState, { colour: string; name: string; line: st
   sleeping: { colour: '#5a6070', name: 'ASLEEP', line: 'dormant' },
 }
 
-/** The colour each Engram's sigil was last drawn in: the next one fades in from it. */
-const sigilColours = new Map<string, string>()
-
-/** The colour a new sigil fades in from, and remember the one it fades to. */
-function sigilFrom(id: string, colour: string): string {
-  const from = sigilColours.get(id) ?? colour
-  sigilColours.set(id, colour)
-  return from
-}
+/** The sigil's size in cells: about 56 px square. */
+const SIGIL_COLS = 7
+const SIGIL_ROWS = 3
 
 /** How busy a HUD's recording runs in a state. */
 function waveLevel(state: VesselState): 'idle' | 'working' | 'attention' {
@@ -298,10 +292,8 @@ function framed(
             ? at(
                 'frame-tag',
                 1,
-                cols - 3 - Math.ceil(SIGIL_PX / PX_PER_COLUMN),
-                <Box width={Math.ceil(SIGIL_PX / PX_PER_COLUMN)} height={Math.ceil(SIGIL_PX / PX_PER_ROW)}>
-                  <Svg key={`frame-sigil:${view.state}`} source={sigilSvg(look.colour, sigilFrom(awake.engram.id, look.colour), waveLevel(view.state))} alt="Sigil" width={SIGIL_PX} height={SIGIL_PX} isInteractive />
-                </Box>,
+                cols - 3 - SIGIL_COLS,
+                <Client key="frame-sigil" module="./frame-sigil.tsx" props={{ colour: look.colour, level: waveLevel(view.state), cols: SIGIL_COLS, rows: SIGIL_ROWS }} width={SIGIL_COLS} height={SIGIL_ROWS} />,
               )
             : at('frame-tag', 1, cols - tag.length - 3, <Text color={FRAME_GOLD}>{tag}</Text>))}
       {rows >= 6 &&

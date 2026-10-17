@@ -1,0 +1,1024 @@
+<title>Engram Spec v2</title>
+<meta name="phase-runner:artifact" content="https://claude.ai/artifact/8Pbz4n7q21wJa9fgJn19UV">
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: fixed left sidebar of section links, one 900px column of section cards. */
+:root {
+  --bg: #f9fafb;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --sidebar-bg: #1e293b;
+  --sidebar-text: #ffffff;
+  --sidebar-muted: #94a3b8;
+  --blue: #3b82f6;
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+  --gray: #6b7280;
+  --blue-soft: #dbeafe;
+  --green-soft: #dcfce7;
+  --red-soft: #fee2e2;
+  --amber-soft: #fef3c7;
+  --gray-soft: #e5e7eb;
+  --code-bg: #0f172a;
+  --code-text: #e2e8f0;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface-2: #162032;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --sidebar-bg: #0b1120;
+    --sidebar-text: #f1f5f9;
+    --sidebar-muted: #64748b;
+    --blue: #60a5fa;
+    --green: #4ade80;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --gray: #94a3b8;
+    --blue-soft: #1e3a5f;
+    --green-soft: #14532d;
+    --red-soft: #4c1d1d;
+    --amber-soft: #4a3510;
+    --gray-soft: #334155;
+    --code-bg: #0b1120;
+    --code-text: #e2e8f0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #162032;
+  --border: #334155;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --sidebar-bg: #0b1120;
+  --sidebar-text: #f1f5f9;
+  --sidebar-muted: #64748b;
+  --blue: #60a5fa;
+  --green: #4ade80;
+  --red: #f87171;
+  --amber: #fbbf24;
+  --gray: #94a3b8;
+  --blue-soft: #1e3a5f;
+  --green-soft: #14532d;
+  --red-soft: #4c1d1d;
+  --amber-soft: #4a3510;
+  --gray-soft: #334155;
+  --code-bg: #0b1120;
+  --code-text: #e2e8f0;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.6; }
+* { box-sizing: border-box; }
+a { color: var(--blue); }
+a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 3px; }
+code { font-family: var(--mono); font-size: 0.88em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; overflow-wrap: anywhere; }
+pre { font-family: var(--mono); font-size: 13px; line-height: 1.55; background: var(--code-bg); color: var(--code-text); border-radius: 6px; padding: 14px 16px; overflow-x: auto; margin: 0; }
+pre code { background: none; border: 0; padding: 0; color: inherit; font-size: inherit; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.25; margin: 0; }
+
+/* Sidebar */
+.sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 220px; background: var(--sidebar-bg); color: var(--sidebar-text); padding: calc(24px + env(safe-area-inset-top, 0px)) 16px 24px max(16px, env(safe-area-inset-left, 0px)); overflow-y: auto; }
+.sidebar .brand { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+.sidebar .sub { color: var(--sidebar-muted); font-size: 12px; margin-bottom: 20px; }
+.sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+.sidebar nav a { color: var(--sidebar-text); text-decoration: none; font-size: 13.5px; padding: 6px 10px; border-radius: 6px; border-left: 2px solid transparent; opacity: 0.85; }
+.sidebar nav a:hover { opacity: 1; border-left-color: var(--blue); background: rgba(127,127,127,0.12); }
+.sidebar nav a.sub-link { padding-left: 22px; font-size: 12.5px; }
+
+/* Main column */
+main { margin-left: 220px; padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+section.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; min-width: 0; scroll-margin-top: 16px; }
+.eyebrow { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+section.card > h2 { font-size: 22px; margin-bottom: 14px; }
+h3 { font-size: 16px; margin: 20px 0 8px; }
+p { margin: 0 0 12px; max-width: 70ch; }
+ul, ol { margin: 0 0 12px; padding-left: 20px; max-width: 72ch; }
+li { margin-bottom: 4px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+/* Hero */
+.hero { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 28px 24px; }
+.hero h1 { font-size: 34px; letter-spacing: -0.01em; margin-bottom: 8px; }
+.hero .lede { font-size: 17px; color: var(--muted); max-width: 64ch; margin-bottom: 16px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); align-items: center; }
+.badge { display: inline-block; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+.badge.draft { background: var(--amber-soft); color: var(--text); border: 1px solid var(--amber); }
+.badge.sel { background: var(--green-soft); color: var(--text); border: 1px solid var(--green); }
+.badge.rej { background: var(--red-soft); color: var(--text); border: 1px solid var(--red); }
+.badge.def { background: var(--gray-soft); color: var(--text); border: 1px solid var(--gray); }
+.badge.prop { background: var(--blue-soft); color: var(--text); border: 1px solid var(--blue); }
+
+/* Grids */
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.two > * { min-width: 0; }
+.box { border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; background: var(--surface-2); }
+.box h4 { margin: 0 0 8px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.box ul { margin: 0; }
+
+/* Tables */
+.tw { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { background: var(--surface-2); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); font-weight: 600; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lvl { font-weight: 600; white-space: nowrap; }
+.lvl.h { color: var(--red); } .lvl.m { color: var(--amber); } .lvl.l { color: var(--green); }
+
+/* Diagram */
+.diagram { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); padding: 8px; }
+.diagram svg { display: block; min-width: 760px; width: 100%; height: auto; }
+.n-user { fill: var(--blue-soft); stroke: var(--blue); }
+.n-sys { fill: var(--surface); stroke: var(--gray); }
+.n-ext { fill: var(--amber-soft); stroke: var(--amber); }
+.n-store { fill: var(--green-soft); stroke: var(--green); }
+.n-later { fill: var(--surface); stroke: var(--gray); stroke-dasharray: 5 4; }
+.n-label { fill: var(--text); font: 600 13px var(--sans); }
+.n-sub { fill: var(--muted); font: 12px var(--mono); }
+.n-sub2 { fill: var(--muted); font: 13px var(--sans); }
+.edge { stroke: var(--gray); stroke-width: 1.5; fill: none; }
+.edge.dash { stroke-dasharray: 5 4; }
+.e-label { fill: var(--muted); font: 12px var(--sans); }
+.arrowhead { fill: var(--gray); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); margin: 12px 0 16px; }
+.legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1px solid; }
+.legend .lu::before { background: var(--blue-soft); border-color: var(--blue); }
+.legend .ls::before { background: var(--surface); border-color: var(--gray); }
+.legend .le::before { background: var(--amber-soft); border-color: var(--amber); }
+.legend .ld::before { background: var(--green-soft); border-color: var(--green); }
+.legend .ll::before { background: var(--surface); border-color: var(--gray); border-style: dashed; }
+
+/* Options */
+.option { border: 1px solid var(--border); border-radius: 8px; padding: 18px; margin-bottom: 16px; }
+.option:last-child { margin-bottom: 0; }
+.option-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.option-head h3 { margin: 0; }
+.pros li::marker { color: var(--green); }
+.cons li::marker { color: var(--red); }
+.pros h4 { color: var(--green); } .cons h4 { color: var(--red); }
+.verdict-note { font-size: 13.5px; color: var(--muted); margin: 12px 0 0; }
+
+/* Decisions & questions */
+.dec { border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; margin-bottom: 12px; }
+.dec h3 { margin: 0 0 10px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.dec dl { display: grid; grid-template-columns: 110px 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
+.dec dt { font-weight: 600; color: var(--muted); font-size: 12.5px; letter-spacing: 0.04em; text-transform: uppercase; padding-top: 2px; }
+.dec dd { margin: 0; min-width: 0; }
+
+/* Wireframes */
+.wf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.wf-grid > figure { min-width: 0; margin: 0; }
+.wf { border: 1.5px solid var(--gray); border-radius: 6px; background: var(--surface); font-size: 13px; overflow: hidden; }
+.wf-bar { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; background: var(--surface-2); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+.wf-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.wf-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.wf-tab { border: 1px solid var(--gray); border-radius: 4px; padding: 1px 8px; font-size: 12px; }
+.wf-tab.on { background: var(--text); color: var(--surface); border-color: var(--text); }
+.wf-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wf-card { border: 1px dashed var(--gray); border-radius: 4px; padding: 8px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.wf-img { height: 46px; border-radius: 3px; background: var(--gray-soft); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 11px; }
+.wf-btn { align-self: flex-start; border: 1px solid var(--text); border-radius: 4px; padding: 1px 8px; font-size: 12px; }
+.wf-tag { display: inline-block; border: 1px dashed var(--blue); color: var(--blue); border-radius: 4px; padding: 0 6px; font-size: 11px; font-family: var(--mono); }
+.wf-pill { display: inline-block; border-radius: 999px; padding: 0 7px; font-size: 11px; border: 1px solid var(--gray); color: var(--muted); }
+.wf-pill.yours { border-color: var(--blue); color: var(--blue); }
+.wf-term { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; background: var(--code-bg); color: var(--code-text); padding: 10px 12px; border-radius: 4px; overflow-x: auto; }
+.wf-term .ok { color: var(--green); } .wf-term .bad { color: var(--red); } .wf-term .warn { color: var(--amber); }
+figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
+figcaption strong { color: var(--text); }
+
+/* Phases */
+.phases { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 12px 0 16px; }
+.phase { border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; background: var(--surface-2); min-width: 0; }
+.phase b { display: block; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--blue); margin-bottom: 4px; }
+.phase .t { font-weight: 600; margin-bottom: 4px; }
+.phase p { font-size: 13px; color: var(--muted); margin: 0; }
+
+.callout { border: 1px solid var(--amber); background: var(--amber-soft); border-radius: 6px; padding: 12px 14px; font-size: 14px; margin: 0 0 14px; }
+.callout p { margin: 0; max-width: none; }
+
+@media (max-width: 768px) {
+  .sidebar { position: static; width: auto; padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 14px max(16px, env(safe-area-inset-left, 0px)); }
+  .sidebar nav { flex-direction: row; flex-wrap: wrap; }
+  .sidebar nav a.sub-link { padding-left: 10px; }
+  .sidebar .sub { margin-bottom: 10px; }
+  main { margin-left: 0; padding-block: 16px 48px; }
+  .two, .wf-grid, .phases { grid-template-columns: 1fr; }
+  .dec dl { grid-template-columns: 1fr; gap: 2px; }
+  .dec dd { margin-bottom: 8px; }
+  .hero h1 { font-size: 28px; }
+}
+@media (max-width: 480px) { .wf-cards { grid-template-columns: 1fr; } }
+</style>
+
+<aside class="sidebar">
+  <div class="brand">Engram Spec v2</div>
+  <div class="sub">Eidola mod · plan · 16 Oct 2026</div>
+  <nav aria-label="Sections">
+    <a href="#overview">Overview</a>
+    <a href="#today">Where the format stands</a>
+    <a href="#flow">Data flow</a>
+    <a href="#options">Options considered</a>
+    <a href="#mockups">UI mockups</a>
+    <a href="#decisions">Technical decisions</a>
+    <a href="#spec">The spec, drafted</a>
+    <a href="#spec-folder" class="sub-link">Folder</a>
+    <a href="#spec-fields" class="sub-link">Fields</a>
+    <a href="#spec-rules" class="sub-link">Validation rules</a>
+    <a href="#shrine">Local Shrine</a>
+    <a href="#next">Next: scene plugins</a>
+    <a href="#questions">Open questions &amp; risks</a>
+    <a href="#handoff">Implementation handoff</a>
+  </nav>
+</aside>
+
+<main>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Eidola · product plan</div>
+  <h1>Engram Spec v2</h1>
+  <p class="lede">Eidola is a live companion that reacts to what Claude is doing. This plan sets one folder format for every Engram it loads: the three bundled creatures (the Kraken, the Lich and the Wisp) first, then the ones people make themselves.</p>
+  <div class="meta">
+    <span class="badge draft">Draft</span>
+    <span>16 Oct 2026</span>
+    <span>Project: Eidola</span>
+    <span>Author: Jeremy Kaye</span>
+    <span>Source: <code>AyeJK/eidola-mod</code> 0.6.0 (<code>75479c3</code>)</span>
+  </div>
+</header>
+
+<section class="card" id="overview">
+  <div class="eyebrow">Overview</div>
+  <h2>What we're building, and why</h2>
+  <div class="callout"><p><strong>Changed 16 Oct.</strong> <strong>Scenes only:</strong> v2 has no frames, so Spirit, Skull, Moon, Sigil and Starfield are removed with their pictures, and the bundle is the Kraken, the Lich and the Wisp (decisions 3, 4). <strong>Surfaces:</strong> one setting for all Engrams, three switches (Pane, Band, Shrine) and "hide the band while the pane is open", replaces <code>placement</code> (decision 5). <strong>Make your own:</strong> people create or remix Engrams with Claude, and each one ships as its own Engram plugin, made and published with an Eidola skill. That is Phase 2 now, replacing the settings-only folder (decision 14). <strong>No Soul:</strong> Eidola is the visual companion only and adds nothing to the prompt, so <code>SOUL.md</code> and Soul injection are gone (decision 9).</p></div>
+  <p>Eidola is a live companion that reacts to what Claude is doing: a creature in the pane, the band or the Shrine that moves with each prompt, tool and turn. Engram spec v2 is its package format. An Engram is a creature: a scene, a name, a description, colours and where it shows. Today the bundled Engrams are TypeScript objects in <code>hooks/engrams.ts</code>, and their pictures sit in <code>vessels/&lt;pack&gt;/</code>. v2 keeps the three that draw live scenes and turns each into a folder the mod reads at session start (<code>engram.json</code> and a <code>vessel/</code> folder for picker thumbnails), writes the format down in the mod repo, and gives creators a checker. The v1 spec in <code>eidola-runtime</code> retires.</p>
+
+  <h3>Why now</h3>
+  <ul>
+    <li><strong>The spec on record describes a different product.</strong> <code>eidola-runtime/docs/spec/engram-format.md</code> is v1: Lottie, WebM, MP4 and GIF clips, a compiled Cursor rule, a <code>CLAUDE.md</code> import. None of it draws or runs in the mod.</li>
+    <li><strong>Only code can add an Engram.</strong> Nobody can make one without editing the mod and opening a PR against TypeScript.</li>
+    <li><strong>The format grew in code with no contract.</strong> <code>shows</code>, <code>thumbnails</code>, <code>hud</code> and <code>scene</code> arrived in 0.4–0.6 and the renderer and picker read them, but nothing defines them. The open bug where <code>/eidola place both</code> still shows a band-only Engram in the pane comes from that gap.</li>
+    <li><strong>It has to be settled before anyone else builds on it.</strong> Creators build against the spec, so it gets locked before the mod goes public.</li>
+  </ul>
+
+  <h3>What success looks like</h3>
+  <ul>
+    <li>The Kraken, the Lich and the Wisp load from <code>engrams/&lt;id&gt;/</code> folders. <code>hooks/engrams.ts</code> keeps the types and the loader and holds no Engram data. Their picker cards, thumbnails and scenes are unchanged, proven by snapshot tests taken before the move. The five frames Engrams are gone, on purpose, with their own test.</li>
+    <li>Eidola adds nothing to the prompt, on either path, proven by a test.</li>
+    <li>A person copies the template into their Engrams folder, picks a bundled scene, edits <code>engram.json</code> (name, description, HUD colours), runs <code>/engrams</code>, and it shows in the picker. No change to the mod.</li>
+    <li>A broken package never breaks a session. The loader skips it, and <code>/eidola</code> names the file, the problem and the fix.</li>
+    <li><code>docs/spec/engram-format.md</code> lists only fields the mod reads, and each field has a test.</li>
+    <li>Where an Engram draws is decided by one function from one surfaces setting, and a band-only Engram never opens the pane by itself.</li>
+  </ul>
+
+  <div class="two">
+    <div class="box">
+      <h4>In scope</h4>
+      <ul>
+        <li>The v2 folder format and field reference</li>
+        <li>A loader for bundled Engrams and your own folder</li>
+        <li>One validator: loader, check script and <code>/eidola check</code></li>
+        <li>Moving the Kraken, the Lich and the Wisp into folders</li>
+        <li>Removing the five frames Engrams and the frames path</li>
+        <li>Removing the Soul and all prompt injection</li>
+        <li>Spec docs in the mod repo: format and Vessel states</li>
+        <li>A template Engram to copy</li>
+        <li>The surfaces setting and the <code>shows</code> rule</li>
+        <li>A pointer from the v1 spec to v2</li>
+        <li>A local Shrine for the Kraken LCD, served by the mod, drawing the live 3D Engrams (Phase 4)</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h4>Out of scope</h4>
+      <ul>
+        <li>The Directory or any marketplace</li>
+        <li>Forge v2 and the GIF / MP4 converter</li>
+        <li>A media tier and the eidola.app relay</li>
+        <li>Cloud sessions: Eidola runs in local sessions only</li>
+        <li>Frames: per-state SVG pictures</li>
+        <li>Scene plugins: the later creator path, after Phase 4</li>
+        <li>Voice</li>
+        <li>Souls, personas or any prompt text (an optional link to a persona the person already has may come later, outside the format)</li>
+        <li>Surfaces beyond Claude Code for now</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="card" id="today">
+  <div class="eyebrow">Evidence</div>
+  <h2>Where the format stands in 0.6.0</h2>
+  <p>Read from the mod's source and the plugin API types on 16 Oct 2026. The plan builds on these, not on the Oct 14 draft alone.</p>
+  <div class="tw"><table>
+    <thead><tr><th>What</th><th>Today</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td>Engram data</td><td>TypeScript objects in an <code>ENGRAMS</code> map</td><td><code>hooks/engrams.ts</code></td></tr>
+      <tr><td>Metadata shape</td><td>v1 <code>engram.yaml</code> copied as an object: <code>engram_version</code>, <code>id</code>, <code>name</code>, <code>voice_id: null</code>, <code>meta{author, created, description, tags}</code></td><td><code>hooks/engrams.ts</code></td></tr>
+      <tr><td>Fields the mod reads</td><td><code>id</code>, <code>name</code>, <code>meta.description</code>, the Soul, and under <code>vessel</code>: <code>pack</code>, <code>placement</code>, <code>shows</code>, <code>thumbnails</code>, <code>scene</code>, <code>hud</code>. Nothing reads <code>engram_version</code>, <code>voice_id</code>, <code>author</code>, <code>created</code>, <code>tags</code> or <code>forge</code>.</td><td><code>hooks/register.tsx</code></td></tr>
+      <tr><td>Soul</td><td>A string in code. Seven Engrams get a generated "quiet" Soul; Wisp has its own, 1,146 characters. Sent as <code>&lt;eidola-soul&gt;</code> on <code>prompt.submit</code> and as an "Active Engram" system section. v2 removes all of it (decision 9).</td><td><code>hooks/engrams.ts</code>, <code>register.tsx</code></td></tr>
+      <tr><td>Pictures</td><td>One SVG per state, <code>vessels/&lt;pack&gt;/&lt;state&gt;.svg</code>. Largest is 96,664 characters (<code>skull/success</code>), under the 131,072 limit. 2.2 MB across all packs. v2 drops these frames and keeps only the thumbnails.</td><td><code>vessels/</code></td></tr>
+      <tr><td>Missing picture</td><td>Falls back to the built-in pixel sprite</td><td><code>vesselFor()</code></td></tr>
+      <tr><td>Scenes</td><td>Kraken, Lich and Wisp draw from code and follow three moods (idle, working, attention), not the nine states</td><td><code>hooks/scenes.ts</code></td></tr>
+      <tr><td>Thumbnail bake</td><td>Finds thumbnails by reading <code>hooks/engrams.ts</code> as text</td><td><code>scripts/bake-thumbs.mjs</code></td></tr>
+      <tr><td>Spec on record</td><td>v1 (June 2026). The mod's resolver comment still cites <code>vessel-reactivity.md</code> there.</td><td><code>eidola-runtime/docs/spec/</code></td></tr>
+      <tr><td>Code shared with the runtime</td><td>None. The mod imports only the plugin API and its own files.</td><td>whole repo</td></tr>
+      <tr><td>Kraken LCD</td><td>Lives only in the v1 Shrine: <code>kraken-detect.ts</code> (112 lines), <code>kraken-setup.ts</code> (29 lines) and the CAM setup doc. CAM points at <code>http://127.0.0.1:9743/shrine/</code>.</td><td><code>eidola-runtime/packages/shrine</code></td></tr>
+      <tr><td>Serving a local page</td><td>No server API. <code>$.process.spawn</code> keeps a child process running for the session's life, and <code>$.http.fetch</code> can post to it. <code>/eidola</code> already probes <code>127.0.0.1:9743</code>.</td><td><code>.claude-plugin/types</code>, <code>hooks/net-probe.ts</code></td></tr>
+      <tr><td>Probe, 16 Oct</td><td>A throwaway mod run with <code>claude -p --plugin-dir</code> on your PC (engine 2.1.289) and in a cloud session (2.1.302): spawned Node, served and fetched on <code>127.0.0.1</code>, read outside its folder, found the home folder. 12 of 13 checks passed; the miss was port 9743, where no v1 Shrine was running.</td><td><code>eidola-mod/.probe</code> (removed)</td></tr>
+      <tr><td>Plugin API limits</td><td><code>$.fs.read</code>, <code>list</code> and <code>exists</code> take absolute paths, 4 MiB per read. <code>$.env.get</code> reads <code>HOME</code>. <code>$.store</code> is one JSON file, 4 MiB in total. <code>Svg</code> takes up to 131,072 characters and draws them in a sandbox with scripts and event attributes stripped.</td><td><code>.claude-plugin/types</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="card" id="flow">
+  <div class="eyebrow">Data flow</div>
+  <h2>From a folder to the pane</h2>
+  <div class="legend">
+    <span class="lu">Person</span><span class="ls">Mod component</span><span class="le">Outside the mod</span><span class="ld">Files and stored data</span><span class="ll">Later, not in v2</span>
+  </div>
+  <div class="diagram">
+    <svg viewBox="0 0 900 470" role="img" aria-label="Data flow. A creator writes an Engram folder and checks it with check-engram. The loader reads bundled Engrams from the mod and your Engrams from your home folder, validates them, and puts good ones in the Engram registry and broken ones in a skipped list that /eidola shows. The person picks an Engram in the picker; its id is kept in the plugin store. whereItDraws picks the surfaces from the surfaces setting and the Engram's shows list. Nothing is sent to the Claude model. The resolver turns Claude Code engine events into states and moods, and the renderer draws the awake Engram's scene and HUD on the surfaces that are switched on, plus the status line. The Directory feeds the loader later.">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="arrowhead"/></marker>
+      </defs>
+
+      <!-- Column 1: authoring and sources -->
+      <rect x="20" y="20" width="170" height="44" rx="6" class="n-user"/>
+      <text x="105" y="47" text-anchor="middle" class="n-label">Creator</text>
+
+      <rect x="20" y="100" width="170" height="44" rx="6" class="n-sys"/>
+      <text x="105" y="127" text-anchor="middle" class="n-label">check-engram</text>
+
+      <rect x="20" y="180" width="170" height="56" rx="6" class="n-store"/>
+      <text x="105" y="203" text-anchor="middle" class="n-label">Your Engrams</text>
+      <text x="105" y="222" text-anchor="middle" class="n-sub" style="font-size: 10.5px">~/.claude/eidola/engrams</text>
+
+      <rect x="20" y="262" width="170" height="56" rx="6" class="n-store"/>
+      <text x="105" y="285" text-anchor="middle" class="n-label">Bundled Engrams</text>
+      <text x="105" y="304" text-anchor="middle" class="n-sub">&lt;mod&gt;/engrams</text>
+
+      <rect x="20" y="344" width="170" height="44" rx="6" class="n-later"/>
+      <text x="105" y="371" text-anchor="middle" class="n-label">Directory (later)</text>
+
+      <!-- Column 2 -->
+      <rect x="250" y="200" width="170" height="80" rx="6" class="n-sys"/>
+      <text x="335" y="232" text-anchor="middle" class="n-label">Loader</text>
+      <text x="335" y="252" text-anchor="middle" class="n-sub2">parse · validate</text>
+      <text x="335" y="269" text-anchor="middle" class="n-sub2">fill defaults</text>
+
+      <rect x="250" y="360" width="170" height="56" rx="6" class="n-ext"/>
+      <text x="335" y="383" text-anchor="middle" class="n-label">Claude Code engine</text>
+      <text x="335" y="402" text-anchor="middle" class="n-sub2">prompt · tool · turn</text>
+
+      <!-- Column 3 -->
+      <rect x="480" y="20" width="170" height="44" rx="6" class="n-user"/>
+      <text x="565" y="47" text-anchor="middle" class="n-label">Person</text>
+
+      <rect x="480" y="140" width="170" height="56" rx="6" class="n-sys"/>
+      <text x="565" y="163" text-anchor="middle" class="n-label">Engram registry</text>
+      <text x="565" y="182" text-anchor="middle" class="n-sub2">id → Engram</text>
+
+      <rect x="480" y="240" width="170" height="56" rx="6" class="n-sys"/>
+      <text x="565" y="263" text-anchor="middle" class="n-label">Skipped packages</text>
+      <text x="565" y="282" text-anchor="middle" class="n-sub2">file · reason · fix</text>
+
+      <rect x="480" y="360" width="170" height="56" rx="6" class="n-sys"/>
+      <text x="565" y="383" text-anchor="middle" class="n-label">Resolver</text>
+      <text x="565" y="402" text-anchor="middle" class="n-sub2">9 states · 3 moods</text>
+
+      <!-- Column 4 -->
+      <rect x="710" y="20" width="170" height="44" rx="6" class="n-sys"/>
+      <text x="795" y="47" text-anchor="middle" class="n-label">Picker</text>
+
+      <rect x="710" y="100" width="170" height="44" rx="6" class="n-store"/>
+      <text x="795" y="127" text-anchor="middle" class="n-label">Awake id ($.store)</text>
+
+      <rect x="710" y="180" width="170" height="56" rx="6" class="n-sys"/>
+      <text x="795" y="203" text-anchor="middle" class="n-label">whereItDraws</text>
+      <text x="795" y="222" text-anchor="middle" class="n-sub2">surfaces · shows</text>
+
+      <rect x="710" y="340" width="170" height="56" rx="6" class="n-sys"/>
+      <text x="795" y="363" text-anchor="middle" class="n-label">Renderer</text>
+      <text x="795" y="382" text-anchor="middle" class="n-sub2">scene + HUD</text>
+      <text x="795" y="430" text-anchor="middle" class="e-label">→ pane · band · Shrine · status line</text>
+
+      <!-- Edges -->
+      <path d="M105 64 V96" class="edge" marker-end="url(#arr)"/>
+      <path d="M105 144 V176" class="edge" marker-end="url(#arr)"/>
+      <text x="113" y="166" class="e-label">checks</text>
+      <path d="M190 214 L248 232" class="edge" marker-end="url(#arr)"/>
+      <path d="M190 290 L248 258" class="edge" marker-end="url(#arr)"/>
+      <path d="M190 366 L248 276" class="edge dash" marker-end="url(#arr)"/>
+      <path d="M420 228 L478 176" class="edge" marker-end="url(#arr)"/>
+      <path d="M420 254 L478 266" class="edge" marker-end="url(#arr)"/>
+      <text x="436" y="314" class="e-label">shown by</text>
+      <text x="436" y="330" class="e-label">/eidola</text>
+      <path d="M650 42 H706" class="edge" marker-end="url(#arr)"/>
+      <path d="M650 152 L708 60" class="edge" marker-end="url(#arr)"/>
+      <path d="M795 64 V96" class="edge" marker-end="url(#arr)"/>
+      <path d="M795 144 V176" class="edge" marker-end="url(#arr)"/>
+      <path d="M650 176 L706 204" class="edge" marker-end="url(#arr)"/>
+      <path d="M650 190 L716 336" class="edge" marker-end="url(#arr)"/>
+      <path d="M795 236 V336" class="edge" marker-end="url(#arr)"/>
+      <path d="M420 388 H476" class="edge" marker-end="url(#arr)"/>
+      <path d="M650 378 H706" class="edge" marker-end="url(#arr)"/>
+    </svg>
+  </div>
+  <h3>In plain words</h3>
+  <ol>
+    <li>At session start, and again on <code>/engrams</code>, the loader reads each folder under the mod's <code>engrams/</code> and under your Engrams folder. It reads only <code>engram.json</code> at this point.</li>
+    <li>Each package is checked against the spec. A good one goes into the registry with its defaults filled in. A broken one goes on the skipped list with the file, the problem and the fix, and <code>/eidola</code> shows that list. Nothing throws.</li>
+    <li>The picker lists the registry. Awakening an Engram stores its id in <code>$.store</code>, as today.</li>
+    <li><code>whereItDraws</code> picks where the awake Engram draws, from the surfaces setting and the Engram's <code>shows</code>. Nothing goes to the model: Eidola adds no text to any prompt.</li>
+    <li>The resolver turns engine events into a state and a mood. The renderer draws the awake Engram's scene in that mood, with its HUD, on each surface that is switched on and that the Engram's <code>shows</code> lists. An error plays as a one-off effect on top. Thumbnails are read on first use and cached.</li>
+    <li>Creators run the same checks before they share, through <code>check-engram</code> or <code>/eidola check &lt;id&gt;</code>.</li>
+  </ol>
+</section>
+
+<section class="card" id="options">
+  <div class="eyebrow">Options considered</div>
+  <h2>Four ways to define an Engram</h2>
+
+  <div class="option">
+    <div class="option-head"><h3>A · One manifest: <code>engram.json</code>, naming a scene</h3><span class="badge sel">Selected</span></div>
+    <p class="muted small">Folder named by id. One JSON manifest that names the scene it draws, and a <code>vessel/</code> folder for picker thumbnails. Per-state SVG frames and an optional <code>SOUL.md</code> were part of this option until 16 Oct; both are gone (decisions 3, 9).</p>
+    <div class="two">
+      <div class="box pros"><h4>Pros</h4><ul>
+        <li>No YAML parser needed in a hooks module that imports nothing but the plugin API</li>
+        <li>One file to validate, with a JSON Schema for editors</li>
+        <li>A package is small: a manifest and at most two thumbnails, each fitting one <code>$.fs.read</code> and one <code>Svg</code></li>
+        <li>Manifests load at start and thumbnails load lazily</li>
+      </ul></div>
+      <div class="box cons"><h4>Cons</h4><ul>
+        <li>Drops the v1 file names <code>engram.yaml</code> and <code>vessel.yaml</code></li>
+        <li>JSON has no comments for creators</li>
+        <li>Departs from the Oct 14 draft</li>
+      </ul></div>
+    </div>
+    <p class="verdict-note">Selected. v1 Engrams can't load in the mod whatever we name the files, because their clips are Lottie, WebM, MP4 or GIF and none of those draw in Claude. Keeping v1 names would buy nothing.</p>
+  </div>
+
+  <div class="option">
+    <div class="option-head"><h3>B · The Oct 14 draft: two YAML files, <code>native.svg.json</code>, optional media tier</h3><span class="badge rej">Rejected</span></div>
+    <p class="muted small"><code>engram.yaml</code> + <code>vessel.yaml</code>, all states packed into <code>vessel/native.svg.json</code>, and WebM / MP4 / GIF for the Shrine.</p>
+    <div class="two">
+      <div class="box pros"><h4>Pros</h4><ul>
+        <li>Already written up and reviewed once</li>
+        <li>Keeps v1 file names</li>
+        <li>Media tier is ready if the Shrine returns</li>
+      </ul></div>
+      <div class="box cons"><h4>Cons</h4><ul>
+        <li>Needs a YAML parser. Whether the hooks module can bundle npm packages is unverified.</li>
+        <li>Nine SVGs packed as strings in one JSON file are hard to view and edit (and v2 has no frames now)</li>
+        <li>Specifies a media tier for a surface v1 of the mod won't ship</li>
+        <li>Predates <code>shows</code>, <code>thumbnails</code>, <code>hud</code> and <code>scene</code></li>
+      </ul></div>
+    </div>
+    <p class="verdict-note">Rejected. Its good parts carry over: <code>spec</code> as a version field, a <code>rights</code> attestation, <code>extensions</code>, and dropping <code>voice_id</code>. Its <code>fallback</code> map carried over too, until frames went on 16 Oct.</p>
+  </div>
+
+  <div class="option">
+    <div class="option-head"><h3>C · Keep Engrams in code, write the spec as docs only</h3><span class="badge rej">Rejected</span></div>
+    <p class="muted small">Document the TypeScript shape and leave <code>hooks/engrams.ts</code> as it is.</p>
+    <div class="two">
+      <div class="box pros"><h4>Pros</h4><ul><li>No loader, nothing to move</li><li>Fastest to finish</li></ul></div>
+      <div class="box cons"><h4>Cons</h4><ul><li>Only you can make Engrams</li><li>Docs and code drift apart again, as they have</li><li>No way to check a package</li></ul></div>
+    </div>
+    <p class="verdict-note">Rejected. A spec nobody can build against isn't a spec.</p>
+  </div>
+
+  <div class="option">
+    <div class="option-head"><h3>D · Each Engram as its own Claude plugin</h3><span class="badge rej">Rejected</span></div>
+    <p class="muted small">Ship every Engram through Claude's plugin marketplace.</p>
+    <div class="two">
+      <div class="box pros"><h4>Pros</h4><ul><li>Claude's installer and updater for free</li></ul></div>
+      <div class="box cons"><h4>Cons</h4><ul><li>Two installed Engrams mean two Vessels fighting over one pane</li><li>Engrams would have to ship code</li></ul></div>
+    </div>
+    <p class="verdict-note">Rejected on Oct 14, and still true: one mod is the engine, Engrams are data. A scene plugin is a different thing: it adds a scene, which is code, and Engrams name it (<a href="#next">Next: scene plugins</a>).</p>
+  </div>
+</section>
+
+<section class="card" id="mockups">
+  <div class="eyebrow">UI mockups</div>
+  <h2>Wireframes</h2>
+  <p class="muted">Structure only. Dashed blue tags name the interactive elements. The picker and <code>/eidola</code> exist today; what's new is the Yours filter, the badge, the Surfaces and Engrams lines and the checker. Every Engram here, bundled or yours, draws a scene; none has frames.</p>
+  <div class="wf-grid">
+    <figure>
+      <div class="wf">
+        <div class="wf-bar"><span>Lich / ENGRAMS</span><span>3 bundled · 1 yours</span></div>
+        <div class="wf-body">
+          <div class="wf-row"><span class="wf-tab">All</span><span class="wf-tab">Pane</span><span class="wf-tab">Band</span><span class="wf-tab">Shrine</span><span class="wf-tab on">Yours</span><span class="wf-tag">tabs: filter</span></div>
+          <div class="wf-cards">
+            <div class="wf-card"><div class="wf-img">thumb-pane.svg</div><strong>Ember Lich</strong><span class="wf-row"><span class="wf-pill yours">yours</span><span class="wf-pill">pane + band</span></span><span class="muted small">The Lich's scene, in coal and green.</span><span class="wf-btn">Awaken</span></div>
+            <div class="wf-card"><div class="wf-img">Wisp's thumbnail</div><strong>Ghost Cat</strong><span class="wf-row"><span class="wf-pill yours">yours</span><span class="wf-pill">band only</span></span><span class="muted small">The Wisp's scene, in grey and amber.</span><span class="wf-btn">Awaken</span></div>
+          </div>
+          <span class="wf-tag">button: awaken</span>
+        </div>
+      </div>
+      <figcaption><strong>Picker with your Engrams.</strong> A Yours tab and a "yours" badge. Each of yours is a bundled scene with its own name, description and HUD colours. With no thumbnails of its own, a card shows its scene's bundled thumbnail.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="wf">
+        <div class="wf-bar"><span>Lich / ENGRAMS</span><span>3 bundled</span></div>
+        <div class="wf-body">
+          <div class="wf-row"><span class="wf-tab">All</span><span class="wf-tab">Pane</span><span class="wf-tab">Band</span><span class="wf-tab">Shrine</span><span class="wf-tab on">Yours</span></div>
+          <div class="box"><strong>No Engrams of your own yet.</strong><br><span class="muted small">Copy the template from the mod's <code>engrams/_template</code> into <code>~/.claude/eidola/engrams/</code>, rename the folder, pick a scene in <code>engram.json</code>, then run <code>/engrams</code>.</span></div>
+          <span class="wf-tag">empty state</span>
+        </div>
+      </div>
+      <figcaption><strong>Empty state.</strong> One clear way to make the first one, with the real paths.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="wf-term">/eidola
+Engram: Lich (awake) · draws on pane + band
+Surfaces: pane on · band on (hidden while the pane is open) · shrine off
+Engrams: 3 bundled, 1 yours (~/.claude/eidola/engrams)
+<span class="bad">Skipped 1:</span>
+  ghost-cat/vessel/thumb-band.svg is 164,900 characters; the limit is 131,072.
+  Use a smaller picture, then run /engrams.</div>
+      <figcaption><strong>Diagnostics with a broken package.</strong> The session runs normally. The line names the file, the limit and the fix.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="wf-term">$ node scripts/check-engram.mjs ~/.claude/eidola/engrams/ember-lich
+<span class="ok">ember-lich: ok</span>
+  draws: scene lich · shows pane + band
+  HUD: sparks meter, sigil tag, its own colours
+  thumbnails: pane, band (largest 88,410 / 131,072)
+<span class="warn">1 warning:</span>
+  "tags" is not a v2 field; put it under "extensions" to keep it.</div>
+      <figcaption><strong>Checker passes.</strong> What will draw, the sizes against their limits, and warnings that don't block.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="wf-term">/eidola check ghost-cat
+<span class="bad">ghost-cat: 3 problems</span>
+  engram.json: "id" is "ghostcat" but the folder is "ghost-cat". Make them match.
+  engram.json: "rights" is missing. Set it to "original" or "licensed".
+  engram.json: "vessel.scene" is missing. Set it to "kraken", "lich" or "wisp".</div>
+      <figcaption><strong>Checker fails.</strong> Each problem names the file and says exactly what to change.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="wf-term">/engrams
+Reloaded: 4 Engrams (3 bundled, 1 yours).
+<span class="warn">Skipped:</span> lich (yours): "lich" is a bundled id. Rename your folder and its "id".</div>
+      <figcaption><strong>Reload with an id clash.</strong> Bundled ids are reserved, so your copy is skipped with a rename hint instead of silently replacing ours.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="card" id="decisions">
+  <div class="eyebrow">Technical decisions</div>
+  <h2>Decided 16 Oct</h2>
+  <p class="muted">Each of these stands unless you change it in review. Two depend on open questions and say so.</p>
+
+  <div class="dec"><h3>1 · A package is a folder named by its id <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd><code>&lt;id&gt;/engram.json</code> (required) and <code>&lt;id&gt;/vessel/</code> (optional, picker thumbnails only). No <code>SOUL.md</code> (decision 9). The folder name equals <code>id</code>.</dd>
+    <dt>Rationale</dt><dd>One manifest to parse and validate without a dependency. With no frames (decision 3), a package is just who it is and which scene it draws.</dd>
+    <dt>Constraints</dt><dd>v1 packages don't load. The bake script stops reading <code>engrams.ts</code> as text and reads manifests.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>2 · The spec holds only what the mod reads <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd>Drop <code>engram_version</code>, <code>voice_id</code>, <code>meta.created</code>, <code>meta.tags</code>, <code>vessel.type</code>, <code>vessel.pack</code> and <code>vessel.forge</code>. Keep <code>extensions</code> as a free namespace the mod preserves and never reads. Unknown top-level keys warn rather than fail.</dd>
+    <dt>Rationale</dt><dd>Fields nothing reads go stale and mislead creators. That is how the v1 spec drifted.</dd>
+    <dt>Constraints</dt><dd>A field comes back only together with the code that reads it and a test. Tags return with the Directory, if it ever comes.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>3 · One way to draw: scenes <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd>Every Engram names a scene in <code>vessel.scene</code>, which is required. For now that's a scene built into the mod: <code>kraken</code>, <code>lich</code> or <code>wisp</code>. Later it can also be a scene a scene plugin provides (<a href="#next">Next</a>). There are no frames: no <code>vessel/&lt;state&gt;.svg</code> files. The five frames Engrams, Spirit, Skull, Moon, Sigil and Starfield, are removed along with their <code>vessels/&lt;pack&gt;/</code> folders, and the bundle is the Kraken, the Lich and the Wisp.</dd>
+    <dt>Rationale</dt><dd>One way to draw means one thing to spec, check, test and port to the Shrine. A package still reuses a scene with its own name, description and HUD colours, which is the preset-then-customize model.</dd>
+    <dt>Constraints</dt><dd>No Engram package ships code. A new bundled scene ships in a mod release. Each scene has a pane view, a band view and a Shrine canvas view, all driven by one simulation. The terminal still draws the text faces. Removing the five is a visible change, so it gets its own sprint and test (Phase 1, Sprint 1.3); a stored awake id for one of them is cleared at start with a one-line notice.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>4 · Three moods, and error as an effect <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd>Scenes follow three moods, <code>idle</code>, <code>working</code> and <code>attention</code>, and blend between them. Error isn't a mood: it's a one-off effect on top of the current mood (the Kraken inks, the Lich is scorched), then the scene carries on. The resolver still has its nine states, and the HUD and status line may name them in text, such as "Lich · thinking".</dd>
+    <dt>Rationale</dt><dd>It's what the live scenes already do in 0.6.0. Nine pictures per Engram was the cost of the frames path, and that path is gone.</dd>
+    <dt>Constraints</dt><dd>No fallback table: every scene draws every mood. With nothing awake, the pane and band draw the resting Wisp's scene, dimmed, where the Wisp's sleeping frame drew before.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>5 · Where an Engram draws: one surfaces setting <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd>One setting for all Engrams: three on/off switches, <strong>Pane</strong>, <strong>Band</strong> and <strong>Shrine</strong>, plus <strong>hide the band while the pane is open</strong>. They replace the <code>placement</code> option and its <code>default</code> / <code>both</code> / <code>pane</code> / <code>band</code> / <code>auto</code> values, and Engrams no longer carry a <code>placement</code> suggestion. Each Engram draws only on surfaces that are switched on and that its <code>shows</code> lists (<code>pane</code>, <code>band</code>, <code>shrine</code>). A band-only Engram never opens the pane by itself; you can still open the pane with <code>/eidola</code>, and it draws its band view there. A Shrine-only Engram draws only a one-line band with its name and the Shrine's URL, which the <code>shrineBand</code> option turns off (Q10). The status line stays its own toggle.</dd>
+    <dt>Rationale</dt><dd>You set it once, for every Engram, instead of a global option mixed with each Engram's suggestion. Fixes the bug where <code>/eidola place both</code> opened a band-only Engram in the pane, and keeps the Oct 14 rule that an Engram can never stop you opening the pane.</dd>
+    <dt>Constraints</dt><dd>One function, <code>whereItDraws(surfaces, engram, isPaneOpen)</code>, replaces the reads spread across <code>register.tsx</code> (Phase 1, Sprint 1.5). Defaults: Pane on, Band on, hide the band while the pane is open on (as today's <code>auto</code>), Shrine off. <code>/eidola place</code> shows the switches and sets one, e.g. <code>/eidola place band off</code>. The Shrine switch arrives with the Shrine (Phase 4, Sprint 4.2); with it off, the mod starts no server and posts nothing.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>6 · Two sources; bundled ids are reserved <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd>Bundled: <code>${$.plugin.root}/engrams/</code>. Everything else: Engram plugins that announce themselves to Eidola at session start (decision 14), wherever they're installed from: your own in <code>~/.claude/eidola/engrams/</code> through the local <code>eidola-local</code> marketplace, or someone else's from their repo. An Engram plugin whose id matches a bundled one is marked not loading with a rename hint. Cloud sessions load bundled Engrams only.</dd>
+    <dt>Rationale</dt><dd>Silent overrides make bug reports impossible to read. To change a bundled Engram, remix it under a new id. A cloud VM's home isn't yours.</dd>
+    <dt>Constraints</dt><dd>Reads outside the mod's folder verified on Windows (Q2); home comes from <code>USERPROFILE</code> there, since <code>HOME</code> is unset. Changed 16 Oct: the second source was a folder of settings-only packages; decision 14 replaced it with Engram plugins.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>7 · Manifests at start, thumbnails on first use <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd>Read every <code>engram.json</code> at session start and on <code>/engrams</code>. Read each thumbnail the first time the picker shows it, and cache it.</dd>
+    <dt>Rationale</dt><dd>Start-up stays small however many Engrams a person keeps.</dd>
+    <dt>Constraints</dt><dd>The checker reads every file. The loader checks a thumbnail's size when it first reads it, and uses the scene's bundled thumbnail if it's too big.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>8 · One validator, three callers <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd>A pure <code>hooks/validate.ts</code> module, used by the loader (skip and report), by <code>scripts/check-engram.mjs</code> (run through the engine's test runner, as <code>bake-thumbs.mjs</code> does), and by <code>/eidola check &lt;id&gt;</code>. Plus <code>docs/spec/engram.schema.json</code> for editor hints.</dd>
+    <dt>Rationale</dt><dd>The checker and the loader can never disagree.</dd>
+    <dt>Constraints</dt><dd>The schema is generated from, or tested against, <code>validate.ts</code>. One source of truth.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>9 · No Soul: Eidola is the visual companion only <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd>Eidola drops the Soul completely. An Engram is a creature: a scene, a name, a description, colours and <code>shows</code>. Packages carry no prompt text at all: no <code>SOUL.md</code>, no Soul fields, no Soul budget. Eidola injects nothing into the prompt on either path: the <code>prompt.submit</code> <code>&lt;eidola-soul&gt;</code> block and the <code>prompt.compose</code> <code>eidola:soul</code> section both go, along with the "quiet Soul". The Wisp loses its custom voice.</dd>
+    <dt>Rationale</dt><dd>Seven of the eight bundled Engrams only ever used the generated quiet Soul, which says little beyond "a companion is here". Personas already have homes in Claude Code: <code>CLAUDE.md</code>, output styles and skills. Injecting nothing costs zero tokens a turn and can't clash with a persona the person already has.</dd>
+    <dt>Constraints</dt><dd>Removed in Phase 1, Sprint 1.3, with a test that nothing is injected. Q4 (the Soul budget) goes away. A leftover <code>SOUL.md</code> in a package is ignored with a warning. Room is left for an optional link to a persona the person already has, later and outside the Engram format; nothing in v2 builds it.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>10 · Rights attestation is required <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd><code>rights</code>: <code>"original"</code> or <code>"licensed"</code>, required.</dd>
+    <dt>Rationale</dt><dd>Costs nothing now. It's the first thing a PR intake or a Directory needs, and the v1 DMCA work showed what happens without it.</dd>
+    <dt>Constraints</dt><dd>It's the creator's word, not a check. Review still applies.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>11 · No media tier <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd>v2 has no <code>media</code> field. GIF, MP4, WebM and Lottie aren't part of the format. The local Shrine draws the same native Vessel the pane does (decision 13). A creator who wants to keep clips puts them under <code>extensions</code>.</dd>
+    <dt>Rationale</dt><dd>They don't draw in Claude (VS Code froze GIFs on frame 1 and drew WebM black, Oct 14). The Shrine draws from the same Engram files and the same scene code, so one format covers every screen.</dd>
+    <dt>Constraints</dt><dd>Reverses the Oct 14 plan's media tier. Nothing a creator makes plays only on the Kraken.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>12 · The spec lives in the mod repo <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd><code>docs/spec/engram-format.md</code>, <code>docs/spec/vessel-states.md</code> (ported from v1's <code>vessel-reactivity.md</code>: the nine resolver states, the three moods scenes draw, and the error effect), and <code>docs/spec/engram.schema.json</code>. The v1 spec files get a one-line pointer to the mod.</dd>
+    <dt>Rationale</dt><dd>It cuts the last link to <code>eidola-runtime</code>, so that repo can be archived.</dd>
+    <dt>Constraints</dt><dd>The comment in <code>hooks/resolver.ts</code> moves to the new doc.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>13 · The mod serves its own local Shrine <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd>A small server that ships with the mod, <code>shrine/server.mjs</code> (Node, no dependencies), is started by the mod with <code>$.process.spawn</code> and runs on <code>127.0.0.1:9743</code> for the session's life. The mod posts the state, mood and ink count. The page at <code>/shrine/</code> draws the Engram itself, from its files and from the same simulation code the pane runs. No relay, no eidola.app.</dd>
+    <dt>Rationale</dt><dd>We run local sessions only, so the cloud reach a relay gave is worth nothing. A hosted relay means auth, pairing and a service to run, all for that. The Oct 14 plan rejected a localhost bridge only because of cloud sessions.</dd>
+    <dt>Constraints</dt><dd>Local sessions only. Port 9743 stays, so an existing CAM setup keeps working, and the v1 Shrine must be uninstalled first. Spawning and serving verified on Windows and Linux (Q7, Q8).</dd>
+  </dl></div>
+
+  <div class="dec"><h3>14 · Engrams you make are plugins, made with Claude <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Decision</dt><dd>People make Engrams the way the Kraken and the Lich were made: by describing them to Claude, from nothing or by remixing any Engram. Each one ships as its own small Claude Code plugin, an Engram plugin, with its <code>engram.json</code> and its own drawing code. Eidola hands it the drawing of the creature and keeps the frame, HUD, picker and Shrine. An Eidola skill, shipped with the mod, creates, remixes, checks and publishes them. Publishing means a GitHub repo others install with two commands.</dd>
+    <dt>Rationale</dt><dd>A folder of settings naming a bundled scene couldn't change the creature itself, which is the point. A mod can't load code from a folder (Client modules must sit inside the plugin; no <code>import()</code> or <code>eval</code>), so a plugin is the only way to ship code. The 16 Oct probe showed another plugin can read Eidola's state, call its commands, draw in the band and serve a Shrine module.</dd>
+    <dt>Constraints</dt><dd>Eidola's pane must hand off with <code>next(e)</code>, which the probe hasn't proven yet: Phase 2 tests it first. Eidola's <code>PluginState</code> becomes a public, versioned contract. A broken Engram plugin falls back and is marked not loading; it never breaks the session. Replaces the settings-only "Your Engrams" folder of the earlier Phase 2 and the "scene plugins later" direction.</dd>
+  </dl></div>
+</section>
+
+<section class="card" id="spec">
+  <div class="eyebrow">The spec, drafted</div>
+  <h2>Engram spec v2</h2>
+  <p>Sprint 1.1 turns this into <code>docs/spec/engram-format.md</code>.</p>
+
+  <h3 id="spec-folder">Folder</h3>
+<pre><code>&lt;id&gt;/
+  engram.json          # required: which creature it is and which scene it draws
+  vessel/              # optional
+    thumb-pane.svg     # optional picker stills; absent means the scene's own
+    thumb-band.svg</code></pre>
+  <p class="muted small">No frames. v2 has no <code>vessel/&lt;state&gt;.svg</code> files: every Engram draws a scene. No <code>SOUL.md</code>: an Engram carries no prompt text. A leftover frame file or <code>SOUL.md</code> is ignored with a warning.</p>
+
+  <h3>The bundled Lich, as v2</h3>
+<pre><code>{
+  "spec": 2,
+  "id": "lich",
+  "name": "Lich",
+  "version": "1.0.0",
+  "author": "eidola",
+  "description": "A crowned skull of alchemical signs, soul-fire in its sockets. It burns brighter while you work.",
+  "rights": "original",
+  "vessel": {
+    "scene": "lich",
+    "shows": ["pane", "band", "shrine"],
+    "thumbnails": { "pane": "thumb-pane.svg", "band": "thumb-band.svg" },
+    "hud": {
+      "show": true,
+      "meter": "sparks",
+      "tag": "sigil",
+      "label": "serif",
+      "bracket": "#9a3c28",
+      "colours": {
+        "idle":      { "label": "#e0603e", "detail": "#9a3c28" },
+        "working":   { "label": "#a860f0", "detail": "#6c34a8" },
+        "attention": { "label": "#3ccf8a", "detail": "#22905e" }
+      }
+    }
+  },
+  "extensions": {}
+}</code></pre>
+  <p class="muted small">Colours trimmed to three states for the page. The real file carries all nine, copied from <code>hooks/engrams.ts</code>.</p>
+
+  <h3 id="spec-fields">Fields</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Field</th><th>Required</th><th>Type</th><th>Default</th><th>Read by</th></tr></thead>
+    <tbody>
+      <tr><td><code>spec</code></td><td>yes</td><td><code>2</code></td><td>—</td><td>loader</td></tr>
+      <tr><td><code>id</code></td><td>yes</td><td>slug <code>[a-z0-9-]</code>, 2–32, equals the folder</td><td>—</td><td>loader, <code>$.store</code>, <code>/awaken</code></td></tr>
+      <tr><td><code>name</code></td><td>yes</td><td>string, up to 32</td><td>—</td><td>picker, HUD, status line</td></tr>
+      <tr><td><code>version</code></td><td>yes</td><td>semver</td><td>—</td><td><code>/eidola</code>, picker (yours)</td></tr>
+      <tr><td><code>author</code></td><td>yes</td><td>string</td><td>—</td><td>picker (yours), checker</td></tr>
+      <tr><td><code>description</code></td><td>yes</td><td>string, up to 160</td><td>—</td><td>picker card, <code>/engrams</code></td></tr>
+      <tr><td><code>rights</code></td><td>yes</td><td><code>original</code> | <code>licensed</code></td><td>—</td><td>checker</td></tr>
+      <tr><td><code>vessel.scene</code></td><td>yes</td><td><code>kraken</code> | <code>lich</code> | <code>wisp</code> (later, also a scene plugin's scene)</td><td>—</td><td>renderer, Shrine</td></tr>
+      <tr><td><code>vessel.shows</code></td><td>no</td><td>list of <code>pane</code>, <code>band</code>, <code>shrine</code></td><td>all three</td><td><code>whereItDraws</code>, picker, Shrine</td></tr>
+      <tr><td><code>vessel.thumbnails</code></td><td>no</td><td><code>{ pane?, band? }</code>, files in <code>vessel/</code></td><td>the scene's bundled thumbnail</td><td>picker</td></tr>
+      <tr><td><code>vessel.hud.show</code></td><td>no</td><td>boolean</td><td><code>false</code></td><td>HUD frame</td></tr>
+      <tr><td><code>vessel.hud.meter</code></td><td>no</td><td><code>bars</code> | <code>wave</code> | <code>sparks</code> | <code>none</code></td><td><code>bars</code></td><td>HUD frame</td></tr>
+      <tr><td><code>vessel.hud.tag</code></td><td>no</td><td><code>name</code> | <code>livecam</code> | <code>sigil</code> | <code>none</code></td><td><code>name</code></td><td>HUD frame</td></tr>
+      <tr><td><code>vessel.hud.camera</code></td><td>no</td><td>string, with <code>tag: livecam</code></td><td>—</td><td>HUD frame</td></tr>
+      <tr><td><code>vessel.hud.layout</code></td><td>no</td><td><code>top</code> | <code>bottom</code></td><td><code>top</code></td><td>HUD frame</td></tr>
+      <tr><td><code>vessel.hud.label</code></td><td>no</td><td><code>bold</code> | <code>serif</code> | <code>pixel</code></td><td><code>bold</code></td><td>HUD frame</td></tr>
+      <tr><td><code>vessel.hud.bracket</code></td><td>no</td><td>hex colour</td><td>brass</td><td>HUD frame</td></tr>
+      <tr><td><code>vessel.hud.colours</code></td><td>no</td><td>state → <code>{ label, detail }</code> hex</td><td>mod defaults</td><td>HUD frame</td></tr>
+      <tr><td><code>extensions</code></td><td>no</td><td>object</td><td><code>{}</code></td><td>nothing; kept as is</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted small">Scenes draw three moods, <code>idle</code>, <code>working</code> and <code>attention</code>, blending between them, with error as a one-off effect on top. The resolver's nine states (<code>idle</code>, <code>thinking</code>, <code>working</code>, <code>waiting</code>, <code>responding</code>, <code>success</code>, <code>error</code>, <code>attention</code>, <code>sleeping</code>) appear only as text in the HUD and status line, and key <code>vessel.hud.colours</code>. <code>vessel.placement</code> and <code>vessel.fallback</code> were dropped on 16 Oct with the surfaces setting and the frames.</p>
+
+  <h3 id="spec-rules">Validation rules</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Rule</th><th>Level</th></tr></thead>
+    <tbody>
+      <tr><td><code>engram.json</code> parses, <code>spec</code> is 2, and the required fields are present with the right types</td><td><span class="lvl h">error</span></td></tr>
+      <tr><td><code>id</code> equals the folder name and isn't a bundled id (for yours)</td><td><span class="lvl h">error</span></td></tr>
+      <tr><td><code>vessel.scene</code> is set and names a scene the mod has</td><td><span class="lvl h">error</span></td></tr>
+      <tr><td>Each thumbnail SVG is at most 131,072 characters and starts with <code>&lt;svg</code></td><td><span class="lvl h">error</span></td></tr>
+      <tr><td>No <code>&lt;script&gt;</code>, no <code>on*=</code> attributes, no <code>href</code> to <code>http(s):</code> in a thumbnail. The host strips scripts anyway; we reject so creators know.</td><td><span class="lvl h">error</span></td></tr>
+      <tr><td>Thumbnail files named in <code>vessel.thumbnails</code> exist</td><td><span class="lvl h">error</span></td></tr>
+      <tr><td>A frame file such as <code>vessel/idle.svg</code>: "v2 has no frames; this file is ignored"</td><td><span class="lvl m">warning</span></td></tr>
+      <tr><td><code>vessel.shows</code> lists at least one place, each once</td><td><span class="lvl h">error</span></td></tr>
+      <tr><td>A <code>SOUL.md</code>: "Eidola adds nothing to the prompt; this file is ignored"</td><td><span class="lvl m">warning</span></td></tr>
+      <tr><td>Unknown keys outside <code>extensions</code> (v1 keys like <code>tags</code> or <code>voice_id</code> included)</td><td><span class="lvl m">warning</span></td></tr>
+      <tr><td><code>vessel.hud.camera</code> set without <code>tag: livecam</code></td><td><span class="lvl m">warning</span></td></tr>
+      <tr><td>A v1 package (<code>engram.yaml</code>, no <code>engram.json</code>)</td><td><span class="lvl h">error</span>: "v1 Engram: its clips can't draw in Claude"</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="card" id="shrine">
+  <div class="eyebrow">Phase 4</div>
+  <h2>Local Shrine for the Kraken LCD</h2>
+  <p>The Vessel off-screen again: on the Kraken's pump display, a browser tab or an OBS source. The Shrine page draws the Engram itself, from the same files and the same simulation code the pane runs, so it isn't held to the pane's limits. The mod only tells it what's happening.</p>
+  <div class="diagram">
+    <svg viewBox="0 0 900 270" role="img" aria-label="Local Shrine data flow. Claude Code engine events reach the Eidola mod. At session start the mod spawns the local Shrine, a Node server on 127.0.0.1 port 9743, and on each state change posts the state, mood and ink count to it. The Shrine reads Engram files from the bundled and personal folders and pushes each change over server-sent events to the NZXT CAM page, which runs the scene simulation on a canvas and drives the Kraken LCD, and to any browser or OBS source.">
+      <defs>
+        <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="arrowhead"/></marker>
+      </defs>
+      <rect x="20" y="190" width="190" height="56" rx="6" class="n-ext"/>
+      <text x="115" y="213" text-anchor="middle" class="n-label">Claude Code engine</text>
+      <text x="115" y="232" text-anchor="middle" class="n-sub2">prompt · tool · turn</text>
+
+      <rect x="20" y="70" width="190" height="72" rx="6" class="n-sys"/>
+      <text x="115" y="98" text-anchor="middle" class="n-label">Eidola mod</text>
+      <text x="115" y="118" text-anchor="middle" class="n-sub2">posts state · mood · ink</text>
+
+      <rect x="320" y="70" width="210" height="72" rx="6" class="n-sys"/>
+      <text x="425" y="98" text-anchor="middle" class="n-label">Local Shrine</text>
+      <text x="425" y="118" text-anchor="middle" class="n-sub">node · 127.0.0.1:9743</text>
+
+      <rect x="610" y="30" width="150" height="56" rx="6" class="n-ext"/>
+      <text x="685" y="53" text-anchor="middle" class="n-label">NZXT CAM page</text>
+      <text x="685" y="72" text-anchor="middle" class="n-sub2">3D sim on canvas</text>
+
+      <rect x="790" y="30" width="100" height="56" rx="6" class="n-ext"/>
+      <text x="840" y="53" text-anchor="middle" class="n-label">Kraken LCD</text>
+      <text x="840" y="72" text-anchor="middle" class="n-sub2">640 × 640</text>
+
+      <rect x="610" y="140" width="150" height="48" rx="6" class="n-ext"/>
+      <text x="685" y="169" text-anchor="middle" class="n-label">Browser · OBS</text>
+
+      <rect x="320" y="190" width="210" height="56" rx="6" class="n-store"/>
+      <text x="425" y="213" text-anchor="middle" class="n-label">Engram files</text>
+      <text x="425" y="232" text-anchor="middle" class="n-sub2">bundled + yours</text>
+      <path d="M425 190 V146" class="edge" marker-end="url(#arr2)"/>
+      <text x="433" y="172" class="e-label">reads</text>
+      <path d="M115 190 V146" class="edge" marker-end="url(#arr2)"/>
+      <path d="M210 92 H316" class="edge dash" marker-end="url(#arr2)"/>
+      <text x="263" y="84" text-anchor="middle" class="e-label">spawns at start</text>
+      <path d="M210 124 H316" class="edge" marker-end="url(#arr2)"/>
+      <text x="263" y="142" text-anchor="middle" class="e-label">POST /state</text>
+      <path d="M530 92 L606 62" class="edge" marker-end="url(#arr2)"/>
+      <text x="566" y="66" text-anchor="middle" class="e-label">SSE</text>
+      <path d="M530 122 L606 160" class="edge" marker-end="url(#arr2)"/>
+      <path d="M760 58 H786" class="edge" marker-end="url(#arr2)"/>
+    </svg>
+  </div>
+
+  <h3>How it works</h3>
+  <ol>
+    <li>The Shrine runs only while its switch in the surfaces setting is on (decision 5); it's off by default. With it on, on <code>session.start</code> the mod asks <code>http://127.0.0.1:9743/health</code>. If nothing answers, it starts <code>node &lt;mod&gt;/shrine/server.mjs</code> with <code>$.process.spawn</code>, passing it the bundled and personal Engram folders. The server lives as long as the session.</li>
+    <li>On each state, mood or ink change, debounced, the mod posts <code>{ engram, state, mood, ink }</code> to <code>/state</code> with <code>$.http.fetch</code>. A few bytes, fire and forget.</li>
+    <li>The server serves the page, its bundled script, and the awake Engram's files (<code>engram.json</code>, thumbnails) straight from the folders. It pushes each change to every open page over server-sent events.</li>
+    <li>The page draws the Engram itself. Every Engram is a scene, so the page runs that scene's simulation on a canvas, and the Kraken, the Lich and the Wisp move live in 3D at the screen's own frame rate, blending between moods. A rise in the ink count plays the error effect. There's no frames path.</li>
+    <li>The page fits whatever window it's in (see <a href="#any-size">Any size</a>). On CAM's Kraken browser (<code>window.nzxt.v1</code> or <code>?kraken=1</code>) it takes the screen's size, shape and <code>targetFps</code> and draws a 640 × 640 circle. That's ported from the v1 <code>kraken-detect.ts</code> and <code>kraken-setup.ts</code>.</li>
+    <li>With several sessions open, the last one to post shows. When the session that started the server ends, the server goes with it. The next post from another session finds nothing and starts its own.</li>
+    <li><code>/eidola shrine</code> prints the URL and CAM's deep link: <code>nzxt-cam://action/load-web-integration?url=http://127.0.0.1:9743/shrine/</code>, with the <code>cam-redirect.nzxt.com</code> fallback.</li>
+  </ol>
+
+  <h3>One simulation, two renderers</h3>
+  <p>Today each live Engram is one file that both moves the creature and draws it as Boxes. It splits so the pane and the Shrine run the same creature. The Kraken as the example:</p>
+  <div class="tw"><table>
+    <thead><tr><th>File</th><th>What it holds</th><th>Runs in</th></tr></thead>
+    <tbody>
+      <tr><td><code>hooks/kraken-sim.ts</code></td><td>The creature: its 3D model (from <code>kraken3d.ts</code>), how each mood moves it, one step per tick, and the colour at any pixel. No drawing and no plugin API.</td><td>both</td></tr>
+      <tr><td><code>hooks/kraken-live.tsx</code></td><td>Ticks the simulation every 100 ms and draws it as Boxes, inside the 700-Box budget</td><td>desktop pane and band</td></tr>
+      <tr><td><code>shrine/kraken.canvas.ts</code></td><td>Ticks the simulation at the screen's frame rate and paints it on a canvas, on a finer pixel grid</td><td>Shrine page</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small muted">The Lich (<code>lich3d.ts</code>, glyphs instead of pixels) and the Wisp split the same way. <code>shrine/page.ts</code> imports the simulations and is bundled to <code>shrine/page.js</code> with esbuild. The bundle is committed, because installing a plugin runs no build. The pane and the LCD run separate copies, so they answer to the same moods but don't move in lockstep.</p>
+
+  <h3 id="any-size">Any size</h3>
+  <p>The Shrine can be the pump's round screen, a browser tab, an OBS source, or a strip as thin as the band. There's no resolution setting: the page fits the window it's in. A setting couldn't work anyway, because one server feeds several screens at once and each needs its own size.</p>
+  <ul>
+    <li><strong>The window is the frame.</strong> The canvas matches the window (times the device pixel ratio) and redraws on resize. The simulation gets the canvas size as its frame, as the pane's Kraken already gets its cols and rows today: <code>camera</code>, <code>sizeOf</code>, <code>pickSpot</code> and <code>isOutOfView</code> all work from the frame's width and height. So the creatures roam the whole window and leave and re-enter at its real edges, at any size.</li>
+    <li><strong>The shape picks the view.</strong> Round on the Kraken, wide at about 2.5:1 or wider, regular in between. The view sets the camera and the creature's size.</li>
+    <li><strong>In-between shapes get a blended size.</strong> Today <code>sizeOf</code> has two rules, the band's and the pane's. The Shrine blends smoothly between them, so a 16:9 tab or a 3:1 strip gets a fitting creature. The pane keeps its two sizes exactly.</li>
+    <li><strong>Grid density follows the size.</strong> A minimum cell size keeps the pixel look; a bigger window gets more cells, up to the frame budget, and coarsens when a frame runs long.</li>
+    <li><strong>Overrides go in the URL, per screen:</strong> <code>?view=round|wide|regular</code>, <code>?bg=transparent</code> for OBS, <code>?hud=0</code> to drop the state and camera labels. <code>?kraken=1</code> already works this way.</li>
+  </ul>
+  <p class="small muted">No safe area in the spec: the creatures move in and out of frame by design, so nothing pins them inside it.</p>
+
+  <h3>Shrine-only Engrams</h3>
+  <p>The Shrine isn't held to the pane's limits: 131,072 characters a picture, 700 Boxes a frame, 10 ticks a second. So some Engrams can be made for it alone, such as a denser Kraken or a Lich in full particle fire. They set <code>"shows": ["shrine"]</code>.</p>
+  <ul>
+    <li>They're scenes, so for now they're first-party: a new one ships in a mod release. Later, a scene plugin could provide one (<a href="#next">Next</a>).</li>
+    <li>Awake, the status line still shows their name and state. The band shows one line, their name and the Shrine's URL, unless you turn it off with the <code>shrineBand</code> option (Q10).</li>
+    <li>The picker gets a Shrine filter, and their cards say "Shrine only".</li>
+  </ul>
+
+  <h3>Options for drawing on the Shrine</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Option</th><th>Verdict</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>The page runs the same simulation, bundled from the mod's own files</td><td><span class="badge sel">Selected</span></td><td>Live 3D at the screen's rate, whatever the pane is doing, and finer than the pane can draw. One source for each creature, so nothing drifts.</td></tr>
+      <tr><td>The mod renders an SVG on each change and posts it</td><td><span class="badge rej">Rejected</span></td><td>The live frames never pass through the mod. They're drawn on the desktop app's drawing thread, so the LCD would get only the simpler field scenes.</td></tr>
+      <tr><td>Stream the pane's live frames to the Shrine</td><td><span class="badge rej">Rejected</span></td><td>About 20 KB a frame at 10 a second. The LCD freezes whenever the pane isn't drawing: closed, band-only, or the app in the background.</td></tr>
+      <tr><td>A hosted relay on eidola.app (Oct 14 plan)</td><td><span class="badge rej">Rejected</span></td><td>Its only gain was cloud sessions, which we don't run. It costs auth, pairing and a live service.</td></tr>
+      <tr><td>Keep the v1 Shrine running</td><td><span class="badge rej">Rejected</span></td><td>It's fed by the v1 hook relays and state socket, so the old runtime would have to stay installed.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Carried over from v1, and left behind</h3>
+  <ul>
+    <li><strong>Carried:</strong> CAM viewport detection, including <code>targetFps</code>, the circular 640 × 640 preset, the CAM setup doc, port 9743.</li>
+    <li><strong>Left:</strong> the v1 server, the Lottie, video and GIF players, the state socket, the <code>EIDOLA_SHRINE_*</code> settings.</li>
+  </ul>
+</section>
+
+<section class="card" id="next">
+  <div class="eyebrow">Phase 2 · see decision 14</div>
+  <h2>Next: scene plugins</h2>
+  <p>Brought forward on 16 Oct: this is now Phase 2, as Engram plugins made with an Eidola skill (decision 14). The notes below are the background it started from; where they say an Engram is data that names another plugin's scene, decision 14 supersedes them: an Engram you make carries its own scene.</p>
+  <ul>
+    <li><strong>Engrams stay data.</strong> An Engram package has no code and no prompt text. It names a scene, either one bundled in Eidola or one a scene plugin provides.</li>
+    <li><strong>A scene plugin is code.</strong> It draws the scene in the pane and band, and gives the Shrine a browser module to run on its canvas. It ships no Soul and adds nothing to the prompt either (decision 9).</li>
+    <li><strong>Eidola stays the engine.</strong> It still owns the HUD, the frame and corner, the resolver and where things draw.</li>
+  </ul>
+
+  <h3>What the 16 Oct probe found</h3>
+  <p class="small muted">A throwaway second plugin, <code>eidola-mod/.probe/eidola-scene-probe</code>, notes in <code>eidola-mod/.probe/SCENE-PROBE.md</code>.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Question</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Can it read Eidola's state?</td><td>Yes. <code>$.state.get</code> reads Eidola's PluginState with literal <code>{ plugin: 'eidola', key }</code> refs.</td></tr>
+      <tr><td>Can it run Eidola's commands?</td><td>Yes, with <code>$.command.run</code>. Each run shows in the transcript.</td></tr>
+      <tr><td>Can it tell Eidola has loaded?</td><td>Yes. Its <code>plugin.register</code> hook saw Eidola load, with Eidola's root path. This depends on load order.</td></tr>
+      <tr><td>Can the Shrine load its browser module?</td><td>Yes. A Shrine-style page served by Node imported the plugin's <code>shrine-scene.js</code> from the plugin's folder. A path escaping that folder got a 403.</td></tr>
+      <tr><td>Can it draw in the band?</td><td>Yes, in a desktop session. Its <code>AbovePrompt</code> <code>ui.render</code> hook ran because Eidola passed <code>next</code> while the band was hidden.</td></tr>
+      <tr><td>Can it draw in the pane?</td><td>No. Eidola's <code>Pane</code> <code>ui.render</code> hook (<code>register.tsx</code>, around line 1004) never calls <code>next</code>, and the probe's hook sits inside Eidola's.</td></tr>
+    </tbody>
+  </table></div>
+  <p>So Eidola needs a hand-off: when the awake Engram's scene comes from a plugin, Eidola's <code>Pane</code> hook calls <code>next(e)</code> and places the returned tree under its own HUD, frame and corner. This is untested.</p>
+
+  <h3>Open for that phase</h3>
+  <ol>
+    <li><strong>The hand-off.</strong> Does <code>next(e)</code> from Eidola's <code>Pane</code> hook return the plugin's tree, and can Eidola place it under its HUD, frame and corner? Same for the band.</li>
+    <li><strong>Discovery.</strong> Does Eidola find scene plugins by hooking <code>plugin.register</code>, or do scene plugins announce themselves? Load order matters for the first.</li>
+    <li><strong>A public contract.</strong> Eidola's PluginState (the awake Engram, the mood, the ink count) would become a public, versioned contract that scene plugins read.</li>
+    <li><strong>The Shrine.</strong> How the Shrine finds and loads a scene plugin's browser module, and which folders it may serve.</li>
+    <li><strong>The creator skill.</strong> A Claude skill that scaffolds a scene plugin: what it generates, and how a creator tests it.</li>
+  </ol>
+</section>
+
+<section class="card" id="questions">
+  <div class="eyebrow">Open questions &amp; risks</div>
+  <h2>Still to settle</h2>
+
+  <div class="callout"><p><strong>This plan replaces parts of the Oct 14 plan.</strong> <code>docs/Plan-EidolaV2-2026-10-14.html</code> keeps the Forge, the Directory, a hosted relay on eidola.app and a media tier for the Shrine. This plan drops all four. The Shrine stays, served locally by the mod (decision 13).</p></div>
+
+  <div class="dec"><h3>Q1 · Is the Shrine part of Eidola's future? <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Answer</dt><dd>Yes, as a local page the mod serves. No relay, no media tier. Eidola runs in local sessions only.</dd>
+    <dt>Effect</dt><dd>Decisions 11 and 13, and Phase 4.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>Q2 · Does reading <code>~/.claude/eidola/engrams</code> prompt or get blocked? <span class="badge sel">Verified 16 Oct</span></h3><dl>
+    <dt>Answer</dt><dd>No prompt and no block. On Windows the probe read a file outside its own folder, found <code>C:\Users\Jeremy\.claude</code> and listed it. <code>HOME</code> is unset on Windows; <code>USERPROFILE</code> is <code>C:\Users\Jeremy</code>, so the fallback in decision 6 is required, not optional.</dd>
+    <dt>Caveat</dt><dd>Tested with your installed plugins. Another plugin's <code>fs.*</code> hook or a managed setting could still deny it, so the loader reports a denied read like any other skipped package.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>Q3 · Is that the right folder for your Engrams? <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Answer</dt><dd>Yes: the fixed folder, <code>~/.claude/eidola/engrams</code>. No setting for it in v2.</dd>
+    <dt>Effect</dt><dd>Decision 6, the template instructions and the empty state.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>Q4 · What should the Soul budget be? <span class="badge rej">Dropped 16 Oct</span></h3><dl>
+    <dt>Answer</dt><dd>No longer a question. Eidola has no Soul and injects nothing, so there's nothing to budget (decision 9).</dd>
+  </dl></div>
+
+  <div class="dec"><h3>Q5 · Should creators be able to adjust scenes? <span class="badge sel">Partly now, 16 Oct</span></h3><dl>
+    <dt>Answer</dt><dd>The HUD now, the scene itself later. With frames and the Soul gone, an Engram of yours is your own name, description and HUD on top of a bundled scene. Its HUD colours (<code>vessel.hud.colours</code>, <code>bracket</code>) are the part brought forward into Phase 2, along with the <code>meter</code>, <code>tag</code>, <code>label</code> and <code>layout</code> the spec already has. Options for the scene itself, such as the creature's colours, wait for scene plugins (<a href="#next">Next</a>).</dd>
+    <dt>Note</dt><dd>HUD colours aren't a setting for the person. <code>vessel.hud.colours</code> is where an Engram keeps its own colours, as the bundled ones do in <code>engrams.ts</code> today. A creator sets them in the Engram's <code>engram.json</code>, and nobody changes them from <code>/config</code>.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>Q6 · Can a hooks module bundle npm packages?</h3><dl>
+    <dt>Impact</dt><dd>Low under this plan, since JSON needs no parser. It matters if YAML comes back, or for schema tooling inside the mod.</dd>
+    <dt>Owner</dt><dd>Research: the plugin API docs and <code>claude plugin validate</code>.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>Q7 · Can the mod start a process? <span class="badge sel">Verified 16 Oct</span></h3><dl>
+    <dt>Answer</dt><dd>Yes. The probe ran <code>node --version</code>, spawned a Node server, read its output and got <code>200</code> from <code>127.0.0.1:9744/health</code> on the first try (155 ms). On your PC with engine 2.1.289, and in a Linux cloud session with 2.1.302.</dd>
+    <dt>Caveat</dt><dd>The Windows run was <code>claude -p</code> started from your desktop app's local session, not a mod loaded in an interactive desktop session. Same engine, so low risk. The first Phase 4 sprint confirms it in the desktop app itself.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>Q8 · Is <code>node</code> on the PATH the session sees? <span class="badge sel">Verified 16 Oct</span></h3><dl>
+    <dt>Answer</dt><dd>Yes: <code>C:\nvm4w\nodejs\node.exe</code>, v24.13.1, the same from the desktop app's session as from inside the mod.</dd>
+    <dt>Caveat</dt><dd>That path follows whichever version nvm has switched to. The Shrine checks for Node 20 or later when it starts, and <code>/eidola shrine</code> says which version it found.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>Q9 · Should the Shrine get the live Kraken and Lich? <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Answer</dt><dd>Yes. The Shrine page runs the same simulation the pane runs, bundled from the mod's files, on a canvas.</dd>
+    <dt>Effect</dt><dd>Phase 4, and Shrine-only Engrams.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>Q10 · What shows in Claude while a Shrine-only Engram is awake? <span class="badge sel">Decided 16 Oct</span></h3><dl>
+    <dt>Answer</dt><dd>The band only: one line with the Engram's name and the Shrine's URL. A <code>shrineBand</code> option in <code>/config</code> (on by default) turns it off. The pane shows nothing by itself.</dd>
+    <dt>Effect</dt><dd>Decision 5, a <code>userConfig</code> option beside the surfaces switches and <code>statusLine</code>.</dd>
+  </dl></div>
+
+  <div class="dec"><h3>Q11 · Do the live files split cleanly, and does the simulation scale to a finer grid?</h3><dl>
+    <dt>Impact</dt><dd>The size of Phase 4, and how much finer the LCD can look. <code>kraken-live.tsx</code> imports only <code>field</code>, <code>kraken</code>, <code>kraken3d</code> and <code>live-pixels</code>, which looks clean. But the creature logic and the Box drawing share one 837-line file, and the grid size comes in as props.</dd>
+    <dt>Owner</dt><dd>The first Phase 4 sprint after Q7 and Q8: the Kraken first, with <code>kraken.test.ts</code> guarding the pane.</dd>
+  </dl></div>
+
+  <h3>Risks</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td>Moving the three kept Engrams changes how they look</td><td><span class="lvl m">medium</span></td><td><span class="lvl m">medium</span></td><td>Snapshot their picker cards, thumbnails and scenes in each mood before the removal and the move, and diff after</td></tr>
+      <tr><td>Someone has a removed Engram (such as Skull) awake when 0.7.0 lands</td><td><span class="lvl m">medium</span></td><td><span class="lvl l">low</span></td><td>Clear the stored id at start, so nothing is awake, and say once in <code>/eidola</code> that it was removed</td></tr>
+      <tr><td>The plugin API changes under us</td><td><span class="lvl m">medium</span></td><td><span class="lvl h">high</span></td><td>Keep the loader small and pure, and run type checks and render tests on each engine build</td></tr>
+      <tr><td>The spec changes after the first outside Engram</td><td><span class="lvl m">medium</span></td><td><span class="lvl m">medium</span></td><td><code>spec</code> version field, unknown keys warn, <code>extensions</code> for anything experimental</td></tr>
+      <tr><td>Windows home path (<code>HOME</code> unset)</td><td><span class="lvl m">medium</span></td><td><span class="lvl m">medium</span></td><td>Fall back to <code>USERPROFILE</code>, and test on your Windows machine first</td></tr>
+      <tr><td>A hostile or heavy thumbnail SVG</td><td><span class="lvl l">low</span></td><td><span class="lvl m">medium</span></td><td>Host sandbox strips scripts, plus validator rules and the size cap</td></tr>
+      <tr><td>Many Engrams slow session start</td><td><span class="lvl l">low</span></td><td><span class="lvl l">low</span></td><td>Manifests only at start, pictures on first use</td></tr>
+      <tr><td>The bake script breaks when <code>engrams.ts</code> stops holding data</td><td><span class="lvl h">high</span></td><td><span class="lvl l">low</span></td><td>Update <code>bake-thumbs.mjs</code> in the same sprint as the move</td></tr>
+      <tr><td>The v1 Shrine still holds port 9743</td><td><span class="lvl m">medium</span></td><td><span class="lvl m">medium</span></td><td>Uninstall v1 first. If <code>/health</code> answers but isn't ours, <code>/eidola</code> says what's on the port.</td></tr>
+      <tr><td>The Shrine process outlives a crashed session, or two start at once</td><td><span class="lvl l">low</span></td><td><span class="lvl l">low</span></td><td>Health check before spawning. A second server fails to bind and exits.</td></tr>
+      <tr><td>Splitting a live file changes how the pane's Kraken or Lich moves</td><td><span class="lvl m">medium</span></td><td><span class="lvl m">medium</span></td><td>One Engram at a time, existing tests as the guard, frames compared for a fixed seed before and after</td></tr>
+      <tr><td>CAM's LCD browser can't keep up with a full-rate canvas</td><td><span class="lvl l">low</span></td><td><span class="lvl m">medium</span></td><td>Honour <code>targetFps</code>, and coarsen the grid if a frame runs long</td></tr>
+      <tr><td>A build step in a repo that has none</td><td><span class="lvl m">medium</span></td><td><span class="lvl l">low</span></td><td>Commit the bundle, and fail the pre-push checks when it doesn't match its source</td></tr>
+      <tr><td>Posting on every state change slows the turn</td><td><span class="lvl l">low</span></td><td><span class="lvl m">medium</span></td><td>Debounce, fire and forget, never awaited inside a tool call</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="card" id="handoff">
+  <div class="eyebrow">Implementation handoff</div>
+  <h2>For phase-planner</h2>
+  <p><strong>What exists:</strong> the mod at 0.6.0 (<code>75479c3</code>) in <code>AyeJK/eidola-mod</code>, with 99 passing tests. Eight Engrams live inline in <code>hooks/engrams.ts</code>, pictures in <code>vessels/&lt;pack&gt;/</code>, scenes in <code>hooks/scenes.ts</code>. <code>scripts/bake-thumbs.mjs</code> reads <code>engrams.ts</code> as text.</p>
+  <p><strong>Decided 16 Oct:</strong> scenes only, so the bundle becomes the Kraken, the Lich and the Wisp, and Spirit, Skull, Moon, Sigil and Starfield are removed with their frames. One surfaces setting (Pane, Band, Shrine, and hide the band while the pane is open) replaces <code>placement</code>. Scene plugins are the later creator path, after Phase 4. No Soul: Eidola is the visual companion only and injects nothing into the prompt.</p>
+  <p><strong>First sprint:</strong> write <code>docs/spec/engram-format.md</code>, the v2 types and <code>hooks/validate.ts</code> with tests. Then take the snapshot tests of the three kept Engrams' picker cards, thumbnails and scenes, before anything is removed or moved.</p>
+  <p><strong>Key constraints:</strong> never let a hook break a tool call or a turn. A thumbnail SVG is at most 131,072 characters. The person's surfaces setting always wins. No Engram package ships code or prompt text. Every check runs before a push: <code>claude plugin validate</code>, <code>tsc</code>, <code>claude plugin test</code>, <code>node scripts/bake-thumbs.mjs --check</code>.</p>
+
+  <div class="phases">
+    <div class="phase"><b>Phase 1</b><div class="t">Spec and bundled Engrams</div><p>Spec docs and schema (scenes only), types, validator, snapshots of the three kept Engrams, remove the five frames Engrams, the frames path and Soul injection, move the Kraken, the Lich and the Wisp into folders, update the bake script, the surfaces setting and <code>whereItDraws</code>, port the Vessel states doc.</p></div>
+    <div class="phase"><b>Phase 2</b><div class="t">Make your own</div><p>The picker and Engram page to the new design, the Surfaces screen and ways in. Then the pane and band hand-off, the Engram plugin contract and discovery, the bundled three made exportable, the checker, the Eidola skill (create, remix, edit, check, publish) and your Engrams in the picker.</p></div>
+    <div class="phase"><b>Phase 3</b><div class="t">Retire v1, release</div><p>Pointers from the v1 spec to v2, a README listing the three Engrams with a creator section and saying Eidola adds nothing to the prompt, release 0.7.0.</p></div>
+    <div class="phase"><b>Phase 4</b><div class="t">Local Shrine</div><p>Split the Kraken into simulation and drawing (Q11). Then the Shrine switch, <code>shrine/server.mjs</code>, spawn and health check, the debounced post, the bundled page (scenes only, any-size views, CAM detection), the Kraken's canvas renderer, <code>/eidola shrine</code>. The Lich and the Wisp next, release 0.8.0. Shrine-only Engrams after.</p></div>
+    <div class="phase"><b>Later</b><div class="t">A home for Engrams</div><p>Not planned. A place to browse published Engram plugins, if GitHub repos aren't enough.</p></div>
+  </div>
+
+  <h3>Generate the phase plan</h3>
+<pre><code>Use this plan as input: docs/Plan-EngramSpecV2-2026-10-16.html
+Generate a phase plan for Engram Spec v2. Stack: Claude Code plugin
+(TypeScript hooks module) in AyeJK/eidola-mod; no platform work.
+First phase goal: write the v2 spec (scenes only), types and validator,
+snapshot the Kraken, the Lich and the Wisp, remove the five frames Engrams
+and all Soul injection as their own tested changes, then load the three
+from engrams/&lt;id&gt;/
+folders with no visible change, and replace placement with one surfaces
+setting. Phase 4 adds the local Shrine for the Kraken LCD;
+its first sprint splits the Kraken's simulation from its drawing (Q11).
+Spawning a Node server from the mod is verified on Windows (Q7, Q8).</code></pre>
+</section>
+
+</div>
+</main>

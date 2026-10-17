@@ -1,6 +1,6 @@
 {
   "name": "eidola",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "An Engram's scene that reacts to what Claude is doing, in a pane or the band above the prompt.",
   "types": "./types/index.d.ts",
   "author": {

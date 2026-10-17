@@ -139,3 +139,29 @@ export function judge(asked: Asked): Verdict {
   }
   return { fault: { file: module, problem: `it drew nothing Eidola can place: its drawing must be one Box keyed "${at}".` } }
 }
+
+/**
+ * A tree split at the Box keyed `key`: that Box, found depth first, and the
+ * tree without it (undefined when the tree is that Box). A plugin between
+ * Eidola and the Engram's plugin (one drawing its own row in the band, say)
+ * wraps the drawing in its own tree; Eidola places the drawing in its frame
+ * and draws the rest above it.
+ */
+export function splitAt(tree: unknown, key: string): { found?: unknown; rest: unknown } {
+  if (keyOf(tree) === key) {
+    return { found: tree, rest: undefined }
+  }
+  if (tree === null || typeof tree !== 'object') {
+    return { rest: tree }
+  }
+  const children = (tree as { children?: unknown }).children
+  const list = Array.isArray(children) ? children : children === undefined ? [] : [children]
+  for (let i = 0; i < list.length; i += 1) {
+    const inner = splitAt(list[i], key)
+    if (inner.found !== undefined) {
+      const kept = inner.rest === undefined ? [...list.slice(0, i), ...list.slice(i + 1)] : [...list.slice(0, i), inner.rest, ...list.slice(i + 1)]
+      return { found: inner.found, rest: { ...(tree as object), children: Array.isArray(children) ? kept : kept[0] } }
+    }
+  }
+  return { rest: tree }
+}

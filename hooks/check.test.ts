@@ -173,7 +173,13 @@ describe('the checker on broken copies', () => {
         }
         const bandless = copy(name)
         bandless[module] = bandless[module]!.replaceAll("component: 'AbovePrompt'", "component: 'BelowPrompt'")
-        hasError(check(name, bandless), module, /draws nothing in the band/, /Add the band hook/)
+        const isInBand = ((engram(bandless).vessel['shows'] as string[] | undefined) ?? ['pane']).includes('band')
+        if (isInBand) {
+          hasError(check(name, bandless), module, /draws nothing in the band/, /Add the band hook/)
+        } else {
+          // Pane only: no band hook is needed.
+          expect(check(name, bandless).errors).toEqual([])
+        }
 
         const renamed = copy(name)
         renamed[module] = renamed[module]!.replace(/const ID = '[^']+'/, "const ID = 'someone-else'")
@@ -250,8 +256,8 @@ describe('the checker on broken copies', () => {
 describe('the checker itself', () => {
   test('prints ok and what it found, or the problems, each with its file and fix', () => {
     const good = formatReport(check('exported-lich', copy('exported-lich')))
-    expect(good).toMatch(/^exported-lich: ok\n {2}draws: its own creature, remixed from lich · shows pane \+ band \+ shrine\n/)
-    expect(good).toMatch(/\n {2}thumbnails: pane, band \(largest [\d,]+ \/ 131,072\)/)
+    expect(good).toMatch(/^exported-lich: ok\n {2}draws: its own creature, remixed from lich · shows pane \+ shrine\n/)
+    expect(good).toMatch(/\n {2}thumbnails: pane \(largest [\d,]+ \/ 131,072\)/)
 
     const broken = copy('exported-lich')
     delete broken['.claude-plugin/plugin.json']

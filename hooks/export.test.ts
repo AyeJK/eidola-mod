@@ -4,8 +4,8 @@
 //
 // - Eidola hands it the room and the state it gives the bundled Lich: a
 //   plugin standing in for its hooks reads the hand-off back, and the bundled
-//   Lich's own live drawings, awake in the same pane and band, are sized and
-//   fed the same.
+//   Lich's own live drawings, awake in the same pane, are sized and fed the
+//   same. Both show in the pane only: neither is drawn in the band.
 // - Its drawing module, given that hand-off, draws the very tree Eidola draws
 //   for the bundled Lich, the backdrop's source included.
 // - The fixed-seed run matches: its lich-live.tsx, run tick by tick from the
@@ -65,7 +65,7 @@ const EXPORTED_ENGRAM = {
   description: 'A crowned skull of alchemical signs, soul-fire in its sockets. It burns brighter while you work.',
   rights: 'licensed',
   remixOf: 'lich',
-  vessel: { scene: 'self', shows: ['pane', 'band', 'shrine'], thumbnails: { pane: 'thumb-pane.svg', band: 'thumb-band.svg' }, hud: { show: true, meter: 'sparks', tag: 'sigil', label: 'serif', bracket: '#9a3c28' } },
+  vessel: { scene: 'self', shows: ['pane', 'shrine'], thumbnails: { pane: 'thumb-pane.svg' }, hud: { show: true, meter: 'sparks', tag: 'sigil', label: 'serif', bracket: '#9a3c28' } },
   extensions: {},
 }
 
@@ -157,11 +157,16 @@ function walk(node: unknown, out: Node[] = []): Node[] {
   return out
 }
 
+/** Every hand-off the stand-in drew, as its text. */
+function handoffsIn(tree: unknown): string[] {
+  return walk(tree)
+    .flatMap(node => (Array.isArray(node.children) ? node.children : [node.children]))
+    .filter((child): child is string => typeof child === 'string' && child.startsWith('HANDOFF '))
+}
+
 /** The hand-off the stand-in was given, read back out of the drawing. */
 function handoffIn(tree: unknown): EidolaHandoff {
-  const text = walk(tree)
-    .flatMap(node => (Array.isArray(node.children) ? node.children : [node.children]))
-    .find((child): child is string => typeof child === 'string' && child.startsWith('HANDOFF '))
+  const text = handoffsIn(tree)[0]
   expect(text, 'the stand-in drew the hand-off').toBeDefined()
   return JSON.parse(text!.slice('HANDOFF '.length)) as EidolaHandoff
 }
@@ -192,7 +197,7 @@ function kit(name: string) {
 }
 
 describe('the exported Lich, handed off to', () => {
-  test('Eidola hands it the room and the state it hands the bundled Lich, pane and band', { plugins: [STAND_IN] }, async ($, on) => {
+  test('Eidola hands it the room and the state it hands the bundled Lich, in the pane; neither draws in the band', { plugins: [STAND_IN] }, async ($, on) => {
     engine(on, 'exported-lich', {})
     await start($)
     expect((await $.command.run({ command: 'awaken', args: 'exported-lich', ...TYPED })).text).toBe('Exported Lich is awake.')
@@ -201,28 +206,23 @@ describe('the exported Lich, handed off to', () => {
     const pane = await $.ui.mount(PANE)
     const inPane = handoffIn(await pane.drawn())
     await pane.unmount()
-    const band = await $.ui.mount(BAND)
-    const inBand = handoffIn(await band.drawn())
-    await band.unmount()
     expect(inPane).toMatchObject({ engram: 'exported-lich', where: 'pane', columns: 52, rows: 75, mood: 'working' })
-    // The band as tall as the bundled Lich's: twelve rows, from its remixOf.
-    expect(inBand).toMatchObject({ engram: 'exported-lich', where: 'band', columns: 100, rows: 12, mood: 'working' })
+    // Pane only: the band is never handed off.
+    const band = await $.ui.mount(BAND)
+    expect(handoffsIn(await band.drawn())).toEqual([])
+    await band.unmount()
 
-    // The bundled Lich, awake in the same pane and band: its live drawings get the same room and state.
+    // The bundled Lich, awake in the same pane: its live drawing gets the same room and state.
     await $.command.run({ command: 'awaken', args: 'lich', ...TYPED })
     const lichPane = await $.ui.mount(PANE)
     const slice = (await lichPane.find({ type: 'Client', key: 'lich-0' }))?.props?.['props']
     await lichPane.unmount()
+    const { contract: _contract, engram: _engram, where: _where, columns, rows, ...state } = inPane
+    expect(slice).toMatchObject({ ...state, cols: columns, rows })
+    // Pane only: no live strip in the band.
     const lichBand = await $.ui.mount(BAND)
-    const strip = (await lichBand.find({ type: 'Client', key: 'lich-band' }))?.props?.['props']
+    expect(await lichBand.find({ type: 'Client', key: 'lich-band' })).toBeUndefined()
     await lichBand.unmount()
-    for (const [handoff, live] of [
-      [inPane, slice],
-      [inBand, strip],
-    ] as const) {
-      const { contract: _contract, engram: _engram, where: _where, columns, rows, ...state } = handoff
-      expect(live).toMatchObject({ ...state, cols: columns, rows })
-    }
   })
 
   test('its drawing module draws, from that hand-off, the tree Eidola draws for the bundled Lich', { plugins: [STAND_IN], timeoutMs: 30_000 }, async ($, on) => {
@@ -235,27 +235,23 @@ describe('the exported Lich, handed off to', () => {
       if (mood === 'attention') {
         await $.command.run({ command: 'eidola', args: 'ink', ...TYPED })
       }
-      for (const where of [PANE, BAND]) {
-        await $.command.run({ command: 'awaken', args: 'exported-lich', ...TYPED })
-        const asked = await $.ui.mount(where)
-        const handoff = handoffIn(await asked.drawn())
-        await asked.unmount()
+      // The pane only: both show nowhere else Eidola hands off.
+      await $.command.run({ command: 'awaken', args: 'exported-lich', ...TYPED })
+      const asked = await $.ui.mount(PANE)
+      const handoff = handoffIn(await asked.drawn())
+      await asked.unmount()
 
-        await $.command.run({ command: 'awaken', args: 'lich', ...TYPED })
-        const bundled = await $.ui.mount(where)
-        const drawn = (await bundled.drawn()) as Node
-        await bundled.unmount()
-        // The pane: Eidola's frame holds the creature first. The band: the creature's strip, the corner after it.
-        const creature =
-          where === PANE
-            ? ((((drawn.children as Node[])[0] as Node).children as Node[])[0] as Node)
-            : { ...drawn, children: (drawn.children as Node[]).filter(child => child.props?.['key'] !== 'corner') }
+      await $.command.run({ command: 'awaken', args: 'lich', ...TYPED })
+      const bundled = await $.ui.mount(PANE)
+      const drawn = (await bundled.drawn()) as Node
+      await bundled.unmount()
+      // Eidola's frame holds the creature first.
+      const creature = (((drawn.children as Node[])[0] as Node).children as Node[])[0] as Node
 
-        const els = seen.els!
-        const ours = exportedDraw(els, handoff, kit('Lich'))
-        expect(plain(ours), `${where.component}, ${mood}`).toEqual(plain(creature))
-        expect(plain(ours), `${where.component}, ${mood}`).toEqual(plain(bundledDraw(els, handoff, kit('Lich'))))
-      }
+      const els = seen.els!
+      const ours = exportedDraw(els, handoff, kit('Lich'))
+      expect(plain(ours), `Pane, ${mood}`).toEqual(plain(creature))
+      expect(plain(ours), `Pane, ${mood}`).toEqual(plain(bundledDraw(els, handoff, kit('Lich'))))
     }
   })
 })

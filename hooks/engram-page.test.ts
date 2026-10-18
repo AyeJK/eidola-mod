@@ -143,7 +143,7 @@ describe('the Engram page', () => {
 
     // Three facts, two a row in a docked pane; no On error.
     for (const [title, text] of [
-      ['DRAWS', 'lich scene · pane + band'],
+      ['DRAWS', 'lich scene · pane only'],
       ['SOURCE', 'Bundled with Eidola · v'],
       ['RIGHTS', 'Original: made by its author.'],
     ] as const) {

@@ -5,7 +5,7 @@ import type { VesselState } from '../types'
 import { renderScene } from './field'
 import { grimoireGlyphs, pageTop, sheetAt } from './grimoire3d'
 import { lichBandScene, lichPaneScene, voidScene } from './lich'
-import { advance, born, replay } from './lich-live'
+import LichLive, { advance, born, replay } from './lich-live'
 import type { Live } from './lich-live'
 import { GLYPH_BUDGET, drawGlyphs } from './live-glyphs'
 import { SVG_LIMIT } from './stage'
@@ -51,8 +51,10 @@ describe('the Lich as a field scene', () => {
 })
 
 describe('the Lich Engram', () => {
-  test('draws it live in glyphs, in four slices that tile the pane, and in the band', async ($, on) => {
+  test('draws it live in glyphs, in four slices that tile the pane, and nothing in the band', async ($, on) => {
     servePackages(on)
+    // What the engine draws in the band when the mod passes it on: an empty Box.
+    on('ui.render', { component: 'AbovePrompt' }, ($, e) => $.ui.resolve(e).Box({}))
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))
@@ -102,11 +104,9 @@ describe('the Lich Engram', () => {
       component: 'AbovePrompt',
       props: { hasSurvey: false, isWorking: false, maxRows: 12, bodyColumns: 95, scroll: { offset: 0, bodyRows: 11 }, view: {} },
     })
-    const strip = await band.find({ type: 'Client' })
-    expect(strip?.key ?? strip?.props?.key).toBe('lich-band')
-    expect((strip?.props?.props as { view?: string }).view).toBe('band')
-    await band.advance(1500)
-    expect(JSON.stringify(await band.drawn({ in: 'lich-band' })).length).toBeLessThan(TREE_LIMIT)
+    // Pane only: the band is passed on to the engine, with nothing of the Lich's in it.
+    expect(await band.find({ type: 'Client' })).toBeUndefined()
+    expect(await band.find({ type: 'Svg' })).toBeUndefined()
     await band.unmount()
   })
 
@@ -125,12 +125,45 @@ describe('the Lich Engram', () => {
   })
 })
 
-const BAND = {
-  plugin: 'eidola',
-  surface: 'desktop',
-  component: 'AbovePrompt',
-  props: { hasSurvey: false, isWorking: false, maxRows: 12, bodyColumns: 120, scroll: { offset: 0, bodyRows: 11 }, view: {} },
-} as const
+type BandProps = Parameters<typeof LichLive>[0]
+
+/**
+ * lich-live's band view (the grimoire), run by hand: its timer stepped one
+ * tick (100ms) at a time, its state kept. The Lich itself shows in the pane
+ * only, so this drives the module directly rather than through a band.
+ */
+function grimoire(cols = 120, rows = 12) {
+  let state: unknown
+  let tick: (() => void) | undefined
+  const surface = {
+    elements: { Box: 'Box', Text: 'Text' },
+    get state() {
+      return state
+    },
+    setState: (next: unknown) => {
+      state = next
+    },
+    columns: cols,
+    rows,
+    every: (_ms: number, fn: () => void) => {
+      tick = fn
+      return () => {
+        tick = undefined
+      }
+    },
+    onPointer: () => () => undefined,
+    onKey: () => () => undefined,
+    post: () => undefined,
+  } as unknown as Parameters<typeof LichLive>[1]
+  return {
+    frame: (props: Omit<BandProps, 'cols' | 'rows' | 'view'>) => JSON.stringify(LichLive({ ...props, cols, rows, view: 'band' } as BandProps, surface)),
+    advance: (ticks: number) => {
+      for (let i = 0; i < ticks; i += 1) {
+        tick?.()
+      }
+    },
+  }
+}
 
 /** The book as text, cell by cell: what a frame shows, colours and glyphs. */
 function bookText(book: Parameters<typeof grimoireGlyphs>[0], cols = 120, rows = 12): string {
@@ -138,55 +171,38 @@ function bookText(book: Parameters<typeof grimoireGlyphs>[0], cols = 120, rows =
   return Array.from({ length: rows }, (_, y) => Array.from({ length: cols }, (_, x) => JSON.stringify(at(x, y, 8) ?? null)).join('')).join(String.fromCharCode(10))
 }
 
-describe('the grimoire in the band', () => {
-  test('lies open and still at idle', async ($, on) => {
-    servePackages(on)
-    on('ui.open', () => ({ value: { isPlaced: true as const } }))
-    on('ui.panes', () => ({ value: UNPLACED }))
-    on('ui.invalidate', () => ({ value: undefined }))
-    on('store.set', () => ({ value: undefined }))
-    on('clock.now', () => ({ value: NOW }))
-    await $.command.run({ command: 'awaken', args: 'lich', ...TYPED })
-    const band = await $.ui.mount(BAND)
-    await band.advance(500)
-    const first = JSON.stringify(await band.drawn({ in: 'lich-band' }))
+describe("the grimoire (lich-live's band view)", () => {
+  test('lies open and still at idle', () => {
+    const band = grimoire()
+    const props = { mood: 'idle', ink: 0 } as const
+    band.frame(props)
+    band.advance(5)
+    const first = band.frame(props)
     // Its stacked page edges toward the glass, and signs written on it.
     expect(first).toContain('===')
     expect(first).toMatch(/[☿♀♂♁☽]/)
     for (let i = 0; i < 4; i += 1) {
-      await band.advance(1500)
-      expect(JSON.stringify(await band.drawn({ in: 'lich-band' }))).toBe(first)
+      band.advance(15)
+      expect(band.frame(props)).toBe(first)
     }
-    await band.unmount()
 
     // Still means still: whatever the time, nothing moves at rest.
     const rest = { flip: -1, pages: 3, heat: 0, alarm: 0, t: 0 }
     expect(bookText({ ...rest, t: 40 })).toBe(bookText(rest))
   })
 
-  test('turns its pages while it works', async ($, on) => {
-    servePackages(on)
-    on('ui.open', () => ({ value: { isPlaced: true as const } }))
-    on('ui.panes', () => ({ value: UNPLACED }))
-    on('ui.invalidate', () => ({ value: undefined }))
-    on('store.set', () => ({ value: undefined }))
-    // No session started, so no shared clock: the drawing keeps its own, and the mood turns a second in.
-    on('clock.now', () => ({ value: 1000 }))
-    on('turn.start', (_, e) => ({ turnId: e.turnId }))
-    on('ui.status', () => ({ value: undefined }))
-    await $.command.run({ command: 'awaken', args: 'lich', ...TYPED })
-    await $.turn.start({ text: 'work', turnId: 'grimoire' })
-    const band = await $.ui.mount({ ...BAND, props: { ...BAND.props, isWorking: true } })
-    const strip = await band.find({ type: 'Client' })
-    expect((strip?.props?.props as { mood?: string }).mood).toBe('working')
+  test('turns its pages while it works', () => {
+    // No epoch, so no shared clock: the drawing keeps its own.
+    const band = grimoire()
+    const props = { mood: 'working', ink: 0 } as const
+    band.frame(props)
     const frames = new Set<string>()
     for (let i = 0; i < 40; i += 1) {
-      await band.advance(100)
-      frames.add(JSON.stringify(await band.drawn({ in: 'lich-band' })))
+      band.advance(1)
+      frames.add(band.frame(props))
     }
     // A page lifting, going over, settling: many frames, not one.
     expect(frames.size).toBeGreaterThan(8)
-    await band.unmount()
   })
 
   test('a turning page goes from the right to the left, over the pages, never through them', () => {

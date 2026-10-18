@@ -103,12 +103,12 @@ describe('the picker', () => {
     expect(await pane.find({ type: 'Client', key: 'menu-catch' })).toBeDefined()
     expect(await pane.find({ type: 'Client', key: 'open:lich' })).toBeUndefined()
 
-    // Band: an Engram that draws in both is listed under Pane and under Band; the menu closes.
+    // Band: only an Engram that draws in the band is listed, the Wisp, not the pane-only Lich; the menu closes.
     await click(pane, 'filter-option:surface:band')
     expect(await pane.find({ type: 'Client', key: 'menu-catch' })).toBeUndefined()
     expect(await handed(pane, 'filter-toggle:surface')).toMatchObject({ label: 'Band', caret: '▼' })
     expect(await pane.find({ type: 'Client', key: 'awaken:wisp' })).toBeDefined()
-    expect(await pane.find({ type: 'Client', key: 'awaken:lich' })).toBeDefined()
+    expect(await pane.find({ type: 'Client', key: 'awaken:lich' })).toBeUndefined()
     await click(pane, 'filter-toggle:surface')
     await click(pane, 'filter-option:surface:pane')
     expect(await pane.find({ type: 'Client', key: 'awaken:lich' })).toBeDefined()
@@ -429,7 +429,26 @@ describe('ways in', () => {
     })
   }
 
-  for (const id of ['kraken', 'lich', 'wisp'] as const) {
+  // The Kraken and the Lich show in the pane only: their band is passed on, with no corner triangle.
+  for (const id of ['kraken', 'lich'] as const) {
+    test(`the ${id} draws nothing in the band, so no corner triangle there`, async ($, on) => {
+      servePackages(on)
+      on('ui.open', () => ({ value: { isPlaced: true as const } }))
+      on('ui.panes', () => ({ value: UNPLACED }))
+      on('ui.invalidate', () => ({ value: undefined }))
+      on('store.set', () => ({ value: undefined }))
+      on('clock.now', () => ({ value: NOW }))
+      // What the engine draws in the band when the mod passes it on: an empty Box.
+      on('ui.render', { component: 'AbovePrompt' }, ($2, e) => $2.ui.resolve(e).Box({}))
+      await $.command.run({ command: 'awaken', args: id, ...TYPED })
+      const band = await $.ui.mount(BAND)
+      expect(await band.find({ type: 'Client', key: 'band-corner' })).toBeUndefined()
+      expect(await band.find({ type: 'Client' })).toBeUndefined()
+      await band.unmount()
+    })
+  }
+
+  for (const id of ['wisp'] as const) {
     test(`the ${id}'s band has the corner triangle, and it opens the pane on the picker`, async ($, on) => {
       servePackages(on)
       const opened: string[] = []

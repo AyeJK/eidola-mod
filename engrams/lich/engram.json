@@ -8,8 +8,8 @@
   "rights": "original",
   "vessel": {
     "scene": "lich",
-    "shows": ["pane", "band", "shrine"],
-    "thumbnails": { "pane": "thumb-pane.svg", "band": "thumb-band.svg" },
+    "shows": ["pane", "shrine"],
+    "thumbnails": { "pane": "thumb-pane.svg" },
     "hud": {
       "show": true,
       "meter": "sparks",

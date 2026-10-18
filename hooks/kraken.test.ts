@@ -94,8 +94,10 @@ describe('the Kraken Engram', () => {
   const UNPLACED: UiPane[] = [{ id: 'eidola', title: 'Kraken', isShown: false, isFocused: false, isPlaced: false }]
   const TYPED = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
 
-  test('fills the pane and the band with its scene, no text', async ($, on) => {
+  test('fills the pane with its scene, no text; it draws nothing in the band', async ($, on) => {
     servePackages(on)
+    // What the engine draws in the band when the mod passes it on: an empty Box.
+    on('ui.render', { component: 'AbovePrompt' }, ($, e) => $.ui.resolve(e).Box({}))
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))
@@ -141,12 +143,9 @@ describe('the Kraken Engram', () => {
       component: 'AbovePrompt',
       props: { hasSurvey: false, isWorking: false, maxRows: 12, bodyColumns: 80, scroll: { offset: 0, bodyRows: 11 }, view: {} },
     })
-    // The band too: still water, and the same live Kraken framed for a strip.
-    const strip = await band.find({ type: 'Svg' })
-    expect(strip?.props?.width).toBe(636)
-    expect(strip?.props?.height).toBe(131)
-    const bandLive = await band.find({ type: 'Client' })
-    expect((bandLive?.props?.props as { view?: string } | undefined)?.view).toBe('band')
+    // Pane only: the band is passed on to the engine, with nothing of the Kraken's in it.
+    expect(await band.find({ type: 'Svg' })).toBeUndefined()
+    expect(await band.find({ type: 'Client' })).toBeUndefined()
     expect(await band.find({ type: 'Text' })).toBeUndefined()
     await band.unmount()
   })

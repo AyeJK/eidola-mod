@@ -11,12 +11,10 @@
     "scene": "self",
     "shows": [
       "pane",
-      "band",
       "shrine"
     ],
     "thumbnails": {
-      "pane": "thumb-pane.svg",
-      "band": "thumb-band.svg"
+      "pane": "thumb-pane.svg"
     },
     "hud": {
       "show": true,

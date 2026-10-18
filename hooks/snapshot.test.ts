@@ -51,9 +51,7 @@ type Surface = (typeof SURFACES)[number]
  */
 const STILLS: Record<string, string> = {
   'kraken/thumb-pane.svg': '0 0 960 722',
-  'kraken/thumb-band.svg': '0 0 1200 304',
   'lich/thumb-pane.svg': '0 0 480 361',
-  'lich/thumb-band.svg': '0 0 720 190',
   'wisp/thumb-band.svg': '0 0 720 171',
 }
 

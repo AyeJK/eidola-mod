@@ -2,7 +2,8 @@ import { describe, expect, test } from 'claude-code/testing'
 import type { On, UiPane } from 'claude-code'
 import type { Engine, Mounted } from 'claude-code/testing'
 
-import { servePackages } from './packages.data'
+import type { ShowPlace } from './engram-types'
+import { PACKAGES, packageFile, packageList, servePackages } from './packages.data'
 
 // A mount rejects when the surface refuses the tree (an element it lacks, a
 // prop it does not take), so each mount here is the check the desktop pane
@@ -21,12 +22,39 @@ function findVessel(ui: Pick<Mounted, 'find'>, surface: (typeof SURFACES)[number
 const TYPED = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
 
 /**
- * The Kraken awake: an Engram that shows in the pane and the band. The default
- * Wisp shows only in the band, so these tests of where the Engram draws use
- * the Kraken.
+ * The Kraken awake: an Engram that shows in the pane. The default Wisp shows
+ * only in the band, so these tests of the pane use the Kraken.
  */
 async function kraken($: Engine, on: On): Promise<void> {
   servePackages(on)
+  on('store.set', () => ({ value: undefined }))
+  on('ui.open', () => ({ value: { isPlaced: true as const } }))
+  on('ui.invalidate', () => ({ value: undefined }))
+  on('clock.now', () => ({ value: 1_760_000_000_000 }))
+  await $.command.run({ command: 'awaken', args: 'kraken', ...TYPED })
+}
+
+/**
+ * An Engram that shows in the pane and the band, for the band tests: the
+ * Kraken's package with the band put back in its `shows`. The bundled Kraken
+ * and Lich show in the pane only, and the Wisp only in the band, so no
+ * bundled Engram shows in both; and only one that does steps its band aside
+ * for the pane.
+ */
+async function paneAndBand($: Engine, on: On): Promise<void> {
+  const both = { ...PACKAGES.kraken, vessel: { ...PACKAGES.kraken.vessel, shows: ['pane', 'band', 'shrine'] as ShowPlace[] } }
+  on('fs.list', ($2, e, next) => {
+    const entries = packageList(String(e.path))
+    return entries ? { value: entries } : next(e)
+  })
+  on('fs.read', ($2, e, next) => {
+    const path = String(e.path)
+    if (/(?:^|[\\/])engrams[\\/]+kraken[\\/]+engram\.json$/.test(path)) {
+      return { value: `${JSON.stringify(both, null, 2)}\n` }
+    }
+    const text = packageFile(path)
+    return text !== undefined ? { value: text } : next(e)
+  })
   on('store.set', () => ({ value: undefined }))
   on('ui.open', () => ({ value: { isPlaced: true as const } }))
   on('ui.invalidate', () => ({ value: undefined }))
@@ -64,7 +92,7 @@ describe('band', () => {
   for (const surface of SURFACES) {
     test(`with hide off, draws on ${surface} beside a placed pane`, { options: { hideBandWhilePaneOpen: false } }, async ($, on) => {
       on('ui.panes', () => ({ value: PLACED }))
-      await kraken($, on)
+      await paneAndBand($, on)
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await findVessel(ui, surface)).toBeDefined()
       await ui.unmount()
@@ -74,7 +102,7 @@ describe('band', () => {
 
       on('ui.panes', () => ({ value: PLACED }))
       on('ui.render', { component: 'AbovePrompt' }, ($2, e) => $2.ui.resolve(e).Box({}))
-      await kraken($, on)
+      await paneAndBand($, on)
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await findVessel(ui, surface)).toBeUndefined()
       await ui.unmount()
@@ -83,7 +111,7 @@ describe('band', () => {
     test(`by default, draws on ${surface} when no pane is placed`, async ($, on) => {
 
       on('ui.panes', () => ({ value: UNPLACED }))
-      await kraken($, on)
+      await paneAndBand($, on)
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await findVessel(ui, surface)).toBeDefined()
       await ui.unmount()
@@ -94,7 +122,7 @@ describe('band', () => {
       on('ui.panes', () => ({ value: PLACED }))
       // Beneath the plugin, the engine's own band: empty here.
       on('ui.render', { component: 'AbovePrompt' }, ($2, e) => $2.ui.resolve(e).Box({}))
-      await kraken($, on)
+      await paneAndBand($, on)
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await findVessel(ui, surface)).toBeUndefined()
       await ui.unmount()
@@ -107,7 +135,7 @@ describe('band', () => {
         const { Text } = $2.ui.resolve(e)
         return Text({ children: 'How is Claude doing?' })
       })
-      await kraken($, on)
+      await paneAndBand($, on)
       const ui = await $.ui.mount({ ...BAND, surface, props: { ...BAND.props, hasSurvey: true } })
       expect(await findVessel(ui, surface)).toBeDefined()
       expect(await ui.find({ type: 'Text', text: 'How is Claude doing?' })).toBeDefined()
@@ -118,7 +146,7 @@ describe('band', () => {
 
       on('ui.panes', () => ({ value: UNPLACED }))
       on('ui.render', { component: 'AbovePrompt' }, ($2, e) => $2.ui.resolve(e).Box({}))
-      await kraken($, on)
+      await paneAndBand($, on)
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await findVessel(ui, surface)).toBeUndefined()
       await ui.unmount()

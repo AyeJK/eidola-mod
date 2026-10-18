@@ -19,8 +19,8 @@ export const PACKAGES: Record<'kraken' | 'lich' | 'wisp', EngramJson> = {
     rights: 'original',
     vessel: {
       scene: 'kraken',
-      shows: ['pane', 'band', 'shrine'],
-      thumbnails: { pane: 'thumb-pane.svg', band: 'thumb-band.svg' },
+      shows: ['pane', 'shrine'],
+      thumbnails: { pane: 'thumb-pane.svg' },
       hud: {
         show: true,
         meter: 'none',
@@ -52,8 +52,8 @@ export const PACKAGES: Record<'kraken' | 'lich' | 'wisp', EngramJson> = {
     rights: 'original',
     vessel: {
       scene: 'lich',
-      shows: ['pane', 'band', 'shrine'],
-      thumbnails: { pane: 'thumb-pane.svg', band: 'thumb-band.svg' },
+      shows: ['pane', 'shrine'],
+      thumbnails: { pane: 'thumb-pane.svg' },
       hud: {
         show: true,
         meter: 'sparks',

@@ -21,8 +21,7 @@ export const SNAPSHOTS: Record<string, unknown> = {
     },
     "listedUnder": [
       "all",
-      "pane",
-      "band"
+      "pane"
     ]
   },
   "card: lich": {
@@ -35,8 +34,7 @@ export const SNAPSHOTS: Record<string, unknown> = {
     },
     "listedUnder": [
       "all",
-      "pane",
-      "band"
+      "pane"
     ]
   },
   "card: wisp": {
@@ -132,20 +130,14 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "    Client#frame-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#3c9aa6\",\"isOpen\":false},\"width\":3,\"height\":2}"
   ],
   "scene: kraken, idle, desktop band": [
-    "Box {\"width\":100,\"height\":7}",
-    "  Svg {\"source\":\"[15270 chars #b37bc58e]\",\"alt\":\"Kraken in deep water\",\"width\":796,\"height\":131,\"isInteractive\":true}",
-    "  Box {\"position\":\"absolute\",\"top\":0,\"left\":0}",
-    "    Client#kraken-band {\"module\":\"hooks/kraken-live.tsx\",\"props\":{\"mood\":\"idle\",\"cols\":100,\"rows\":7,\"view\":\"band\",\"ink\":0},\"width\":100,\"height\":7}",
-    "  Box#corner {\"position\":\"absolute\",\"top\":5,\"left\":97}",
-    "    Client#band-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#3c9aa6\",\"isOpen\":false},\"width\":3,\"height\":2}"
+    "Box"
   ],
   "scene: kraken, idle, terminal pane": [
     "Text",
     "  \"( o_o )\""
   ],
   "scene: kraken, idle, terminal band": [
-    "Text",
-    "  \"( o_o )\""
+    "Box"
   ],
   "scene: kraken, working, desktop pane": [
     "Box {\"width\":52,\"height\":75}",
@@ -181,20 +173,14 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "    Client#frame-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#3c9aa6\",\"isOpen\":false},\"width\":3,\"height\":2}"
   ],
   "scene: kraken, working, desktop band": [
-    "Box {\"width\":100,\"height\":7}",
-    "  Svg {\"source\":\"[15270 chars #b37bc58e]\",\"alt\":\"Kraken in deep water\",\"width\":796,\"height\":131,\"isInteractive\":true}",
-    "  Box {\"position\":\"absolute\",\"top\":0,\"left\":0}",
-    "    Client#kraken-band {\"module\":\"hooks/kraken-live.tsx\",\"props\":{\"mood\":\"working\",\"cols\":100,\"rows\":7,\"view\":\"band\",\"ink\":0},\"width\":100,\"height\":7}",
-    "  Box#corner {\"position\":\"absolute\",\"top\":5,\"left\":97}",
-    "    Client#band-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#3c9aa6\",\"isOpen\":false},\"width\":3,\"height\":2}"
+    "Box"
   ],
   "scene: kraken, working, terminal pane": [
     "Text",
     "  \"( >_< ) *\""
   ],
   "scene: kraken, working, terminal band": [
-    "Text",
-    "  \"( >_< ) *\""
+    "Box"
   ],
   "scene: kraken, attention, desktop pane": [
     "Box {\"width\":52,\"height\":75}",
@@ -230,20 +216,14 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "    Client#frame-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#3c9aa6\",\"isOpen\":false},\"width\":3,\"height\":2}"
   ],
   "scene: kraken, attention, desktop band": [
-    "Box {\"width\":100,\"height\":7}",
-    "  Svg {\"source\":\"[15270 chars #b37bc58e]\",\"alt\":\"Kraken in deep water\",\"width\":796,\"height\":131,\"isInteractive\":true}",
-    "  Box {\"position\":\"absolute\",\"top\":0,\"left\":0}",
-    "    Client#kraken-band {\"module\":\"hooks/kraken-live.tsx\",\"props\":{\"mood\":\"attention\",\"cols\":100,\"rows\":7,\"view\":\"band\",\"ink\":0},\"width\":100,\"height\":7}",
-    "  Box#corner {\"position\":\"absolute\",\"top\":5,\"left\":97}",
-    "    Client#band-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#3c9aa6\",\"isOpen\":false},\"width\":3,\"height\":2}"
+    "Box"
   ],
   "scene: kraken, attention, terminal pane": [
     "Text",
     "  \"( O_O ) !\""
   ],
   "scene: kraken, attention, terminal band": [
-    "Text",
-    "  \"( O_O ) !\""
+    "Box"
   ],
   "scene: lich, idle, desktop pane": [
     "Box {\"width\":52,\"height\":75}",
@@ -284,20 +264,14 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "    Client#frame-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#9a3c28\",\"isOpen\":false},\"width\":3,\"height\":2}"
   ],
   "scene: lich, idle, desktop band": [
-    "Box {\"width\":100,\"height\":12}",
-    "  Svg {\"source\":\"[4202 chars #afc10364]\",\"alt\":\"Lich in the dark\",\"width\":796,\"height\":226,\"isInteractive\":true}",
-    "  Box {\"position\":\"absolute\",\"top\":0,\"left\":0}",
-    "    Client#lich-band {\"module\":\"hooks/lich-live.tsx\",\"props\":{\"mood\":\"idle\",\"moodAt\":1760000000000,\"moodBefore\":\"idle\",\"ink\":0,\"inkAt\":0,\"epoch\":1760000000000,\"cols\":100,\"rows\":12,\"view\":\"band\"},\"width\":100,\"height\":12}",
-    "  Box#corner {\"position\":\"absolute\",\"top\":10,\"left\":97}",
-    "    Client#band-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#9a3c28\",\"isOpen\":false},\"width\":3,\"height\":2}"
+    "Box"
   ],
   "scene: lich, idle, terminal pane": [
     "Text",
     "  \"( o_o )\""
   ],
   "scene: lich, idle, terminal band": [
-    "Text",
-    "  \"( o_o )\""
+    "Box"
   ],
   "scene: lich, working, desktop pane": [
     "Box {\"width\":52,\"height\":75}",
@@ -338,20 +312,14 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "    Client#frame-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#9a3c28\",\"isOpen\":false},\"width\":3,\"height\":2}"
   ],
   "scene: lich, working, desktop band": [
-    "Box {\"width\":100,\"height\":12}",
-    "  Svg {\"source\":\"[4202 chars #afc10364]\",\"alt\":\"Lich in the dark\",\"width\":796,\"height\":226,\"isInteractive\":true}",
-    "  Box {\"position\":\"absolute\",\"top\":0,\"left\":0}",
-    "    Client#lich-band {\"module\":\"hooks/lich-live.tsx\",\"props\":{\"mood\":\"working\",\"moodAt\":1760000000000,\"moodBefore\":\"idle\",\"ink\":0,\"inkAt\":0,\"epoch\":1760000000000,\"cols\":100,\"rows\":12,\"view\":\"band\"},\"width\":100,\"height\":12}",
-    "  Box#corner {\"position\":\"absolute\",\"top\":10,\"left\":97}",
-    "    Client#band-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#9a3c28\",\"isOpen\":false},\"width\":3,\"height\":2}"
+    "Box"
   ],
   "scene: lich, working, terminal pane": [
     "Text",
     "  \"( >_< ) *\""
   ],
   "scene: lich, working, terminal band": [
-    "Text",
-    "  \"( >_< ) *\""
+    "Box"
   ],
   "scene: lich, attention, desktop pane": [
     "Box {\"width\":52,\"height\":75}",
@@ -392,20 +360,14 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "    Client#frame-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#9a3c28\",\"isOpen\":false},\"width\":3,\"height\":2}"
   ],
   "scene: lich, attention, desktop band": [
-    "Box {\"width\":100,\"height\":12}",
-    "  Svg {\"source\":\"[4202 chars #afc10364]\",\"alt\":\"Lich in the dark\",\"width\":796,\"height\":226,\"isInteractive\":true}",
-    "  Box {\"position\":\"absolute\",\"top\":0,\"left\":0}",
-    "    Client#lich-band {\"module\":\"hooks/lich-live.tsx\",\"props\":{\"mood\":\"attention\",\"moodAt\":1760000000000,\"moodBefore\":\"idle\",\"ink\":0,\"inkAt\":0,\"epoch\":1760000000000,\"cols\":100,\"rows\":12,\"view\":\"band\"},\"width\":100,\"height\":12}",
-    "  Box#corner {\"position\":\"absolute\",\"top\":10,\"left\":97}",
-    "    Client#band-corner {\"module\":\"hooks/frame-corner.tsx\",\"props\":{\"colour\":\"#9a3c28\",\"isOpen\":false},\"width\":3,\"height\":2}"
+    "Box"
   ],
   "scene: lich, attention, terminal pane": [
     "Text",
     "  \"( O_O ) !\""
   ],
   "scene: lich, attention, terminal band": [
-    "Text",
-    "  \"( O_O ) !\""
+    "Box"
   ],
   "scene: wisp, idle, desktop band": [
     "Box {\"width\":100,\"height\":9}",
@@ -554,14 +516,14 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "paneOpensAtStart": true,
     "paneShows": "the pane view",
     "bandWithPanePlaced": false,
-    "bandWithPaneNotPlaced": true
+    "bandWithPaneNotPlaced": false
   },
   "placement: kraken, pane on, band on, hide off": {
     "surfaces": "pane on · band on",
     "paneOpensAtStart": true,
     "paneShows": "the pane view",
-    "bandWithPanePlaced": true,
-    "bandWithPaneNotPlaced": true
+    "bandWithPanePlaced": false,
+    "bandWithPaneNotPlaced": false
   },
   "placement: kraken, pane on, band off": {
     "surfaces": "pane on · band off",
@@ -575,28 +537,28 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "paneOpensAtStart": false,
     "paneShows": "the pane view",
     "bandWithPanePlaced": false,
-    "bandWithPaneNotPlaced": true
+    "bandWithPaneNotPlaced": false
   },
   "placement: kraken, pane off, band on, hide off": {
     "surfaces": "pane off · band on",
     "paneOpensAtStart": false,
     "paneShows": "the pane view",
-    "bandWithPanePlaced": true,
-    "bandWithPaneNotPlaced": true
+    "bandWithPanePlaced": false,
+    "bandWithPaneNotPlaced": false
   },
   "placement: lich, pane on, band on, hide on": {
     "surfaces": "pane on · band on (hidden while the pane is open)",
     "paneOpensAtStart": true,
     "paneShows": "the pane view",
     "bandWithPanePlaced": false,
-    "bandWithPaneNotPlaced": true
+    "bandWithPaneNotPlaced": false
   },
   "placement: lich, pane on, band on, hide off": {
     "surfaces": "pane on · band on",
     "paneOpensAtStart": true,
     "paneShows": "the pane view",
-    "bandWithPanePlaced": true,
-    "bandWithPaneNotPlaced": true
+    "bandWithPanePlaced": false,
+    "bandWithPaneNotPlaced": false
   },
   "placement: lich, pane on, band off": {
     "surfaces": "pane on · band off",
@@ -610,14 +572,14 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "paneOpensAtStart": false,
     "paneShows": "the pane view",
     "bandWithPanePlaced": false,
-    "bandWithPaneNotPlaced": true
+    "bandWithPaneNotPlaced": false
   },
   "placement: lich, pane off, band on, hide off": {
     "surfaces": "pane off · band on",
     "paneOpensAtStart": false,
     "paneShows": "the pane view",
-    "bandWithPanePlaced": true,
-    "bandWithPaneNotPlaced": true
+    "bandWithPanePlaced": false,
+    "bandWithPaneNotPlaced": false
   },
   "placement: wisp, pane on, band on, hide on": {
     "surfaces": "pane on · band on (hidden while the pane is open)",

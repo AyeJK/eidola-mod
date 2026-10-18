@@ -14,10 +14,8 @@ import type { ClientModule } from 'claude-code'
 import type { Mood } from './eidola-types'
 import { hash } from './field'
 import { ARCANE, COLOURS, ROBE_EMERALD, ROBE_PURPLE, FIRE, SCORCHED, WITCHLIGHT, framing, glyphFor } from './lich'
-import type { View } from './lich'
 import { BONE, CROWN, GEM, MANTLE, buildModel, modelBounds, sampleModel } from './lich3d'
 import type { Pose } from './lich3d'
-import { grimoireGlyphs } from './grimoire3d'
 import { drawGlyphs } from './live-glyphs'
 import { mixRamp, pick, short } from './live-pixels'
 
@@ -35,7 +33,6 @@ type Props = {
   mood: Mood
   cols: number
   rows: number
-  view?: View
   ink?: number
   slice?: [number, number]
   epoch?: number
@@ -99,23 +96,8 @@ const PLANS: Record<Mood, Plan> = {
   attention: { home: [0.5, -380, 0.3], spread: 0.03, pitch: -0.02, eyes: 1.6, flame: 0.5, runes: 0.6, spin: 0.3, churn: 1, light: 1, acts: [['tilt', 3], ['speak', 2], ['loom', 1], ['beckon', 2]], every: [20, 50] },
 }
 
-/**
- * The band: a strip across its face at the pane's own scale, the same signs
- * the same size, its eyes in the middle row: brow above, nose and teeth below.
- */
-const BAND_HOMES: Record<Mood, [number, number, number]> = {
-  idle: [0.5, 0, 0.27],
-  working: [0.5, 0, 0.3],
-  attention: [0.5, -40, 0.3],
-}
-
-function planOf(view: View, mood: Mood): Plan {
-  return view === 'band' ? { ...PLANS[mood], home: BAND_HOMES[mood], spread: mood === 'attention' ? 0.03 : 0.12, runes: 0 } : PLANS[mood]
-}
-
 export type Live = {
   mood: Mood
-  view: View
   planned: Mood | ''
   tick: number
   t: number
@@ -146,10 +128,6 @@ export type Live = {
   arcane: number
   /** How far its robe has gone to purple (working), and to emerald (attention): 0 to 1 each. */
   heat: number
-  /** The band's grimoire: a page turning (0 to 1, or -1), which pages are open, when the next turns. */
-  flip: number
-  pages: number
-  nextFlip: number
   alarm: number
   blinkUntil: number
   nextBlink: number
@@ -221,7 +199,7 @@ function pickAct(live: Live, plan: Plan): Act {
 }
 
 function poseOf(live: Live, W: number, H: number): Pose {
-  const { s } = framing(live.view, W, H)
+  const { s } = framing('pane', W, H)
   // It floats: a slow rise and fall, never still.
   const hover = Math.sin(live.t * 0.7) * s * 0.03
   return {
@@ -261,7 +239,7 @@ function step(live: Live, W: number, H: number): void {
     live.inkPending = false
     live.scorchUntil = live.tick + 30
   }
-  const plan = planOf(live.view, live.mood)
+  const plan = PLANS[live.mood]
   const ease = (from: number, to: number, rate: number) => from + (to - from) * rate
 
   const endAct = () => {
@@ -282,7 +260,7 @@ function step(live: Live, W: number, H: number): void {
   if (live.act !== 'none' && live.tick >= live.actUntil) {
     endAct()
   }
-  const homeY = live.view === 'band' ? framing('band', W, H).home[1] : plan.home[2]
+  const homeY = plan.home[2]
   if (live.act === 'none' && live.tick >= live.nextAct) {
     const act = pickAct(live, plan)
     live.act = act
@@ -405,7 +383,7 @@ function step(live: Live, W: number, H: number): void {
     if (left === GATHER + 1) {
       live.xTarget = plan.home[0] + (random(live) * 2 - 1) * Math.max(plan.spread, 0.2)
       live.x = live.xTarget
-      live.y = homeY + (random(live) - 0.5) * (live.view === 'band' ? 0 : 0.06)
+      live.y = homeY + (random(live) - 0.5) * 0.06
       live.vx = 0
       live.vy = 0
     }
@@ -468,17 +446,6 @@ function step(live: Live, W: number, H: number): void {
   live.witch = ease(live.witch, live.mood === 'attention' ? 1 : 0, 0.1)
   live.arcane = ease(live.arcane, live.mood === 'working' ? (live.act === 'chant' || live.act === 'surge' ? 1.5 : 1) : 0, 0.05)
   live.heat = ease(live.heat, live.mood === 'working' ? 1 : 0, 0.06)
-  // The grimoire turns its pages while it works, one after another; at rest it lies still.
-  if (live.flip >= 0) {
-    live.flip += 0.07
-    if (live.flip >= 1) {
-      live.flip = -1
-      live.pages += 1
-      live.nextFlip = live.tick + between(live, [6, 18])
-    }
-  } else if (live.mood === 'working' && live.tick >= live.nextFlip) {
-    live.flip = 0
-  }
   live.alarm = ease(live.alarm, live.mood === 'attention' ? 1 : 0, 0.08)
   live.scorch = ease(live.scorch, scorched ? 1 : 0, scorched ? 0.4 : 0.06)
 
@@ -494,13 +461,13 @@ function step(live: Live, W: number, H: number): void {
 
 /** Whether nothing of the Lich is on the glass. */
 function isOutOfView(live: Live, W: number, H: number): boolean {
-  const [x0, y0, x1] = modelBounds(buildModel(poseOf(live, W, H), framing(live.view, W, H).cam))
+  const [x0, y0, x1] = modelBounds(buildModel(poseOf(live, W, H), framing('pane', W, H).cam))
   return x1 < 0 || x0 > W || y0 > H
 }
 
 /** How far past an edge (as a fraction) its centre must be for all of it to be gone, at a depth. */
-function outside(view: View, W: number, H: number, z: number): { x: number; y: number } {
-  const { cam, s } = framing(view, W, H)
+function outside(W: number, H: number, z: number): { x: number; y: number } {
+  const { cam, s } = framing('pane', W, H)
   const k = cam.f / (cam.f + z)
   return { x: (1.8 * s * k) / W + 0.05, y: (1.8 * s * k) / H + 0.05 }
 }
@@ -513,11 +480,10 @@ function outside(view: View, W: number, H: number, z: number): { x: number; y: n
 function flight(live: Live, act: Act, plan: Plan, homeY: number, W: number, H: number): Waypoint[] {
   const side = live.side
   const z = plan.home[1]
-  const far = outside(live.view, W, H, z)
-  const isBand = live.view === 'band'
+  const far = outside(W, H, z)
   const home = { x: plan.home[0], y: homeY, z }
   const edge = (dir: number, o: { x: number }) => (dir > 0 ? 1 + o.x : -o.x)
-  if (act === 'dip' && !isBand) {
+  if (act === 'dip') {
     return [
       { x: live.x + side * 0.15, y: 1 + far.y, z },
       { x: plan.home[0] - side * 0.2, y: 1 + far.y, z, jump: true },
@@ -526,18 +492,18 @@ function flight(live: Live, act: Act, plan: Plan, homeY: number, W: number, H: n
   }
   if (act === 'pass') {
     const near = -420
-    const close = outside(live.view, W, H, near)
+    const close = outside(W, H, near)
     return [
-      { x: edge(side, far), y: homeY + (isBand ? 0 : 0.06), z },
-      { x: edge(-side, close), y: homeY + (isBand ? 0 : 0.04), z: near, jump: true },
-      { x: edge(side, close), y: homeY + (isBand ? 0 : 0.1), z: near },
-      { x: edge(-side, far), y: homeY - (isBand ? 0 : 0.08), z, jump: true },
+      { x: edge(side, far), y: homeY + 0.06, z },
+      { x: edge(-side, close), y: homeY + 0.04, z: near, jump: true },
+      { x: edge(side, close), y: homeY + 0.1, z: near },
+      { x: edge(-side, far), y: homeY - 0.08, z, jump: true },
       home,
     ]
   }
   return [
-    { x: edge(side, far), y: homeY + (isBand ? 0 : 0.12), z: z - 80 },
-    { x: edge(-side, far), y: homeY - (isBand ? 0 : 0.1), z: z + 120, jump: true },
+    { x: edge(side, far), y: homeY + 0.12, z: z - 80 },
+    { x: edge(-side, far), y: homeY - 0.1, z: z + 120, jump: true },
     home,
   ]
 }
@@ -547,12 +513,11 @@ function flight(live: Live, act: Act, plan: Plan, homeY: number, W: number, H: n
  * first, a start is a resync: mid-vanish, nothing of it showing, gathering
  * itself again.
  */
-export function born(carry: Carry, view: View, tick: number): Live {
-  const plan = planOf(view, carry.mood)
+export function born(carry: Carry, tick: number): Live {
+  const plan = PLANS[carry.mood]
   const isResync = tick > 0
   return {
     ...carry,
-    view,
     planned: carry.mood,
     tick,
     t: tick * DT,
@@ -579,9 +544,6 @@ export function born(carry: Carry, view: View, tick: number): Live {
     witch: carry.mood === 'attention' ? 1 : 0,
     arcane: carry.mood === 'working' ? 1 : 0,
     heat: carry.mood === 'working' ? 1 : 0,
-    flip: -1,
-    pages: 0,
-    nextFlip: tick + 10,
     alarm: carry.mood === 'attention' ? 1 : 0,
     blinkUntil: 0,
     nextBlink: tick + 50,
@@ -611,10 +573,8 @@ export function born(carry: Carry, view: View, tick: number): Live {
  * from the last of these.
  */
 function resync(live: Live): void {
-  const { mood, moodNext, moodTick, inkSeen, inkPending, inkTick, flip, pages, nextFlip } = live
-  Object.assign(live, born({ mood, moodNext, moodTick, inkSeen, inkPending, inkTick }, live.view, live.tick))
-  // The grimoire keeps its place: an open book does not jump back a chapter.
-  Object.assign(live, { flip, pages, nextFlip })
+  const { mood, moodNext, moodTick, inkSeen, inkPending, inkTick } = live
+  Object.assign(live, born({ mood, moodNext, moodTick, inkSeen, inkPending, inkTick }, live.tick))
 }
 
 type Sampled = { layer: number; v: number; glyph?: string }
@@ -661,7 +621,6 @@ const LichLive: ClientModule<Props, State> = (props, surface) => {
   const { Box, Text } = surface.elements
   const W = props.cols * CW
   const H = props.rows * CH
-  const view = props.view ?? 'pane'
   const [first, count] = props.slice ?? [0, props.rows]
 
   const clock = (): number | undefined => {
@@ -691,7 +650,6 @@ const LichLive: ClientModule<Props, State> = (props, surface) => {
         inkPending: isNewInk,
         inkTick,
       },
-      view,
       base,
     )
     const past: Live[] = []
@@ -780,13 +738,7 @@ const LichLive: ClientModule<Props, State> = (props, surface) => {
     const glyph = isScorched && cell.layer === BONE ? glyphFor(BONE, hash(x, live.tick), x, y, live.glyphT) : (cell.glyph ?? glyphFor(cell.layer, 0.15 + 0.9 * v, x, y, live.glyphT))
     return [colour, glyph] as const
   }
-  // In the band, the Lich's grimoire lies open.
-  if (view === 'band') {
-    const at = grimoireGlyphs({ flip: live.flip, pages: live.pages, heat: live.heat, alarm: live.alarm, t: live.t }, props.cols, props.rows)
-    return drawGlyphs({ Box, Text }, props.cols, count, (x, sy, levels) => at(x, sy + first, levels))
-  }
-
-  const model = buildModel(poseOf(live, W, H), framing(view, W, H).cam)
+  const model = buildModel(poseOf(live, W, H), framing('pane', W, H).cam)
   // Each cell sampled once a frame, at two heights: a glyph is tall.
   const cells = new Map<number, Sampled | null>()
   const cellAt = (x: number, y: number): Sampled | null => {

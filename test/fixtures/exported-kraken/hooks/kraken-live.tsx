@@ -23,10 +23,7 @@ import { PX_H, PX_W, drawPixels, mixRamp, pick, short } from './live-pixels'
 import type { Steady } from './live-pixels'
 
 /** The grid comes in props, never from the region: a drawing sized by its region resizes it. */
-type Props = { mood: Mood; cols: number; rows: number; view?: View; ink?: number }
-
-/** The pane, tall beside the transcript; or the band, a wide strip above the prompt. */
-type View = 'pane' | 'band'
+type Props = { mood: Mood; cols: number; rows: number; ink?: number }
 
 /** How a mood behaves: where it lives, how it moves, how it glows. */
 type Plan = {
@@ -152,7 +149,6 @@ const ARM_MIX: Record<Mood, Array<[Intent, number]>> = {
 
 type Live = {
   mood: Mood
-  view: View
   arms: ArmLife[]
   /** The mood the current target was picked for. */
   planned: Mood | ''
@@ -233,29 +229,13 @@ function random(live: Live): number {
 
 const between = (live: Live, [a, b]: [number, number]) => Math.round(a + random(live) * (b - a))
 
-/**
- * The band is a strip: the same creature, framed wide, and far too big for
- * it: a slice of mantle and arms slides past; it roams side to side and
- * leaves through the sides; its eye at the glass fills the strip's height.
- */
-const BAND_PLACES: Record<Mood, Pick<Plan, 'home' | 'spread'>> = {
-  idle: { home: [0.5, 0.55, 200], spread: [0.55, 0.25, 60] },
-  working: { home: [0.5, 0.5, -150], spread: [0.55, 0.3, 50] },
-  attention: { home: [0.5, 0.5, -250], spread: [0.06, 0.05, 30] },
+function camera(W: number, H: number): Camera {
+  return { cx: W / 2, cy: H * 0.45, f: H * 1.3 }
 }
 
-function planOf(view: View, mood: Mood): Plan {
-  return view === 'band' ? { ...PLANS[mood], ...BAND_PLACES[mood] } : PLANS[mood]
-}
-
-function camera(W: number, H: number, view: View): Camera {
-  return view === 'band' ? { cx: W / 2, cy: H / 2, f: W } : { cx: W / 2, cy: H * 0.45, f: H * 1.3 }
-}
-
-/** Mantle width for a view: a share of the pane's width, or of the band's height. */
-function sizeOf(W: number, H: number, view: View): number {
-  // In the band it is the creature that does not fit: its mantle alone the strip's height.
-  return view === 'band' ? H : Math.min(W * 0.42, H * 0.25)
+/** Mantle width: a share of the pane's width or height, whichever is less. */
+function sizeOf(W: number, H: number): number {
+  return Math.min(W * 0.42, H * 0.25)
 }
 
 /** A point on the glass at a depth, as a world point. */
@@ -345,8 +325,8 @@ function project3(cam: Camera, p: V3): { x: number; y: number; k: number } {
 
 /** One tick of the Kraken's life. */
 function step(live: Live, W: number, H: number, s: number): void {
-  const plan = planOf(live.view, live.mood)
-  const cam = camera(W, H, live.view)
+  const plan = PLANS[live.mood]
+  const cam = camera(W, H)
   const ease = (from: number, to: number, rate: number) => from + (to - from) * rate
   live.tick += 1
 
@@ -384,8 +364,8 @@ function step(live: Live, W: number, H: number, s: number): void {
     live.actUntil = live.tick + 8 + between(live, [20, 32])
     const at = project3(cam, live.pos)
     const dx = at.x < W / 2 ? 1 : -1
-    const dy = live.view === 'band' ? 0 : random(live) < 0.5 ? -1 : 1
-    const close = live.view === 'band' ? -cam.f * 0.25 : -cam.f * 0.35
+    const dy = random(live) < 0.5 ? -1 : 1
+    const close = -cam.f * 0.35
     live.route = [
       { p: offscreen(live, cam, W, H, s, dx, dy, live.pos[2] + 400) },
       { p: offscreen(live, cam, W, H, s, -dx, 0, close), jump: true },
@@ -421,8 +401,8 @@ function step(live: Live, W: number, H: number, s: number): void {
         ]
       } else {
         // Out through one edge, and back in through another, at another depth.
-        // The band is a strip, and at work it crosses side to side: through the sides.
-        const edges = live.view === 'band' || plan.sideways ? EDGES.filter(([dx]) => dx !== 0) : EDGES
+        // At work it crosses side to side: through the sides.
+        const edges = plan.sideways ? EDGES.filter(([dx]) => dx !== 0) : EDGES
         const out = edges[Math.floor(random(live) * edges.length)]!
         let back = edges[Math.floor(random(live) * edges.length)]!
         if (back[0] === out[0] && back[1] === out[1]) {
@@ -658,16 +638,14 @@ const KrakenLive: ClientModule<Props, State> = (props, surface) => {
   const { Box } = surface.elements
   const W = props.cols * PX_W
   const H = props.rows * PX_H * 2
-  const view = props.view ?? 'pane'
-  const s = sizeOf(W, H, view)
-  const cam = camera(W, H, view)
+  const s = sizeOf(W, H)
+  const cam = camera(W, H)
 
   let state = surface.state
   if (!state) {
-    const plan = planOf(view, props.mood)
+    const plan = PLANS[props.mood]
     const live: Live = {
       mood: props.mood,
-      view,
       arms: Array.from({ length: 8 }, (_, i) => ({
         phase: i * 1.7,
         gather: plan.rest,
@@ -740,7 +718,7 @@ const KrakenLive: ClientModule<Props, State> = (props, surface) => {
     live.inkSeen = props.ink ?? 0
     live.inkPending = true
   }
-  const plan = planOf(live.view, live.mood)
+  const plan = PLANS[live.mood]
 
   // Hovering bobs a little; the attention lean comes and goes.
   const hovering = live.stroke < 0

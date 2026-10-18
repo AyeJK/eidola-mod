@@ -134,7 +134,7 @@ const fileCache = new Map<string, string | null>()
 const BAND_ROWS = 7
 /** The Wisp's band: tall enough for sky, lanterns, the boardwalk and the water under them. */
 const WISP_BAND_ROWS = 9
-/** The Lich's band: tall enough for brow, eyes, nose and teeth at the pane's scale. */
+/** A Lich remix's band (the Grimoire Band): tall enough for an open book at the pane's scale. */
 const LICH_BAND_ROWS = 12
 
 // What the band hook saw and drew last, for /eidola. Not drawn from.
@@ -730,19 +730,12 @@ async function drawBundled(
   return DRAWINGS[scene](els, await handoffOf($, engram, where, cols, rows), await drawKit($, engram, where))
 }
 
-/** A drawing with one more child after its own: the band's corner over a creature's strip. */
-function withChild(tree: RenderElement, child: RenderElement): RenderElement {
-  const own = (tree as { children?: unknown }).children
-  const children = Array.isArray(own) ? own : own === undefined ? [] : [own]
-  return { ...tree, children: [...children, child] } as RenderElement
-}
-
 /**
  * The rows a band drawing takes for a scene: the Lich's as tall as the band
- * allows up to twelve (fewer, and its face is a smear), the Wisp's tall
- * enough for sky, lanterns, boardwalk and water, the rest the band's own.
- * An Engram plugin's band gets its remixOf scene's, so a remix draws as tall
- * as the Engram it came from.
+ * allows up to twelve, the Wisp's tall enough for sky, lanterns, boardwalk
+ * and water, the rest the band's own. The bundled Lich shows in the pane
+ * only, so the Lich's rule is for an Engram plugin remixed from it (the
+ * Grimoire Band): a plugin's band gets its remixOf scene's rows.
  */
 function bandRows(scene: SceneName | undefined, hasSurvey: boolean, maxRows: number): number {
   if (scene === 'lich') {
@@ -2857,17 +2850,6 @@ export const register: Register = (on, options) => {
       return withSurvey(<Text>{FACES[state]}</Text>)
     }
 
-    // The live Kraken in the band, where a Client can draw (desktop): still
-    // water under the creature, framed for a wide strip. As in the pane,
-    // nothing here changes with the mood but the Client's props.
-    if (awake?.vessel.scene === 'kraken' && e.surface === 'desktop') {
-      const els = $.ui.resolve(e) as Elements['desktop']
-      const cols = e.props.bodyColumns
-      const rows = bandRows('kraken', e.props.hasSurvey, e.props.maxRows)
-      const strip = await drawBundled($, els, awake, 'kraken', 'band', cols, rows)
-      return withSurvey(withChild(strip, await bandCorner($, els, cols, rows, awake)))
-    }
-
     // The Wisp in its fen: the fen drawn once, the spirit and its lanterns live
     // over it, in a HUD of its own whose corner opens the picker in the pane.
     // A row taller than its rows, clipped to them, so the HUD meets its edges.
@@ -2883,16 +2865,6 @@ export const register: Register = (on, options) => {
           {await bandCorner($, els, cols, rows, awake)}
         </Box>,
       )
-    }
-
-    // The Lich in the band: a strip across its face, over the dark, as tall
-    // as the band allows up to twelve rows: fewer, and its face is a smear.
-    if (awake?.vessel.scene === 'lich' && e.surface === 'desktop') {
-      const els = $.ui.resolve(e) as Elements['desktop']
-      const cols = e.props.bodyColumns
-      const rows = bandRows('lich', e.props.hasSurvey, e.props.maxRows)
-      const strip = await drawBundled($, els, awake, 'lich', 'band', cols, rows)
-      return withSurvey(withChild(strip, await bandCorner($, els, cols, rows, awake)))
     }
 
     // A scene Engram fills the band edge to edge, no text: the status line

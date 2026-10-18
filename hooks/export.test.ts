@@ -10,13 +10,12 @@
 //   for the bundled Lich, the backdrop's source included.
 // - The fixed-seed run matches: its lich-live.tsx, run tick by tick from the
 //   same seed through the same moods and ink, draws every frame the bundled
-//   one draws, in each slice of the pane and in the band, and lives through
-//   the same states.
+//   one draws, in each slice of the pane, and lives through the same states.
 //
 // The exported Kraken and Wisp (test/fixtures/exported-kraken and
 // exported-wisp, written the same way) get the fixed-seed run too: their
-// kraken-live.tsx and wisp-live.tsx draw every frame the bundled ones draw,
-// in the pane and in the band.
+// kraken-live.tsx and wisp-live.tsx draw every frame the bundled ones draw:
+// the Kraken's in the pane, the Wisp's in the band and a pane opened on it.
 //
 // The kit loads an inline plugin from its register's source alone, so the
 // export's own hooks (which import its drawing) can't be loaded as a plugin
@@ -219,9 +218,9 @@ describe('the exported Lich, handed off to', () => {
     await lichPane.unmount()
     const { contract: _contract, engram: _engram, where: _where, columns, rows, ...state } = inPane
     expect(slice).toMatchObject({ ...state, cols: columns, rows })
-    // Pane only: no live strip in the band.
+    // Pane only: nothing live in the band.
     const lichBand = await $.ui.mount(BAND)
-    expect(await lichBand.find({ type: 'Client', key: 'lich-band' })).toBeUndefined()
+    expect(await lichBand.find({ type: 'Client' })).toBeUndefined()
     await lichBand.unmount()
   })
 
@@ -287,7 +286,7 @@ function runner<P>(module: unknown, elements: ClientElements, columns: number, r
   }
 }
 
-type LiveProps = { mood: Mood; ink: number; cols: number; rows: number; slice?: [number, number]; view?: 'pane' | 'band' }
+type LiveProps = { mood: Mood; ink: number; cols: number; rows: number; slice?: [number, number] }
 
 /**
  * Runs a bundled live module and its exported copy side by side, tick by
@@ -344,55 +343,51 @@ const KRAKEN = { ours: ExportedKrakenLive, theirs: BundledKrakenLive }
 const WISP = { ours: ExportedWispLive, theirs: BundledWispLive }
 
 describe('the exported Lich, run', () => {
-  test("the fixed-seed run matches: the frames of the pane's four slices and of the band, through each mood and an error", { timeoutMs: 60_000 }, async ($, on) => {
+  test("the fixed-seed run matches: the frames of the pane's four slices, through each mood and an error", { timeoutMs: 60_000 }, async ($, on) => {
     const elements = await clientElements($, on)
     const [cols, rows] = [52, 75]
     const cuts = [0, 19, 38, 56, 75]
     for (let i = 0; i < 4; i += 1) {
       expectSameRun(bothRuns(LICH, elements, { cols, rows, slice: [cuts[i]!, cuts[i + 1]! - cuts[i]!] }, 90), `slice ${i}`, 5)
     }
-    expectSameRun(bothRuns(LICH, elements, { cols: 100, rows: 12, view: 'band' }, 90), 'the band', 3)
   })
 
   test('from the same seed it lives through the same states, tick for tick', () => {
     const carry = { mood: 'idle', moodNext: 'idle', moodTick: 0, inkSeen: 0, inkPending: false, inkTick: 0 } as const
     const [W, H] = [416, 1425]
-    for (const view of ['pane', 'band'] as const) {
-      const ours = exportedBorn(carry, view, 0)
-      const theirs = bundledBorn(carry, view, 0)
-      const pastOurs: Parameters<typeof exportedAdvance>[1] = []
-      const pastTheirs: Parameters<typeof bundledAdvance>[1] = []
-      for (let t = 0; t < 600; t += 1) {
-        if (t === 100) {
-          ours.moodNext = theirs.moodNext = 'working'
-          ours.moodTick = theirs.moodTick = 101
-        }
-        if (t === 300) {
-          ours.inkSeen = theirs.inkSeen = 1
-          ours.inkPending = theirs.inkPending = true
-          ours.inkTick = theirs.inkTick = 301
-        }
-        if (t === 400) {
-          ours.moodNext = theirs.moodNext = 'attention'
-          ours.moodTick = theirs.moodTick = 401
-        }
-        exportedAdvance(ours, pastOurs, W, H)
-        bundledAdvance(theirs, pastTheirs, W, H)
-        if (t % 25 === 0) {
-          expect(JSON.stringify(ours), `${view}, tick ${t}`).toBe(JSON.stringify(theirs))
-        }
+    const ours = exportedBorn(carry, 0)
+    const theirs = bundledBorn(carry, 0)
+    const pastOurs: Parameters<typeof exportedAdvance>[1] = []
+    const pastTheirs: Parameters<typeof bundledAdvance>[1] = []
+    for (let t = 0; t < 600; t += 1) {
+      if (t === 100) {
+        ours.moodNext = theirs.moodNext = 'working'
+        ours.moodTick = theirs.moodTick = 101
       }
-      expect(ours.tick).toBe(600)
-      expect(JSON.stringify(ours)).toBe(JSON.stringify(theirs))
+      if (t === 300) {
+        ours.inkSeen = theirs.inkSeen = 1
+        ours.inkPending = theirs.inkPending = true
+        ours.inkTick = theirs.inkTick = 301
+      }
+      if (t === 400) {
+        ours.moodNext = theirs.moodNext = 'attention'
+        ours.moodTick = theirs.moodTick = 401
+      }
+      exportedAdvance(ours, pastOurs, W, H)
+      bundledAdvance(theirs, pastTheirs, W, H)
+      if (t % 25 === 0) {
+        expect(JSON.stringify(ours), `tick ${t}`).toBe(JSON.stringify(theirs))
+      }
     }
+    expect(ours.tick).toBe(600)
+    expect(JSON.stringify(ours)).toBe(JSON.stringify(theirs))
   })
 })
 
 describe('the exported Kraken, run', () => {
-  test('the fixed-seed run matches: the frames of the pane and of the band, through each mood and an error', { timeoutMs: 60_000 }, async ($, on) => {
+  test('the fixed-seed run matches: the frames of the pane, through each mood and an error', { timeoutMs: 60_000 }, async ($, on) => {
     const elements = await clientElements($, on)
     expectSameRun(bothRuns(KRAKEN, elements, { cols: 52, rows: 75 }, 90), 'the pane', 5)
-    expectSameRun(bothRuns(KRAKEN, elements, { cols: 100, rows: 7, view: 'band' }, 90), 'the band', 3)
   })
 })
 

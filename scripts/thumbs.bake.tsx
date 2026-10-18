@@ -170,7 +170,7 @@ const SHOTS: Shot[] = [
   {
     shot: 'kraken/pane',
     module: KrakenLive,
-    props: { mood: 'idle', view: 'pane', ink: 0 },
+    props: { mood: 'idle', ink: 0 },
     from: 20,
     to: 900,
     every: 10,
@@ -179,20 +179,9 @@ const SHOTS: Shot[] = [
     backdrop: backdropAt((w, h) => renderScene(krakenWaterScene(w, h), NOW), 320),
   },
   {
-    shot: 'kraken/band',
-    module: KrakenLive,
-    props: { mood: 'idle', view: 'band', ink: 0 },
-    from: 20,
-    to: 900,
-    every: 10,
-    width: 1200,
-    height: 304,
-    backdrop: backdropAt((w, h) => renderScene(krakenWaterScene(w, h), NOW), 400),
-  },
-  {
     shot: 'lich/pane',
     module: LichLive,
-    props: { mood: 'idle', view: 'pane', ink: 0 },
+    props: { mood: 'idle', ink: 0 },
     from: 20,
     to: 300,
     every: 10,
@@ -203,18 +192,6 @@ const SHOTS: Shot[] = [
     // A bust: its crown clear of the top, its robe running off the bottom.
     drop: 24,
     backdrop: backdropAt((w, h) => renderScene(voidScene(w, h, 'pane'), NOW), 320),
-  },
-  {
-    shot: 'lich/band',
-    module: LichLive,
-    props: { mood: 'idle', view: 'band', ink: 0 },
-    from: 20,
-    to: 300,
-    every: 10,
-    width: 720,
-    height: 190,
-    glyphs: { size: 16, weight: 700 },
-    backdrop: backdropAt((w, h) => renderScene(voidScene(w, h, 'band'), NOW), 400),
   },
 ]
 

@@ -1,7 +1,7 @@
 // The Lich's drawing module (hooks/drawing.ts): the dark it hangs in drawn
-// once, and it drawn over that in glyphs by lich-live.tsx. In the pane, four
-// slices, top to bottom, that keep in step by the hand-off's epoch; in the
-// band, a strip across its grimoire.
+// once, and it drawn over that in glyphs by lich-live.tsx: four slices, top
+// to bottom, that keep in step by the hand-off's epoch. It shows in the pane
+// only.
 //
 // Eidola draws the bundled Lich through this, and an Engram plugin exported
 // from it (scripts/export-engram.mjs) draws with this same file.
@@ -10,7 +10,7 @@ import { overdrawn } from '../../../hooks/drawing'
 import type { Draw } from '../../../hooks/drawing'
 import { renderScene } from '../../../hooks/field'
 import { voidScene } from '../../../hooks/lich'
-import { PX_PER_COLUMN, PX_PER_ROW, sceneSize } from '../../../hooks/stage'
+import { sceneSize } from '../../../hooks/stage'
 
 /** The Lich's pane is drawn by four drawings, one above the next, each within its own bound. */
 export function lichSlices(rows: number): Array<[number, number]> {
@@ -23,19 +23,6 @@ export const draw: Draw = (els, handoff, kit) => {
   const { columns: cols, rows } = handoff
   // What the live drawings share in their props: the mood, the ink, and the clock that keeps split drawings in step.
   const live = { mood: handoff.mood, moodAt: handoff.moodAt, moodBefore: handoff.moodBefore, ink: handoff.ink, inkAt: handoff.inkAt, epoch: handoff.epoch }
-  if (handoff.where === 'band') {
-    const width = Math.max(96, cols * PX_PER_COLUMN - 4)
-    const height = rows * PX_PER_ROW - 2
-    const backdrop = kit.memo(`lich-void:${width}x${height}`, () => renderScene(voidScene(width, height, 'band'), kit.now))
-    return (
-      <Box width={cols} height={rows}>
-        <Svg key="scene:band-void" source={backdrop} alt={`${kit.name} in the dark`} width={width} height={height} isInteractive />
-        <Box position="absolute" top={0} left={0}>
-          <Client key="lich-band" module="../../../hooks/lich-live.tsx" props={{ ...live, cols, rows, view: 'band' }} width={cols} height={rows} />
-        </Box>
-      </Box>
-    )
-  }
   // The dark the same height as the drawing over it: any taller and the pane scrolls.
   const { width } = sceneSize(cols, rows, 'dock')
   const height = overdrawn(rows)

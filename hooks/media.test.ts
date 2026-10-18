@@ -93,7 +93,7 @@ describe('network probes', () => {
 })
 
 describe('pane title', () => {
-  test('names the awake Engram, and follows it when another awakens', async ($, on) => {
+  test('is Eidola, whichever Engram is awake, and asleep', async ($, on) => {
     servePackages(on)
     const titles: (string | undefined)[] = []
     on('ui.open', ($2, e) => {
@@ -106,8 +106,8 @@ describe('pane title', () => {
     on('store.set', () => ({ value: undefined }))
 
     await $.command.run({ command: 'awaken', args: 'kraken', ...TYPED })
-    expect(titles).toContain('Kraken')
-    expect(titles).not.toContain('Eidola')
+    expect(titles.length).toBeGreaterThan(0)
+    expect(titles.every(title => title === 'Eidola')).toBe(true)
 
     await $.command.run({ command: 'sleep', args: '', ...TYPED })
     expect(titles.at(-1)).toBe('Eidola')

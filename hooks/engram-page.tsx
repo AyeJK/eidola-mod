@@ -57,14 +57,12 @@ export function surfaceIcon(kit: Kit, icon: SurfaceIcon, colour: string, key: st
   )
 }
 
-/** The primary button: the surface's own, its text in capitals. A Button takes its label alone, so no colour of ours. */
-export function primaryButton(kit: Kit, key: string, label: string, onPress: () => void): RenderElement {
-  const { Button } = kit.els
-  return <Button key={key} label={label.toUpperCase()} variant="primary" onPress={onPress} />
-}
-
-/** A secondary button: normal case. */
-export function secondaryButton(kit: Kit, key: string, label: string, onPress: () => void): RenderElement {
+/**
+ * A button: the surface's secondary style, normal case. Every button the
+ * screens draw is this one, so Awaken, Sleep, Details and Create with Claude
+ * read alike; the engine's primary fill outshouts the cards it sits on.
+ */
+export function button(kit: Kit, key: string, label: string, onPress: () => void): RenderElement {
   const { Button } = kit.els
   return <Button key={key} label={label} variant="secondary" onPress={onPress} />
 }
@@ -122,31 +120,19 @@ export function accentRule(kit: Kit, key = 'rule'): RenderElement {
   )
 }
 
-/** The header: back, the wordmark, and the Surfaces button with each surface's icon, amber when it is on. */
-export function header(
-  kit: Kit,
-  back: { key: string; onPress: () => void },
-  surfaces: Surfaces,
-  onSurfaces: () => void,
-): RenderElement {
+/** The header: back, then the wordmark. */
+export function header(kit: Kit, back: { key: string; onPress: () => void }): RenderElement {
   const { Box, Text, Svg } = kit.els
-  const isOn: Record<SurfaceIcon, boolean> = { pane: surfaces.pane, band: surfaces.band, shrine: false }
   return (
-    <Box key="head" flexDirection="row" justifyContent="space-between" alignItems="center">
-      <Box key="head-left" flexDirection="row" alignItems="center" gap={1}>
-        {secondaryButton(kit, back.key, '‹', back.onPress)}
-        {kit.isRich ? (
-          <Svg key="wordmark" source={wordmarkSvg(THEME.gold)} alt="Eidola" width={WORDMARK_WIDTH} height={WORDMARK_HEIGHT} />
-        ) : (
-          <Text key="wordmark" bold color={THEME.gold}>
-            EIDOLA
-          </Text>
-        )}
-      </Box>
-      <Box key="head-surfaces" flexDirection="row" alignItems="center" gap={1}>
-        {secondaryButton(kit, 'surfaces', 'Surfaces', onSurfaces)}
-        {SURFACE_ICONS.map(icon => surfaceIcon(kit, icon, isOn[icon] ? THEME.amber : THEME.faint, `head-icon:${icon}`))}
-      </Box>
+    <Box key="head" flexDirection="row" alignItems="center" gap={1} flexShrink={0}>
+      {button(kit, back.key, '‹', back.onPress)}
+      {kit.isRich ? (
+        <Svg key="wordmark" source={wordmarkSvg(THEME.gold)} alt="Eidola" width={WORDMARK_WIDTH} height={WORDMARK_HEIGHT} />
+      ) : (
+        <Text key="wordmark" bold color={THEME.gold}>
+          EIDOLA
+        </Text>
+      )}
     </Box>
   )
 }
@@ -430,7 +416,7 @@ export function engramPage(kit: Kit, input: PageInput): RenderElement {
   const surfacesLink = <Button key="page-surfaces" label="Surfaces" plain onPress={input.onSurfaces} />
   return (
     <Box key={`page:${id}`} flexDirection="column" width={kit.cols} paddingX={1} gap={1} backgroundColor={THEME.void}>
-      {header(kit, { key: 'page-back', ...input.back }, input.surfaces, input.onSurfaces)}
+      {header(kit, { key: 'page-back', ...input.back })}
       {hudPreview(kit, input)}
       <Box key="preview-row" flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="wrap">
         <Box key="preview-moods" flexDirection="row" gap={1}>
@@ -451,9 +437,9 @@ export function engramPage(kit: Kit, input: PageInput): RenderElement {
         </Text>
       </Box>
       <Box key="actions" flexDirection="row" flexWrap="wrap" gap={1}>
-        {input.isAwake ? secondaryButton(kit, 'page-sleep', 'Sleep', input.onSleep) : primaryButton(kit, 'page-awaken', 'Awaken', input.onAwaken)}
-        {secondaryButton(kit, 'page-remix', 'Remix with Claude', input.onRemix)}
-        {input.onPublish ? secondaryButton(kit, 'page-publish', 'Publish', input.onPublish) : null}
+        {input.isAwake ? button(kit, 'page-sleep', 'Sleep', input.onSleep) : button(kit, 'page-awaken', 'Awaken', input.onAwaken)}
+        {button(kit, 'page-remix', 'Remix with Claude', input.onRemix)}
+        {input.onPublish ? button(kit, 'page-publish', 'Publish', input.onPublish) : null}
       </Box>
       {panel(kit, 'where', 'Where it draws', surfacesLink, where)}
       <Box key="facts" flexDirection="column" gap={1}>

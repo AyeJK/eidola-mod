@@ -49,13 +49,15 @@ describe('the picker', () => {
     expect((await pane.findAll({ type: 'Box', in: 'frame-corner' })).filter(b => b.props?.backgroundColor).length).toBe(8)
     expect(await pane.find({ type: 'Button', key: 'awaken:lich' })).toBeUndefined()
 
-    // A click on it: every bundled Engram as a card, the awake one to put to sleep.
+    // A click on it: every bundled Engram as a card; the awake one has no button, the strip above puts it to sleep.
     await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
     expect(await pane.find({ type: 'Client', key: 'kraken-live' })).toBeUndefined()
     for (const id of ['wisp', 'lich']) {
-      expect(await pane.find({ type: 'Button', key: `awaken:${id}` })).toMatchObject({ props: { label: 'AWAKEN', variant: 'primary' } })
+      expect(await pane.find({ type: 'Button', key: `awaken:${id}` })).toMatchObject({ props: { label: 'Awaken', variant: 'secondary' } })
     }
-    expect(await pane.find({ type: 'Button', key: 'sleep:kraken' })).toMatchObject({ props: { label: 'Sleep', variant: 'secondary' } })
+    expect(await pane.find({ type: 'Button', key: 'awaken:kraken' })).toBeUndefined()
+    expect(await pane.find({ type: 'Button', key: 'sleep:kraken' })).toBeUndefined()
+    expect(await pane.find({ type: 'Button', key: 'strip-sleep' })).toMatchObject({ props: { label: 'Sleep', variant: 'secondary' } })
     expect((await pane.findAll({ type: 'Svg' })).length).toBeGreaterThanOrEqual(3)
     // A card shows the view its Engram draws in: the Wisp's the band, the rest their pane.
     expect(await pane.find({ type: 'Text', text: 'pane + band' })).toBeDefined()
@@ -65,7 +67,7 @@ describe('the picker', () => {
     expect(alts.filter(alt => alt.endsWith(', pane view')).length).toBe(2)
 
     // The filter chips, with counts: an Engram that draws in both is listed under Pane and under Band.
-    expect(await pane.find({ type: 'Text', text: '3 BUNDLED' })).toBeDefined()
+    expect(await pane.find({ type: 'Button', key: 'picker-back' })).toBeDefined()
     expect((await pane.findAll({ type: 'Button' })).filter(b => String(b.key).startsWith('filter:')).map(b => b.props.label)).toEqual(['ALL 3', 'PANE 2', 'BAND 3', 'YOURS 0'])
     await pane.press({ key: 'filter:band' })
     expect(await pane.find({ type: 'Box', key: 'chip-filter:band' })).toMatchObject({ props: { borderColor: THEME.amberLine, backgroundColor: THEME.amberFill } })
@@ -75,8 +77,9 @@ describe('the picker', () => {
     expect(await pane.find({ type: 'Button', key: 'awaken:lich' })).toBeDefined()
     expect(await pane.find({ type: 'Button', key: 'awaken:wisp' })).toBeUndefined()
     await pane.press({ key: 'filter:all' })
-    expect(await pane.find({ type: 'Text', text: '3 BUNDLED' })).toBeDefined()
-    expect(await pane.find({ type: 'Client', key: 'frame-corner' })).toBeDefined()
+    expect(await pane.find({ type: 'Button', key: 'picker-back' })).toBeDefined()
+    // No corner on the picker: back is the header's button alone.
+    expect(await pane.find({ type: 'Client', key: 'frame-corner' })).toBeUndefined()
 
     // Awakening the Lich from its card: the picker closes on the Lich.
     await pane.press({ key: 'awaken:lich' })
@@ -88,18 +91,13 @@ describe('the picker', () => {
     await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
     expect(await pane.find({ type: 'Button', key: 'picker-back' })).toMatchObject({ props: { label: '‹' } })
     await pane.press({ key: 'picker-back' })
-    expect(await pane.find({ type: 'Button', key: 'sleep:lich' })).toBeUndefined()
+    expect(await pane.find({ type: 'Button', key: 'picker-back' })).toBeUndefined()
     expect(await pane.find({ type: 'Client', key: 'frame-sigil' })).toBeDefined()
-
-    // Open again and close again from the corner.
-    await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
-    expect(await pane.find({ type: 'Button', key: 'sleep:lich' })).toBeDefined()
-    await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
-    expect(await pane.find({ type: 'Button', key: 'sleep:lich' })).toBeUndefined()
+    expect(await pane.find({ type: 'Client', key: 'frame-corner' })).toMatchObject({ props: { props: { isOpen: false } } })
     await pane.unmount()
   })
 
-  test('Sleep on the awake card puts it to sleep and keeps the picker open', async ($, on) => {
+  test('Sleep on the awake strip puts it to sleep and keeps the picker open', async ($, on) => {
     servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
@@ -110,54 +108,37 @@ describe('the picker', () => {
 
     const pane = await $.ui.mount(PANE)
     await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
-    await pane.press({ key: 'sleep:wisp' })
+    await pane.press({ key: 'strip-sleep' })
     expect(await pane.find({ type: 'Button', key: 'awaken:wisp' })).toBeDefined()
-    expect(await pane.find({ type: 'Button', key: 'sleep:wisp' })).toBeUndefined()
+    expect(await pane.find({ type: 'Box', key: 'strip' })).toBeUndefined()
+    expect(await pane.find({ type: 'Button', key: 'picker-back' })).toBeDefined()
     await pane.unmount()
   })
 
-  test('the header: back, the wordmark, and Surfaces with its icons amber where the switch is on', async ($, on) => {
+  test('the header: back and the wordmark alone; no Surfaces button, title or count', async ($, on) => {
     servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
     on('ui.invalidate', () => ({ value: undefined }))
     on('store.set', () => ({ value: undefined }))
     on('clock.now', () => ({ value: NOW }))
-    const toasts: string[] = []
-    on('ui.toast', ($2, e) => {
-      toasts.push(e.text)
-      return { value: undefined }
-    })
     await $.command.run({ command: 'awaken', args: 'kraken', ...TYPED })
     const pane = await $.ui.mount(PANE)
     await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
 
     expect(await pane.find({ type: 'Button', key: 'picker-back' })).toMatchObject({ props: { label: '‹', variant: 'secondary' } })
-    const svgs = await pane.findAll({ type: 'Svg' })
-    const wordmark = svgs.find(svg => svg.props?.alt === 'Eidola')
+    const wordmark = (await pane.findAll({ type: 'Svg' })).find(svg => svg.props?.alt === 'Eidola')
     expect(String(wordmark?.props?.source)).toContain(`fill="${THEME.gold}"`)
     expect(String(wordmark?.props?.source)).not.toMatch(/<text|font-family/)
-    // Pane and Band on by default, the Shrine not yet a switch.
-    const icon = (alt: string) => String(svgs.find(svg => svg.props?.alt === alt)?.props?.source)
-    expect(icon('Pane')).toContain(`color="${THEME.amber}"`)
-    expect(icon('Band')).toContain(`color="${THEME.amber}"`)
-    expect(icon('Shrine')).toContain(`color="${THEME.faint}"`)
-    // The Surfaces button opens the Surfaces screen over the picker; back returns to it.
-    await pane.press({ key: 'surfaces' })
-    expect(await pane.find({ type: 'Box', key: 'surfaces-page' })).toBeDefined()
-    expect(toasts).toEqual([])
-    await pane.press({ key: 'surfaces-back' })
-    expect(await pane.find({ type: 'Box', key: 'surfaces-page' })).toBeUndefined()
-
-    // The title, its count and the accent rule, ember to gold.
-    expect(await pane.find({ type: 'Text', text: 'Engrams' })).toMatchObject({ props: { bold: true, color: THEME.white } })
-    expect(await pane.find({ type: 'Text', text: '3 BUNDLED' })).toMatchObject({ props: { color: THEME.gold } })
-    const rule = await pane.find({ type: 'Box', key: 'rule' })
-    expect((rule?.children as Array<{ props: { backgroundColor: string } }>).map(bar => bar.props.backgroundColor)[0]).toBe(THEME.ember)
+    expect(await pane.find({ type: 'Box', key: 'head-surfaces' })).toBeUndefined()
+    expect(await pane.find({ type: 'Button', key: 'surfaces' })).toBeUndefined()
+    expect(await exact(pane, 'Engrams')).toBeUndefined()
+    expect(await pane.find({ type: 'Box', key: 'rule' })).toBeUndefined()
+    expect((await pane.findAll({ type: 'Text' })).filter(text => /BUNDLED/.test(String(text.text)))).toEqual([])
     await pane.unmount()
   })
 
-  test('the awake strip: the mood in amber, AWAKE, the name, where it draws, Details and Sleep', async ($, on) => {
+  test('the awake strip: AWAKE, the name, its mood and where it draws, Details and Sleep; no card repeats it', async ($, on) => {
     servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
@@ -170,14 +151,16 @@ describe('the picker', () => {
 
     const strip = await pane.find({ type: 'Box', key: 'strip' })
     expect(strip?.props).toMatchObject({ borderColor: THEME.line, backgroundColor: THEME.panel })
-    expect(await pane.find({ type: 'Text', text: 'IDLE' })).toMatchObject({ props: { color: THEME.amber } })
+    expect(await exact(pane, 'IDLE')).toBeUndefined()
     expect(await exact(pane, 'AWAKE')).toMatchObject({ props: { color: THEME.gold } })
+    expect((await pane.findAll({ type: 'Text' })).filter(text => text.text === 'AWAKE').length).toBe(1)
     expect(await exact(pane, 'Lich')).toMatchObject({ props: { bold: true, color: THEME.white } })
     expect(await exact(pane, 'Idle · drawing in Pane and Band')).toMatchObject({ props: { color: THEME.muted } })
-    // The awake card: the amber border and the AWAKE badge on its still.
+    // The awake card: the amber border, no badge and no button.
     expect(await pane.find({ type: 'Box', key: 'card:lich' })).toMatchObject({ props: { borderColor: THEME.amberLine } })
     expect(await pane.find({ type: 'Box', key: 'card:kraken' })).toMatchObject({ props: { borderColor: THEME.line, backgroundColor: THEME.card } })
-    expect(await pane.find({ type: 'Box', key: 'awake-badge' })).toBeDefined()
+    expect(await pane.find({ type: 'Box', key: 'awake-badge' })).toBeUndefined()
+    expect(await pane.find({ type: 'Button', key: 'sleep:lich' })).toBeUndefined()
 
     // Details opens the awake Engram's page; Sleep puts it to sleep, and the strip goes.
     await pane.press({ key: 'strip-details' })
@@ -219,6 +202,33 @@ describe('the picker', () => {
     await pane.unmount()
   })
 
+  test("a card's description is never clipped: it wraps in full, and its click area covers it", async ($, on) => {
+    servePackages(on)
+    on('ui.open', () => ({ value: { isPlaced: true as const } }))
+    on('ui.panes', () => ({ value: UNPLACED }))
+    on('ui.invalidate', () => ({ value: undefined }))
+    on('store.set', () => ({ value: undefined }))
+    on('clock.now', () => ({ value: NOW }))
+    await $.command.run({ command: 'awaken', args: 'kraken', ...TYPED })
+    const pane = await $.ui.mount(PANE)
+    await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
+    const abouts = await pane.findAll({ type: 'Box', key: 'about' })
+    expect(abouts.length).toBe(3)
+    for (const about of abouts) {
+      expect(about.props?.height).toBeUndefined()
+      expect(about.props?.overflow).toBeUndefined()
+      expect(about.props?.flexGrow).toBe(1)
+    }
+    // Two cards a row at 52 columns: 24 cells each, 22 inside, 20 for the words, so each description runs past two rows.
+    for (const id of ['wisp', 'kraken', 'lich']) {
+      const hit = await pane.find({ type: 'Client', key: `open:${id}` })
+      expect(Number(hit?.props?.height), id).toBeGreaterThanOrEqual(5 + 1 + 4)
+    }
+    // A row of cards stretches to its tallest.
+    expect(await pane.find({ type: 'Box', key: 'row:0' })).toMatchObject({ props: { alignItems: 'stretch' } })
+    await pane.unmount()
+  })
+
   test('every colour the picker draws is a theme colour', async ($, on) => {
     servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
@@ -254,7 +264,7 @@ describe('the picker', () => {
 })
 
 describe('the picker in the terminal', () => {
-  test('the same screen in plain text: header, title, awake strip, chips and cards, no Svg and no Client', async ($, on) => {
+  test('the same screen in plain text: header, awake strip, chips and cards, no Svg and no Client', async ($, on) => {
     servePackages(on)
     on('ui.open', () => ({ value: { isPlaced: true as const } }))
     on('ui.panes', () => ({ value: UNPLACED }))
@@ -271,17 +281,18 @@ describe('the picker in the terminal', () => {
     expect(await term.findAll({ type: 'Svg' })).toEqual([])
     expect(await term.findAll({ type: 'Client' })).toEqual([])
     expect(await term.find({ type: 'Text', text: 'EIDOLA' })).toMatchObject({ props: { bold: true, color: THEME.gold } })
-    expect(await term.find({ type: 'Button', key: 'surfaces' })).toBeDefined()
-    expect(await term.find({ type: 'Text', text: 'Engrams' })).toBeDefined()
-    expect(await term.find({ type: 'Text', text: '3 BUNDLED' })).toBeDefined()
+    expect(await term.find({ type: 'Button', key: 'surfaces' })).toBeUndefined()
+    expect(await exact(term, 'Engrams')).toBeUndefined()
+    expect(await term.find({ type: 'Button', key: 'picker-back' })).toBeDefined()
     expect(await exact(term, 'AWAKE')).toMatchObject({ props: { color: THEME.gold } })
-    expect(await exact(term, 'IDLE')).toMatchObject({ props: { color: THEME.amber } })
+    expect(await exact(term, 'IDLE')).toBeUndefined()
     expect(await exact(term, 'Idle · drawing in Pane and Band')).toBeDefined()
     expect((await term.findAll({ type: 'Button' })).filter(b => String(b.key).startsWith('filter:')).map(b => b.props.label)).toEqual(['ALL 3', 'PANE 2', 'BAND 3', 'YOURS 0'])
     for (const id of ['wisp', 'lich']) {
       expect(await term.find({ type: 'Button', key: `awaken:${id}` })).toBeDefined()
     }
-    expect(await term.find({ type: 'Button', key: 'sleep:kraken' })).toBeDefined()
+    expect(await term.find({ type: 'Button', key: 'sleep:kraken' })).toBeUndefined()
+    expect(await term.find({ type: 'Button', key: 'strip-sleep' })).toBeDefined()
     expect(await term.find({ type: 'Text', text: 'band only' })).toBeDefined()
 
     // A card's name opens its page, in text too.
@@ -315,9 +326,9 @@ describe('ways in', () => {
     expect((await $.command.run({ command: 'engrams', args: '', ...TYPED })).text).toBe('The Engram picker is open in the pane.')
     expect(opened).toContain('eidola')
     const pane = await $.ui.mount(PANE)
-    expect(await pane.find({ type: 'Text', text: '3 BUNDLED' })).toBeDefined()
-    expect(await pane.find({ type: 'Button', key: 'sleep:kraken' })).toBeDefined()
-    expect(await pane.find({ type: 'Client', key: 'frame-corner' })).toMatchObject({ props: { props: { isOpen: true } } })
+    expect(await pane.find({ type: 'Button', key: 'picker-back' })).toBeDefined()
+    expect(await pane.find({ type: 'Button', key: 'strip-sleep' })).toBeDefined()
+    expect(await pane.find({ type: 'Client', key: 'frame-corner' })).toBeUndefined()
     await pane.unmount()
   })
 
@@ -381,7 +392,7 @@ describe('ways in', () => {
       expect(opened).toEqual(['eidola'])
       expect((await band.find({ type: 'Client', key: 'band-corner' }))?.props?.props).toMatchObject({ isOpen: true })
       const pane = await $.ui.mount(PANE)
-      expect(await pane.find({ type: 'Text', text: '3 BUNDLED' })).toBeDefined()
+      expect(await pane.find({ type: 'Button', key: 'picker-back' })).toBeDefined()
       await pane.unmount()
       await band.unmount()
     })
@@ -536,7 +547,7 @@ describe('the Yours view', () => {
         await desk.unmount()
       }
       const pane = surface === 'desktop' ? desk : await $.ui.mount(TERMINAL)
-      expect(await pane.find({ type: 'Text', text: '3 BUNDLED · 2 YOURS' })).toBeDefined()
+      expect(await pane.find({ type: 'Button', key: 'filter:yours' })).toMatchObject({ props: { label: 'YOURS 2' } })
       expect((await pane.findAll({ type: 'Button' })).filter(b => String(b.key).startsWith('filter:')).map(b => b.props.label)).toEqual(['ALL 5', 'PANE 4', 'BAND 5', 'YOURS 2'])
       await pane.press({ key: 'filter:yours' })
       expect(await pane.find({ type: 'Box', key: 'chip-filter:yours' })).toMatchObject({ props: { borderColor: THEME.amberLine, backgroundColor: THEME.amberFill } })
@@ -545,7 +556,7 @@ describe('the Yours view', () => {
       // The New Engram tile, first.
       expect(await pane.find({ type: 'Box', key: 'new-engram' })).toMatchObject({ props: { borderStyle: 'dashed', borderColor: THEME.line } })
       expect(await exact(pane, 'New Engram')).toMatchObject({ props: { bold: true, color: THEME.white } })
-      expect(await pane.find({ type: 'Button', key: 'new-engram-create' })).toMatchObject({ props: { label: 'CREATE WITH CLAUDE', variant: 'primary' } })
+      expect(await pane.find({ type: 'Button', key: 'new-engram-create' })).toMatchObject({ props: { label: 'Create with Claude', variant: 'secondary' } })
       expect(await pane.find({ type: 'Button', key: 'new-engram-remix' })).toMatchObject({ props: { label: 'or remix one' } })
 
       // Yours, working: YOURS, Remix of the Kraken, Edit with Claude and Awaken.
@@ -553,7 +564,7 @@ describe('the Yours view', () => {
       expect(await exact(pane, 'YOURS')).toMatchObject({ props: { color: THEME.gold } })
       expect(await exact(pane, 'Remix of Kraken')).toMatchObject({ props: { color: THEME.faint } })
       expect(await pane.find({ type: 'Button', key: 'edit:fixture' })).toMatchObject({ props: { label: '✎', variant: 'secondary' } })
-      expect(await pane.find({ type: 'Button', key: 'awaken:fixture' })).toMatchObject({ props: { label: 'AWAKEN' } })
+      expect(await pane.find({ type: 'Button', key: 'awaken:fixture' })).toMatchObject({ props: { label: 'Awaken' } })
 
       // Yours, broken: an ember outline, NOT LOADING, its file and line, and Fix with Claude alone.
       expect(await pane.find({ type: 'Box', key: 'card:falling' })).toMatchObject({ props: { borderColor: THEME.ember } })
@@ -607,7 +618,7 @@ describe('the Yours view', () => {
       }
       const pane = surface === 'desktop' ? desk : await $.ui.mount(TERMINAL)
       // Counted under Yours alone: neither draws anywhere.
-      expect(await pane.find({ type: 'Text', text: '3 BUNDLED · 2 YOURS' })).toBeDefined()
+      expect(await pane.find({ type: 'Button', key: 'filter:yours' })).toMatchObject({ props: { label: 'YOURS 2' } })
       expect((await pane.findAll({ type: 'Button' })).filter(b => String(b.key).startsWith('filter:')).map(b => b.props.label)).toEqual(['ALL 3', 'PANE 2', 'BAND 3', 'YOURS 2'])
       expect(await pane.find({ type: 'Box', key: 'card:plugin:refused-engram' })).toBeUndefined()
       await pane.press({ key: 'filter:yours' })
@@ -652,7 +663,7 @@ describe('the Yours view', () => {
         await desk.unmount()
       }
       const pane = surface === 'desktop' ? desk : await $.ui.mount(TERMINAL)
-      expect(await pane.find({ type: 'Text', text: '3 BUNDLED' })).toBeDefined()
+      expect(await pane.find({ type: 'Button', key: 'picker-back' })).toBeDefined()
       await pane.press({ key: 'filter:yours' })
       expect(await pane.find({ type: 'Box', key: 'yours-empty' })).toMatchObject({ props: { borderStyle: 'dashed', borderColor: THEME.line } })
       expect(await exact(pane, 'Make your own Engram')).toMatchObject({ props: { bold: true, color: THEME.white } })

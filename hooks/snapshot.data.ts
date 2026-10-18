@@ -18,7 +18,7 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "description": "Something vast in the deep water beside your work. It surfaces when there is work to do.",
     "button": {
       "key": "awaken:kraken",
-      "label": "AWAKEN"
+      "label": "Awaken"
     },
     "listedUnder": [
       "all",
@@ -33,7 +33,7 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "description": "A crowned skull of alchemical signs, soul-fire in its sockets. It burns brighter while you work.",
     "button": {
       "key": "awaken:lich",
-      "label": "AWAKEN"
+      "label": "Awaken"
     },
     "listedUnder": [
       "all",
@@ -48,7 +48,7 @@ export const SNAPSHOTS: Record<string, unknown> = {
     "description": "A will-o'-the-wisp in a night fen. It flies where it likes, its ghost fire burning the colour of your work, and speaks in flickers.",
     "button": {
       "key": "awaken:wisp",
-      "label": "AWAKEN"
+      "label": "Awaken"
     },
     "listedUnder": [
       "all",

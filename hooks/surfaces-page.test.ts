@@ -202,32 +202,25 @@ describe('the Surfaces screen', () => {
     await pane.unmount()
   })
 
-  test('the Surfaces button and link open it over the picker and a page; back returns to each', async ($, on) => {
+  test("a page's Where it draws link opens it; back steps back screen by screen", async ($, on) => {
     const session = engine(on)
     await $.command.run({ command: 'awaken', args: 'lich', ...TYPED })
     const pane = await $.ui.mount(PANE)
     await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
 
-    // From the picker's header.
-    await pane.press({ key: 'surfaces' })
-    expect(await pane.find({ type: 'Box', key: 'surfaces-page' })).toBeDefined()
-    expect(await pane.find({ type: 'Button', key: 'awaken:kraken' })).toBeUndefined()
-    await pane.press({ key: 'surfaces-back' })
-    expect(await pane.find({ type: 'Box', key: 'surfaces-page' })).toBeUndefined()
-    expect(await pane.find({ type: 'Button', key: 'awaken:kraken' })).toBeDefined()
-
-    // From a page's "Where it draws" link: back to the page.
+    // The picker's header has no Surfaces button; a page's link is the way.
+    expect(await pane.find({ type: 'Button', key: 'surfaces' })).toBeUndefined()
     await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'open:kraken' })
     await pane.press({ key: 'page-surfaces' })
     expect(await pane.find({ type: 'Box', key: 'surfaces-page' })).toBeDefined()
+    expect(await pane.find({ type: 'Client', key: 'frame-corner' })).toBeUndefined()
+
+    // Back: to the page, then the picker, then the Lich.
     await pane.press({ key: 'surfaces-back' })
     expect(await pane.find({ type: 'Box', key: 'page:kraken' })).toBeDefined()
-
-    // The corner closes every screen at once, back to the Lich.
-    await pane.press({ key: 'surfaces' })
-    await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'frame-corner' })
-    expect(await pane.find({ type: 'Box', key: 'surfaces-page' })).toBeUndefined()
-    expect(await pane.find({ type: 'Box', key: 'page:kraken' })).toBeUndefined()
+    await pane.press({ key: 'page-back' })
+    expect(await pane.find({ type: 'Button', key: 'awaken:kraken' })).toBeDefined()
+    await pane.press({ key: 'picker-back' })
     expect(await pane.find({ type: 'Client', key: 'lich-0' })).toBeDefined()
 
     // Opened by /eidola place, back returns to the awake Engram; nothing toasts.

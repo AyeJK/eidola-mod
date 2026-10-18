@@ -168,7 +168,7 @@ export function surfacesPage(kit: Kit, input: SurfacesInput): RenderElement {
   )
   return (
     <Box key="surfaces-page" flexDirection="column" width={kit.cols} paddingX={1} gap={1} backgroundColor={THEME.void}>
-      {header(kit, { key: 'surfaces-back', ...input.back }, surfaces, () => undefined)}
+      {header(kit, { key: 'surfaces-back', ...input.back })}
       {titleBlock(kit, 'Surfaces', `${onCount} of 2 on`)}
       {isAllOff ? (
         <Box key="surfaces-warning" flexDirection="column" borderStyle="round" borderColor={THEME.ember} backgroundColor={THEME.panel} paddingX={1}>

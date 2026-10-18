@@ -53,12 +53,10 @@ import {
   drawingLine,
   engramPage,
   header,
+  button,
   label,
   previewRows,
-  primaryButton,
-  secondaryButton,
   surfaceIcon,
-  titleBlock,
 } from './engram-page'
 import type { Els, Kit } from './engram-page'
 import { surfacesPage } from './surfaces-page'
@@ -831,7 +829,7 @@ async function setEngram($: EngineInterface, id: string | null): Promise<void> {
         await update($, pageAtom, () => null)
         await $.ui.close({ id: PANE })
       } else {
-        await $.ui.open({ id: PANE, title: paneTitle(engram) })
+        await $.ui.open({ id: PANE, title: PANE_TITLE })
       }
     }
   } catch {
@@ -841,10 +839,8 @@ async function setEngram($: EngineInterface, id: string | null): Promise<void> {
   $.ui.invalidate('ui.render')
 }
 
-/** The pane's title: the awake Engram's name, else Eidola. */
-function paneTitle(engram: Engram | undefined): string {
-  return engram ? engram.name : 'Eidola'
-}
+/** The pane's title: always Eidola, whichever Engram is awake; the status line names the Engram. */
+const PANE_TITLE = 'Eidola'
 
 // With "hide the band while the pane is open" on, the band steps aside while
 // the pane is placed. Every open and close redraws it to keep that true.
@@ -859,7 +855,7 @@ async function isPanePlaced($: EngineInterface): Promise<boolean> {
 }
 
 async function openPane($: EngineInterface) {
-  const opened = await $.ui.open({ id: PANE, title: paneTitle(await engramOf($, await read($, engramAtom))) })
+  const opened = await $.ui.open({ id: PANE, title: PANE_TITLE })
   $.ui.invalidate('ui.render')
   return opened
 }
@@ -1220,13 +1216,13 @@ function stillView(engram: Engram): 'pane' | 'band' {
 }
 
 /**
- * The awake strip: a small still with the mood in amber, the "AWAKE" label,
- * the name, where it draws now, and Details and Sleep.
+ * The awake strip: a small still, the "AWAKE" label, the name, its mood and
+ * where it draws now, and Details and Sleep. The picker says "awake" here
+ * alone; the cards below don't repeat it.
  */
 async function awakeStrip($: EngineInterface, kit: Kit, awake: Engram): Promise<RenderElement> {
   const { Box, Text, Svg } = kit.els
   const state = MOOD_STATE[await read($, moodAtom)]
-  const mood = FRAME_STATES[state].name
   let still: RenderElement | null = null
   if (kit.isRich) {
     const width = STRIP_THUMB.cols * PX_PER_COLUMN
@@ -1236,11 +1232,6 @@ async function awakeStrip($: EngineInterface, kit: Kit, awake: Engram): Promise<
     still = (
       <Box key="strip-thumb" width={STRIP_THUMB.cols} height={STRIP_THUMB.rows} overflow="hidden" backgroundColor={THEME.void}>
         <Svg key={`strip-thumb:${awake.id}:${view}`} source={thumb.svg} alt={`${awake.name}, awake`} width={width} height={height} />
-        <Box key="strip-mood" position="absolute" top={0} left={0}>
-          <Text bold color={THEME.amber}>
-            {mood}
-          </Text>
-        </Box>
       </Box>
     )
   }
@@ -1249,14 +1240,7 @@ async function awakeStrip($: EngineInterface, kit: Kit, awake: Engram): Promise<
       <Box key="strip-left" flexDirection="row" alignItems="center" gap={1}>
         {still}
         <Box key="strip-text" flexDirection="column">
-          <Box key="strip-labels" flexDirection="row" gap={1}>
-            {label(kit, 'Awake', 'strip-label')}
-            {kit.isRich ? null : (
-              <Text key="strip-mood" bold color={THEME.amber}>
-                {mood}
-              </Text>
-            )}
-          </Box>
+          {label(kit, 'Awake', 'strip-label')}
           <Text key="strip-name" bold color={THEME.white}>
             {awake.name}
           </Text>
@@ -1266,11 +1250,29 @@ async function awakeStrip($: EngineInterface, kit: Kit, awake: Engram): Promise<
         </Box>
       </Box>
       <Box key="strip-actions" flexDirection="row" gap={1}>
-        {secondaryButton(kit, 'strip-details', 'Details', () => void openPage($, awake.id))}
-        {secondaryButton(kit, 'strip-sleep', 'Sleep', () => void setEngram($, null))}
+        {button(kit, 'strip-details', 'Details', () => void openPage($, awake.id))}
+        {button(kit, 'strip-sleep', 'Sleep', () => void setEngram($, null))}
       </Box>
     </Box>
   )
+}
+
+/**
+ * The rows `text` wraps to in `cols` cells, word by word, as a card's
+ * description does: enough for its click area to cover it.
+ */
+function wrappedRows(text: string, cols: number): number {
+  let rows = 1
+  let used = 0
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (used && used + 1 + word.length > cols) {
+      rows += 1
+      used = word.length
+    } else {
+      used += (used ? 1 : 0) + word.length
+    }
+  }
+  return rows
 }
 
 /** Edit with Claude's icon on a card of yours: a pencil. */
@@ -1297,7 +1299,7 @@ type Broken = {
 async function notLoadingCard($: EngineInterface, kit: Kit, broken: Broken, cardCols: number): Promise<RenderElement> {
   const { Box, Text, Button, Svg, Client } = kit.els as Elements['desktop']
   const { key, name, where, engram } = broken
-  const fix = secondaryButton(kit, `fix:${key}`, 'Fix with Claude', withClaude($, broken.fix))
+  const fix = button(kit, `fix:${key}`, 'Fix with Claude', withClaude($, broken.fix))
   if (!kit.isRich) {
     return (
       <Box key={`card:${key}`} flexDirection="column" width={cardCols} borderStyle="round" borderColor={THEME.ember} paddingX={1}>
@@ -1344,7 +1346,7 @@ async function notLoadingCard($: EngineInterface, kit: Kit, broken: Broken, card
           {name}
         </Text>
       </Box>
-      <Box key="about" height={2} overflow="hidden" paddingX={1}>
+      <Box key="about" flexGrow={1} paddingX={1}>
         <Text color={THEME.muted} wrap="wrap">
           {where}
         </Text>
@@ -1355,7 +1357,7 @@ async function notLoadingCard($: EngineInterface, kit: Kit, broken: Broken, card
       </Box>
       {engram ? (
         <Box key="hit" position="absolute" top={0} left={0}>
-          <Client key={`open:${key}`} module="./card-hit.tsx" props={{ id: engram.id }} width={inner} height={box.rows + 3} />
+          <Client key={`open:${key}`} module="./card-hit.tsx" props={{ id: engram.id }} width={inner} height={box.rows + 1 + wrappedRows(where, inner - 2)} />
         </Box>
       ) : null}
     </Box>
@@ -1363,10 +1365,11 @@ async function notLoadingCard($: EngineInterface, kit: Kit, broken: Broken, card
 }
 
 /**
- * An Engram's card: its still (with an "AWAKE" badge on the awake one), its
- * name, two lines of what it is, and a footer of the surfaces it can draw on,
- * where it shows, and Awaken or Sleep. The card's body opens its page; the
- * button acts at once. In text, the name is the way to the page.
+ * An Engram's card: its still, its name, what it is (wrapped in full), and a
+ * footer of the surfaces it can draw on, where it shows, and Awaken. The
+ * awake one has an amber border and no button: the awake strip above says it
+ * is awake and puts it to sleep. The card's body opens its page; the button
+ * acts at once. In text, the name is the way to the page.
  *
  * One of yours has a "YOURS" badge by its name, "Remix of …" under it, and
  * Edit with Claude, an icon button, before Awaken; one marked not loading is
@@ -1382,16 +1385,16 @@ async function engramCard($: EngineInterface, kit: Kit, engram: Engram, awake: E
   const isAwake = awake?.id === id
   const isMine = isYours(engram)
   const awaken = isAwake
-    ? secondaryButton(kit, `sleep:${id}`, 'Sleep', () => void setEngram($, null))
-    : primaryButton(kit, `awaken:${id}`, 'Awaken', async () => {
+    ? null
+    : button(kit, `awaken:${id}`, 'Awaken', async () => {
         await setEngram($, id)
         await update($, pickerAtom, () => false)
       })
   // Edit with Claude: a square icon button, a pencil. A Button takes its label
   // alone, so the pencil is its label and its name.
-  const button = isMine ? (
+  const actions = isMine ? (
     <Box key="foot-buttons" flexDirection="row" gap={1}>
-      {secondaryButton(kit, `edit:${id}`, EDIT_ICON, withClaude($, `edit ${id}`))}
+      {button(kit, `edit:${id}`, EDIT_ICON, withClaude($, `edit ${id}`))}
       {awaken}
     </Box>
   ) : (
@@ -1422,11 +1425,6 @@ async function engramCard($: EngineInterface, kit: Kit, engram: Engram, awake: E
       <Box key={`card:${id}`} flexDirection="column" width={cardCols} borderStyle="round" borderColor={border} paddingX={1}>
         <Box key="name" flexDirection="row" gap={1}>
           <Button key={`open:${id}`} label={engram.name} plain onPress={() => void openPage($, id)} />
-          {isAwake ? (
-            <Text key="awake-badge" bold color={THEME.amber}>
-              AWAKE
-            </Text>
-          ) : null}
           {yoursBadge}
         </Box>
         {remixLine}
@@ -1435,7 +1433,7 @@ async function engramCard($: EngineInterface, kit: Kit, engram: Engram, awake: E
         </Text>
         <Box key="foot" flexDirection="row" flexWrap="wrap" justifyContent="space-between" alignItems="center" gap={1}>
           {shows}
-          {button}
+          {actions}
         </Box>
       </Box>
     )
@@ -1450,13 +1448,6 @@ async function engramCard($: EngineInterface, kit: Kit, engram: Engram, awake: E
     <Box key={`card:${id}`} flexDirection="column" width={cardCols} borderStyle="round" borderColor={border} backgroundColor={THEME.card} hover={{ borderColor: THEME.amberLine }}>
       <Box key="thumb" width={inner} height={box.rows} alignItems="center" justifyContent="center" backgroundColor={THEME.void}>
         <Svg key={`thumb:${id}:${view}:${thumbW}x${thumbH}`} source={thumb.svg} alt={`${engram.name}, ${view} view`} width={Math.min(thumb.width, thumbW)} height={thumbH} />
-        {isAwake ? (
-          <Box key="awake-badge" position="absolute" top={0} left={1} backgroundColor={THEME.void} borderStyle="round" borderColor={THEME.amberLine}>
-            <Text bold color={THEME.amber}>
-              AWAKE
-            </Text>
-          </Box>
-        ) : null}
       </Box>
       <Box key="name" flexDirection="row" gap={1} paddingX={1}>
         <Text bold color={THEME.white}>
@@ -1465,7 +1456,7 @@ async function engramCard($: EngineInterface, kit: Kit, engram: Engram, awake: E
         {yoursBadge}
       </Box>
       {remixLine}
-      <Box key="about" height={2} overflow="hidden" paddingX={1}>
+      <Box key="about" flexGrow={1} paddingX={1}>
         <Text color={THEME.muted} wrap="wrap">
           {engram.description}
         </Text>
@@ -1478,11 +1469,11 @@ async function engramCard($: EngineInterface, kit: Kit, engram: Engram, awake: E
           </Box>
           {shows}
         </Box>
-        {button}
+        {actions}
       </Box>
       {/* The body, over the still, the name and the description: a click opens the page. */}
       <Box key="hit" position="absolute" top={0} left={0}>
-        <Client key={`open:${id}`} module="./card-hit.tsx" props={{ id }} width={inner} height={box.rows + 3 + (remixLine ? 1 : 0)} />
+        <Client key={`open:${id}`} module="./card-hit.tsx" props={{ id }} width={inner} height={box.rows + 1 + (remixLine ? 1 : 0) + wrappedRows(engram.description, inner - 2)} />
       </Box>
     </Box>
   )
@@ -1519,7 +1510,7 @@ function makeTile($: EngineInterface, kit: Kit, key: string, title: string, line
           {line}
         </Text>
       </Box>
-      {primaryButton(kit, `${key}-create`, 'Create with Claude', withClaude($, 'new'))}
+      {button(kit, `${key}-create`, 'Create with Claude', withClaude($, 'new'))}
       <Button key={`${key}-remix`} label="or remix one" plain onPress={showAll($)} />
     </Box>
   )
@@ -1539,11 +1530,11 @@ function skippedBroken(): Broken[] {
 }
 
 /**
- * The picker: the header, the "Engrams" title with its count and rule, the
- * awake strip, the filter chips with their counts, and the Engrams as cards.
- * Opened and closed by the corner triangle. The Yours filter shows the New
- * Engram tile, then your Engrams, those not loading as such; with none of
- * yours, the empty state.
+ * The picker: the header, the awake strip, the filter chips with their
+ * counts, and the Engrams as cards, each row as tall as its tallest card.
+ * Opened by the corner triangle or /engrams; left by the header's back
+ * button alone. The Yours filter shows the New Engram tile, then your
+ * Engrams, those not loading as such; with none of yours, the empty state.
  */
 async function picker($: EngineInterface, kit: Kit, rows: number, awake: Engram | undefined): Promise<RenderElement> {
   const { Box, Text } = kit.els
@@ -1568,15 +1559,14 @@ async function picker($: EngineInterface, kit: Kit, rows: number, awake: Engram 
   const lines: RenderElement[] = []
   for (let i = 0; i < cards.length; i += perRow) {
     lines.push(
-      <Box key={`row:${i}`} flexDirection="row" gap={gap}>
+      <Box key={`row:${i}`} flexDirection="row" alignItems="stretch" gap={gap}>
         {cards.slice(i, i + perRow)}
       </Box>,
     )
   }
   return (
-    <Box flexDirection="column" width={cols} minHeight={rows} paddingLeft={1} paddingRight={1} gap={1} backgroundColor={THEME.void}>
-      {header(kit, { key: 'picker-back', onPress: () => void closePicker($, awake) }, surfaces, () => void showSurfaces($))}
-      {titleBlock(kit, 'Engrams', `${bundled} bundled${yours ? ` · ${yours} yours` : ''}`)}
+    <Box flexDirection="column" width={cols} minHeight={rows} paddingX={1} paddingY={1} gap={1} backgroundColor={THEME.void}>
+      {header(kit, { key: 'picker-back', onPress: () => void closePicker($, awake) })}
       {awake ? await awakeStrip($, kit, awake) : null}
       <Box key="filters" flexDirection="row" flexWrap="wrap" gap={1}>
         {PICKER_FILTERS.map(one => chip(kit, `filter:${one}`, `${FILTER_LABELS[one]} ${counted(one)}`, one === filter, () => void update($, pickerFilterAtom, () => one)))}
@@ -2305,15 +2295,20 @@ export const register: Register = (on, options) => {
     }
     const els = $.ui.resolve(e) as Elements['desktop']
     const kit: Kit = { els, isRich: true, cols }
+    // A screen (Surfaces, a page, the picker) is as tall as it needs, the
+    // pane scrolling it, with no corner: back is the header's button.
+    if (isSurfaces) {
+      return surfacesScreen($, kit, awake)
+    }
+    if (page) {
+      return pageScreen($, kit, page, awake)
+    }
+    if (isPicking) {
+      return picker($, kit, rows, awake)
+    }
     const brass = awake?.vessel.hud?.bracket ?? FRAME_GOLD
     let body: RenderElement
-    if (isSurfaces) {
-      body = surfacesScreen($, kit, awake)
-    } else if (page) {
-      body = await pageScreen($, kit, page, awake)
-    } else if (isPicking) {
-      body = await picker($, kit, rows, awake)
-    } else if (awake && drawsBandViewInPane(awake) && !isSelfDrawn(awake)) {
+    if (awake && drawsBandViewInPane(awake) && !isSelfDrawn(awake)) {
       // One that doesn't show in the pane, the pane opened by hand: its band
       // view, across the middle of the pane.
       const { Box } = els
@@ -2337,7 +2332,7 @@ export const register: Register = (on, options) => {
       <Box width={cols} height={rows}>
         {body}
         <Box key="corner" position="absolute" top={rows - 2} left={cols - 3}>
-          <Client key="frame-corner" module="./frame-corner.tsx" props={{ colour: brass, isOpen: isPicking || page !== undefined || isSurfaces }} width={3} height={2} />
+          <Client key="frame-corner" module="./frame-corner.tsx" props={{ colour: brass, isOpen: false }} width={3} height={2} />
         </Box>
       </Box>
     )

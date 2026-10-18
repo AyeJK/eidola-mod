@@ -66,9 +66,9 @@ describe('the Engram page', () => {
     await pane.pointer({ type: 'down', x: 2, y: 1, button: 'left', in: 'open:lich' })
     expect(await pane.find({ type: 'Box', key: 'page:lich' })).toBeDefined()
     expect(await pane.find({ type: 'Box', key: 'card:wisp' })).toBeUndefined()
-    // The live scene in its preview, and the corner still there to close it all.
+    // The live scene in its preview; no corner on a page: back is the header's button.
     expect(await pane.find({ type: 'Client', key: 'preview-lich' })).toBeDefined()
-    expect(await pane.find({ type: 'Client', key: 'frame-corner' })).toBeDefined()
+    expect(await pane.find({ type: 'Client', key: 'frame-corner' })).toBeUndefined()
 
     await pane.press({ key: 'page-back' })
     expect(await pane.find({ type: 'Box', key: 'page:lich' })).toBeUndefined()
@@ -102,7 +102,7 @@ describe('the Engram page', () => {
     const rule = await pane.find({ type: 'Box', key: 'about-rule' })
     expect((rule?.children as Array<{ props: { backgroundColor: string } }>).map(bar => bar.props.backgroundColor)).toEqual([...RULE])
     expect(await pane.find({ type: 'Text', text: 'A crowned skull' })).toMatchObject({ props: { color: THEME.body } })
-    expect(await pane.find({ type: 'Button', key: 'page-awaken' })).toMatchObject({ props: { label: 'AWAKEN', variant: 'primary' } })
+    expect(await pane.find({ type: 'Button', key: 'page-awaken' })).toMatchObject({ props: { label: 'Awaken', variant: 'secondary' } })
 
     // Where it draws, from the surfaces setting: the defaults put the Lich in the pane and the band.
     expect(await pane.find({ type: 'Box', key: 'where' })).toMatchObject({ props: { borderColor: THEME.line, backgroundColor: THEME.panel } })

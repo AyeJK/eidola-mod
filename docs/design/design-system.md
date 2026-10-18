@@ -20,7 +20,7 @@ The pane draws with the engine's elements: `Box`, `Text`, `Button`, `Svg`, `Clie
 | Alpha colours (`rgba(...)`) | Solid hex, already blended over the void background. Use the hex column below. |
 | Pixel sizes and gaps | Cells. 1 cell across ≈ 8 px, 1 row ≈ 19 px. Gaps are 1 cell or 1 row. |
 | Rounded 8–12 px corners | `borderStyle="round"` on a `Box`. |
-| Gradients (gold button, ember rule) | Gold button: `Button variant="primary"` with the gold colour. Ember rule: a row of 3 to 5 short `Box`es stepping ember → amber → gold, or an `Svg` line. |
+| Gradients (gold button, ember rule) | No gold button: every button is `Button variant="secondary"` (the engine's primary is a white fill, louder than the cards). Ember rule: a row of 3 to 5 short `Box`es stepping ember → amber → gold, or an `Svg` line. |
 | Glow and shadows | Leave out. Use a brighter border instead. |
 | Hover states | `Box` `hover` with a keyed `Box`; keep to borders and text colour. |
 
@@ -76,20 +76,20 @@ Gold is for labels and brand; amber means "selected" or "on". Don't swap them.
 
 Each matches an element on the canvas.
 
-**Header.** A back button (1 cell `‹`, secondary style), then the wordmark. On the right, the Surfaces button: the word "Surfaces" plus three surface icons, amber when on and faint when off.
+**Header.** A back button (1 cell `‹`, secondary style), then the wordmark. Nothing on the right. The pane's title is always "Eidola", whichever Engram is awake.
 
-**Title and rule.** The screen title, then the count label on the same row at the right ("3 BUNDLED · 1 YOURS"). Below them, the accent rule: about 15 cells wide, ember → amber → gold, fading out.
+**Title and rule** (Surfaces screen only; the picker has none). The screen title, then the count label on the same row at the right ("1 OF 2 ON"). Below them, the accent rule: about 15 cells wide, ember → amber → gold, fading out.
 
-**Awake strip.** A panel holding a small thumbnail with "IDLE" in amber at its top left, then the "AWAKE" label, the name and "Idle · drawing in Pane and Band". Details and Sleep buttons on the right.
+**Awake strip.** A panel holding a small thumbnail, then the "AWAKE" label, the name and "Idle · drawing in Pane and Band". Details and Sleep buttons on the right. The picker says "awake" here and nowhere else.
 
 **Filter chips.** One row of chips with counts: All, Pane, Band, Shrine, Yours. Unselected: `line` border, faint text. Selected: `amber-line` border, `amber-fill` background, amber text.
 
 **Engram card.** `card` background, rounded border:
 - the thumbnail at 16:9 (the Wisp's band strip is shown letterboxed)
 - name, plus a "YOURS" badge (gold text, `line` border) for yours
-- a two-line description
-- a footer, above a `line-soft` divider: the three surface icons (amber if the Engram can draw there, `#2e2d2e` if not), the short "pane + band" text, and Awaken (primary) or Sleep (secondary)
-- the awake card's border is `amber-line`, with an "AWAKE" badge on its thumbnail
+- the description, wrapped in full, never clipped; every card in a row stretches to the tallest, its footer at the bottom
+- a footer, above a `line-soft` divider: the three surface icons (amber if the Engram can draw there, `#2e2d2e` if not), the short "pane + band" text, and Awaken
+- the awake card's border is `amber-line`; it has no badge and no button (the awake strip has Sleep)
 
 Clicking the card opens the Engram page; the button does not.
 
@@ -102,21 +102,20 @@ Clicking the card opens the Engram page; the button does not.
 **Check.** An 18 × 18 px box (1 cell) instead of a native checkbox. Off: `line` border. On: `amber-line` border, `amber-fill`, an amber tick. The label sits to its right in frost.
 
 **Buttons.**
-- **Primary** (Awaken, Create with Claude, Open in NZXT CAM): `Button variant="primary"`, gold, UPPERCASE.
-- **Secondary** (Details, Sleep, Copy, Remix with Claude, Fix with Claude, Publish): a `gold-line` border, frost text, normal case.
+- **One style** for every button (Awaken, Sleep, Details, Create with Claude, Copy, Remix with Claude, Fix with Claude, Publish): `Button variant="secondary"`, normal case. No primary fill.
 - **Icon** (Edit with Claude on a card): a square secondary button with one icon and an accessible label. Use it when a card footer would otherwise hold three buttons.
 - A card footer holds at most two buttons, and button text never wraps.
 - **Error** (Engram page only): an `ember` border, error-text colour.
 
 **HUD preview** (Engram page). The live scene in a `#020308` frame with a 1-cell gold corner mark in each corner. At the top left, "EIDOLA · LICH" small, the mood in bold amber UPPERCASE, and a short line under it. At the top right, "PREVIEW · NOT AWAKE". Under the preview, one row: three mood chips (Idle, Working, Attention), then the Error button set apart from them.
 
-**New Engram tile.** The first tile in the Yours grid, the same size as a card: a dashed `line` border, centred, a round amber "+" mark, "New Engram" in bold white, one muted line, Create with Claude (primary) and an "or remix one" link back to the picker.
+**New Engram tile.** The first tile in the Yours grid, the same size as a card: a dashed `line` border, centred, a round amber "+" mark, "New Engram" in bold white, one muted line, Create with Claude and an "or remix one" link back to the picker.
 
 **Your Engram card.** As an Engram card, with "Remix of …" in faint mono under the name, and a footer of an Edit with Claude icon button and Awaken.
 
 **Not-loading card.** As an Engram card, with an `ember` outline, the thumbnail dimmed, a "NOT LOADING" badge in error-text, the file and line in the description, and Fix with Claude as the only button. No separate error panel.
 
-**Empty state.** A dashed `line` border, centred: the round amber "+", "Make your own Engram", one muted line, Create with Claude (primary) and "or remix one". Keep it to that: no instructions or steps on the screen.
+**Empty state.** A dashed `line` border, centred: the round amber "+", "Make your own Engram", one muted line, Create with Claude and "or remix one". Keep it to that: no instructions or steps on the screen.
 
 ---
 
@@ -126,10 +125,10 @@ Clicking the card opens the Engram page; the button does not.
 |--------|----------|-------------------|
 | Picker | Picker · All | The corner triangle on the pane or any band; `/engrams` |
 | Engram page | Engram page · Lich | Click a card; Details on the awake strip; `/engrams <id>` |
-| Surfaces | Surfaces | The Surfaces button; `/eidola place` with no arguments |
+| Surfaces | Surfaces | The Surfaces link on an Engram page's Where it draws panel; `/eidola place` with no arguments |
 | Yours | Yours, Yours · empty | The Yours filter |
 
-The back button always returns to the screen before. From the picker it closes the picker and shows the awake Engram again.
+The back button always returns to the screen before, and it is the only way back: a screen draws no corner triangle. From the picker it closes the picker and shows the awake Engram again. A screen is as tall as it needs; the pane scrolls it.
 
 ---
 
